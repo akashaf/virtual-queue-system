@@ -1,0 +1,3 @@
+# Web push plus in-page alerts, not WhatsApp or SMS, for MVP
+
+Customers are alerted by Web Push where the browser supports it, plus in-page sound, vibration and title flashing while the queue page is open. iOS Safari only delivers Web Push to sites installed to the Home Screen (iOS 16.4+), which walk-in customers will not do, so many iPhone users get in-page alerts only. We accept that gap for the MVP because WhatsApp (Meta Cloud API) needs business verification, customer phone numbers and a per-message fee, and SMS costs eat into the RM0.25 per Served Ticket margin. WhatsApp is the planned phase 2 upgrade.

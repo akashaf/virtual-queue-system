@@ -1,0 +1,3 @@
+# Customers must be near the Shop to join
+
+A Ticket can only be created when the device's browser geolocation is within the Shop's Join Radius (150 m), checked server-side at join time only. The product is a virtual queue for people who have physically walked in, not a booking system, and a static printed QR code would otherwise let anyone join from anywhere. We rejected rotating QR codes (needs an in-shop screen) and accepted that location can be spoofed by a determined user. Customers who deny location permission cannot join. Rejoin after a No-show and Carried-over Tickets are deliberately exempt, because those Customers already passed the check once.
