@@ -14,23 +14,25 @@ Specs were updated alongside the code — `docs/specs/third-party.md` §2 for th
 
 ## What still needs doing, in order
 
-### 1. Rotate the Supabase service-role key
+### 1. ~~Rotate the Supabase service-role key~~ — done, by migrating instead
 
-It was pasted into a chat transcript. It bypasses RLS, so it can read and write every table.
+The leaked `service_role` key is **revoked**, confirmed by `401` from `/auth/v1/admin/users`.
 
-- The **anon key does not need rotating** — it is public by design and ships to every browser.
-- The keys are the legacy JWT kind, both signed by the project's JWT secret, so **rotating regenerates both**. Do it now while there are no Owners and no data: rotation invalidates existing sessions.
-- Supabase dashboard → `queue-service` → Project Settings → API Keys → regenerate the JWT secret.
-- Then re-set both in Netlify and redeploy:
-  ```
-  ~/.bun/bin/netlify env:set NEXT_PUBLIC_SUPABASE_ANON_KEY '<new anon>' --context production
-  ~/.bun/bin/netlify env:set SUPABASE_SERVICE_ROLE_KEY '<new service role>' --context production --secret
-  ~/.bun/bin/netlify api createSiteBuild --data '{"site_id":"de7b91db-ffac-4749-9d59-7850dec1a65e"}'
-  ```
-  Environment changes never reach an already-running deploy; a rebuild is required.
-- **No `.env` file needs editing.** `.env.local` points at local Supabase with the CLI's fixed demo keys, and `.env.netlify.production` holds only the generated `OPERATOR_API_KEY`, `CRON_SECRET` and VAPID pair — no Supabase keys, on purpose, since those are always readable from the dashboard.
+It was not rotated. The legacy `anon`/`service_role` JWT keys are deprecated by Supabase
+(gone by the end of 2026, and never issued to projects created since 1 November 2025), so
+regenerating the JWT secret would have re-issued a key we had to replace again within the
+year, and invalidated every session to do it. Instead the project moved to publishable and
+secret API keys and the legacy keys were deactivated — see
+[ADR 0004](docs/adr/0004-publishable-and-secret-supabase-api-keys.md) and
+`docs/specs/third-party.md` §3.
 
-Longer term, Supabase's newer `sb_publishable_…` / `sb_secret_…` keys can be revoked individually. `supabase-js` takes them in the same slots, so it would be a values-only change.
+Still open from that migration:
+
+- **Asymmetric JWT signing keys** — deliberately deferred, tracked as
+  [#16](https://github.com/akashaf/virtual-queue-system/issues/16). Access tokens are still
+  signed by the legacy shared JWT secret, so rotating it signs everyone out. Cheapest while
+  no Owner has a session.
+- Deactivation is **reversible** in the Supabase dashboard, if a forgotten client turns up.
 
 ### 2. Push the first migration to the cloud
 
@@ -73,6 +75,10 @@ Not in the specs, and each one cost real time:
 - Supabase auto-grants new `public` tables to `anon`/`authenticated`, so every migration must `revoke` and then grant back deliberately.
 - A Server Action form clicked before hydration submits as a normal POST, and `page.reload()` in Playwright re-submits it. Poll with `page.goto()` instead.
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps`/`PageProps` are generated. After deleting routes, `rm -rf .next` clears stale `.next/types`.
+- **Never let a production secret pass through an agent.** A command containing the value puts
+  it in the transcript, which is how the first `service_role` key leaked. Secrets go into the
+  Netlify UI by hand; editing an existing variable there also keeps its secret flag and scopes,
+  avoiding the silent `--scope` failure above. Public values (`NEXT_PUBLIC_*`) are fine by CLI.
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when polling a deploy state.
 

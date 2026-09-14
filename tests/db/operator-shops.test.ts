@@ -10,9 +10,9 @@ let db: Client;
 let POST: (request: Request) => Promise<Response>;
 
 beforeAll(async () => {
-  const { apiUrl, serviceRoleKey } = inject("supabase");
+  const { apiUrl, secretKey } = inject("supabase");
   process.env.NEXT_PUBLIC_SUPABASE_URL = apiUrl;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey;
+  process.env.SUPABASE_SECRET_KEY = secretKey;
   process.env.OPERATOR_API_KEY = OPERATOR_API_KEY;
   process.env.APP_BASE_URL = APP_BASE_URL;
 

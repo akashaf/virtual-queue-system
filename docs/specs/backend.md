@@ -274,8 +274,8 @@ export const config = { schedule: '0 19 * * *' } // 19:00 UTC = 03:00 Malaysia t
 
 | Name | Where | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client + server | Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only | Customer and Operator functions |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | client + server | Supabase |
+| `SUPABASE_SECRET_KEY` | server only | Customer and Operator functions |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:`) | public / server | Web Push |
 | `OPERATOR_API_KEY` | server | Admin API |
 | `CRON_SECRET` | server | Cron route |

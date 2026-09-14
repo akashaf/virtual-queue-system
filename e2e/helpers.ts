@@ -2,9 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/supabase/database.types";
 import { readLocalSupabase } from "../tests/local-supabase";
 
-const { apiUrl, serviceRoleKey } = readLocalSupabase();
+const { apiUrl, secretKey } = readLocalSupabase();
 
-const admin = createClient<Database>(apiUrl, serviceRoleKey, {
+const admin = createClient<Database>(apiUrl, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 

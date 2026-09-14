@@ -4,16 +4,16 @@ import { inject } from "vitest";
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
 
-/** Service-role client: how Next.js calls Customer, Operator and cron functions. */
+/** Secret-key client: how Next.js calls Customer, Operator and cron functions. */
 export function serviceClient() {
-  const { apiUrl, serviceRoleKey } = inject("supabase");
-  return createClient(apiUrl, serviceRoleKey, noSession);
+  const { apiUrl, secretKey } = inject("supabase");
+  return createClient(apiUrl, secretKey, noSession);
 }
 
-/** Anon-key client: what a browser holds. */
+/** Publishable-key client: what a browser holds. */
 export function anonClient() {
-  const { apiUrl, anonKey } = inject("supabase");
-  return createClient(apiUrl, anonKey, noSession);
+  const { apiUrl, publishableKey } = inject("supabase");
+  return createClient(apiUrl, publishableKey, noSession);
 }
 
 /**

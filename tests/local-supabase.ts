@@ -3,8 +3,8 @@ import { execFileSync } from "node:child_process";
 export interface LocalSupabase {
   apiUrl: string;
   dbUrl: string;
-  anonKey: string;
-  serviceRoleKey: string;
+  publishableKey: string;
+  secretKey: string;
 }
 
 /**
@@ -30,7 +30,7 @@ export function readLocalSupabase(): LocalSupabase {
   return {
     apiUrl: status.API_URL,
     dbUrl: status.DB_URL,
-    anonKey: status.ANON_KEY,
-    serviceRoleKey: status.SERVICE_ROLE_KEY,
+    publishableKey: status.PUBLISHABLE_KEY,
+    secretKey: status.SECRET_KEY,
   };
 }
