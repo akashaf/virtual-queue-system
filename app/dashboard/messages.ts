@@ -18,6 +18,8 @@ export function ownerErrorMessage(reason: OwnerError | "failed"): string {
       return "That ticket is no longer in the queue";
     case "undo_expired":
       return "Too late to undo that";
+    case "too_early":
+      return "Give them a few more minutes";
     case "rejoined":
       return "That customer has already rejoined the queue";
     case "shop_inactive":

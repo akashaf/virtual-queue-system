@@ -1,10 +1,14 @@
 import { describe, expect, test } from "vitest";
+import type { Database } from "@/lib/supabase/database.types";
 import {
   checkCustomerName,
-  isJoinError,
+  isFinalStatus,
+  isCustomerError,
   MAX_CUSTOMER_NAME_LENGTH,
   toCustomerView,
 } from "./view";
+
+type TicketStatus = Database["public"]["Enums"]["ticket_status"];
 
 describe("toCustomerView", () => {
   test("renames the database's fields without changing them", () => {
@@ -17,7 +21,13 @@ describe("toCustomerView", () => {
           joining_state: "open",
           waiting_count: 4,
         },
-        ticket: { id: "t-1", number: 17, status: "waiting", position: 3 },
+        ticket: {
+          id: "t-1",
+          number: 17,
+          status: "waiting",
+          position: 3,
+          can_rejoin: false,
+        },
       }),
     ).toEqual({
       shop: {
@@ -27,7 +37,40 @@ describe("toCustomerView", () => {
         joiningState: "open",
         waitingCount: 4,
       },
-      ticket: { id: "t-1", number: 17, status: "waiting", position: 3 },
+      ticket: {
+        id: "t-1",
+        number: 17,
+        status: "waiting",
+        position: 3,
+        canRejoin: false,
+      },
+    });
+  });
+
+  test("carries the Rejoin offer through, which only a No-show ever has", () => {
+    const view = toCustomerView({
+      shop: {
+        id: "s-1",
+        name: "Kedai Ali",
+        is_active: true,
+        joining_state: "open",
+        waiting_count: 0,
+      },
+      ticket: {
+        id: "t-1",
+        number: 17,
+        status: "no_show",
+        position: 0,
+        can_rejoin: true,
+      },
+    });
+
+    expect(view.ticket).toEqual({
+      id: "t-1",
+      number: 17,
+      status: "no_show",
+      position: 0,
+      canRejoin: true,
     });
   });
 
@@ -54,11 +97,19 @@ describe("toCustomerView", () => {
   });
 });
 
-describe("isJoinError", () => {
-  test.each(["shop_inactive", "last_call", "already_in_queue", "too_far", "queue_full"])(
+describe("isCustomerError", () => {
+  test.each([
+    "shop_inactive",
+    "last_call",
+    "already_in_queue",
+    "too_far",
+    "queue_full",
+    "not_rejoinable",
+    "ticket_not_found",
+  ])(
     "recognises %s as something to explain to the Customer",
     (message) => {
-      expect(isJoinError(message)).toBe(true);
+      expect(isCustomerError(message)).toBe(true);
     },
   );
 
@@ -67,7 +118,7 @@ describe("isJoinError", () => {
     ["a connection failure", "fetch failed"],
     ["nothing", undefined],
   ])("treats %s as a bug, not a situation", (_label, message) => {
-    expect(isJoinError(message)).toBe(false);
+    expect(isCustomerError(message)).toBe(false);
   });
 });
 
@@ -111,5 +162,24 @@ describe("checkCustomerName", () => {
       ok: false,
       problem: "too_long",
     });
+  });
+});
+
+describe("isFinalStatus", () => {
+  test("knows the statuses a Ticket never comes back from", () => {
+    const final: TicketStatus[] = ["served", "no_show", "left", "removed"];
+
+    expect(final.map(isFinalStatus)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  test("knows the ones that are still in play", () => {
+    const active: TicketStatus[] = ["waiting", "called"];
+
+    expect(active.map(isFinalStatus)).toEqual([false, false]);
   });
 });

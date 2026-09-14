@@ -2,14 +2,20 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { createTicket } from "@/lib/customer/queue";
+import {
+  createTicket,
+  leaveTicket,
+  rejoinTicket,
+  type TicketOutcome,
+} from "@/lib/customer/queue";
 import {
   checkCustomerName,
   type CustomerView,
-  type JoinError,
+  type CustomerError,
   type NameProblem,
 } from "@/lib/customer/view";
 import { DEVICE_COOKIE, deviceCookieOptions, isDeviceId } from "@/lib/device-cookie";
+import { isUuid } from "@/lib/uuid";
 import { isLang, LANG_COOKIE, LANG_COOKIE_MAX_AGE } from "@/lib/i18n";
 
 export interface Coords {
@@ -20,7 +26,7 @@ export interface Coords {
 
 export type JoinResult =
   | { status: "joined"; view: CustomerView }
-  | { status: "rejected"; reason: JoinError | "failed" }
+  | { status: "rejected"; reason: CustomerError | "failed" }
   | { status: "invalid_name"; problem: NameProblem };
 
 /**
@@ -108,4 +114,41 @@ function isCoords(value: unknown): value is Coords {
     typeof accuracyM === "number" &&
     Number.isFinite(accuracyM)
   );
+}
+
+export type TicketActionResult =
+  | { status: "done"; view: CustomerView }
+  | { status: "rejected"; reason: CustomerError | "failed" };
+
+/**
+ * The Customer gives up their place, or takes a new one after missing their turn.
+ *
+ * Both prove themselves with the device cookie this server already holds, never
+ * with anything the request says: a Ticket another device holds is not this
+ * one's to end, and the function is what decides that.
+ */
+export async function leaveQueue(ticketId: unknown): Promise<TicketActionResult> {
+  return deviceAction(ticketId, leaveTicket);
+}
+
+export async function rejoinQueue(ticketId: unknown): Promise<TicketActionResult> {
+  return deviceAction(ticketId, rejoinTicket);
+}
+
+async function deviceAction(
+  ticketId: unknown,
+  act: (ticketId: string, deviceId: string) => Promise<TicketOutcome>,
+): Promise<TicketActionResult> {
+  if (!isUuid(ticketId)) return { status: "rejected", reason: "failed" };
+
+  const cookieStore = await cookies();
+  const deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
+  // No cookie means this browser has never joined anything, so it holds no
+  // Ticket to act on — the same answer as naming someone else's.
+  if (!isDeviceId(deviceId)) return { status: "rejected", reason: "ticket_not_found" };
+
+  const outcome = await act(ticketId, deviceId);
+  return outcome.ok
+    ? { status: "done", view: outcome.view }
+    : { status: "rejected", reason: outcome.reason };
 }

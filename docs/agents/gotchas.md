@@ -47,6 +47,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   never appear in a JWKS — so a project with an asymmetric key still on *standby* looks
   identical to one that has rotated to it. Read *Authentication → JWT Keys* for which key is
   **Current key**, or decode an access token and read `alg` and `kid`.
+- **Overloading a Postgres function breaks its existing callers.** #7 added
+  `owner_ticket(shops, uuid, ticket_status[])` beside #6's `(…, ticket_status)` one, and
+  every call site instantly failed with *function … is not unique*: the callers pass a bare
+  `'called'`, which is `unknown` and matches both. `db:reset` catches it, `tsc` cannot. Either
+  cast at every call site or, as #7 did, keep one signature and move the old callers onto it
+  in the same migration.
 - **A broadcast is testable without a browser.** `realtime.send` just inserts into
   `realtime.messages`, so `tests/db/queue-broadcast.test.ts` reads that table over the plain
   `pg` connection. Two things to know: the rows outlive `resetTestData`, which truncates only

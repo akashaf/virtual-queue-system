@@ -24,8 +24,20 @@ afterAll(async () => {
 
 interface OwnerQueue {
   shop: { id: string; name: string; joining_state: string };
-  waiting: { id: string; number: number; name: string; joined_at: string }[];
-  called: { id: string; number: number; name: string; called_at: string }[];
+  waiting: {
+    id: string;
+    number: number;
+    name: string;
+    joined_at: string;
+    origin: string;
+  }[];
+  called: {
+    id: string;
+    number: number;
+    name: string;
+    called_at: string;
+    no_show_in_ms: number;
+  }[];
   just_served: {
     id: string;
     number: number;
@@ -75,8 +87,20 @@ describe("get_owner_queue", () => {
     const queue = await ownerQueue(owner.email, owner.password);
 
     expect(queue.waiting).toEqual([
-      { id: first.id, number: 1, name: "Ali", joined_at: expect.any(String) },
-      { id: second.id, number: 2, name: "Siti", joined_at: expect.any(String) },
+      {
+        id: first.id,
+        number: 1,
+        name: "Ali",
+        joined_at: expect.any(String),
+        origin: "scan",
+      },
+      {
+        id: second.id,
+        number: 2,
+        name: "Siti",
+        joined_at: expect.any(String),
+        origin: "scan",
+      },
     ]);
     expect(queue.called).toEqual([]);
   });
@@ -94,7 +118,13 @@ describe("get_owner_queue", () => {
 
     expect(queue.waiting.map((ticket) => ticket.number)).toEqual([2]);
     expect(queue.called).toEqual([
-      { id: first.id, number: 1, name: "Ali", called_at: expect.any(String) },
+      {
+        id: first.id,
+        number: 1,
+        name: "Ali",
+        called_at: expect.any(String),
+        no_show_in_ms: expect.any(Number),
+      },
     ]);
   });
 
@@ -133,6 +163,62 @@ describe("get_owner_queue", () => {
     const queue = await ownerQueue(owner.email, owner.password);
 
     expect(queue.waiting).toEqual([]);
+  });
+
+  test("marks a Ticket the Customer rejoined onto, so the Owner knows why it is late", async () => {
+    const { owner, shop } = await createShop();
+    const ticket = await join(shop.slug, "Ali");
+    const client = await signInAs(owner.email, owner.password);
+    await client.rpc("call_next");
+    await db.query(
+      "update public.tickets set called_at = now() - interval '6 minutes' where id = $1",
+      [ticket.id],
+    );
+    await client.rpc("mark_no_show", { p_ticket_id: ticket.id });
+    await serviceClient().rpc("rejoin_queue", {
+      p_ticket_id: ticket.id,
+      p_device_id: (
+        await db.query("select device_id from public.tickets where id = $1", [ticket.id])
+      ).rows[0].device_id,
+    });
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    expect(queue.waiting).toEqual([
+      expect.objectContaining({ number: 2, name: "Ali", origin: "rejoin" }),
+    ]);
+  });
+
+  test("counts down to when the Owner may give up on a Called Customer", async () => {
+    const { owner, shop } = await createShop();
+    const ticket = await join(shop.slug, "Ali");
+    const client = await signInAs(owner.email, owner.password);
+    await client.rpc("call_next");
+    await db.query(
+      "update public.tickets set called_at = now() - interval '2 minutes' where id = $1",
+      [ticket.id],
+    );
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    // Five minutes less the two already waited, give or take the round trip.
+    expect(queue.called[0].no_show_in_ms).toBeGreaterThan(178_000);
+    expect(queue.called[0].no_show_in_ms).toBeLessThanOrEqual(180_000);
+  });
+
+  test("stops the countdown at zero once No-show is allowed", async () => {
+    const { owner, shop } = await createShop();
+    const ticket = await join(shop.slug, "Ali");
+    const client = await signInAs(owner.email, owner.password);
+    await client.rpc("call_next");
+    await db.query(
+      "update public.tickets set called_at = now() - interval '9 minutes' where id = $1",
+      [ticket.id],
+    );
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    expect(queue.called[0].no_show_in_ms).toBe(0);
   });
 
   test("shows an Owner their own Shop, never another Owner's", async () => {

@@ -2,10 +2,17 @@
 
 import {
   callNextTicket,
+  markTicketNoShow,
   markTicketServed,
+  removeQueueTicket,
   undoTicketServed,
 } from "@/lib/owner/queue";
-import type { CalledTicket, OwnerOutcome, ServedTicket } from "@/lib/owner/view";
+import type {
+  CalledTicket,
+  OwnerOutcome,
+  ServedTicket,
+  TicketRef,
+} from "@/lib/owner/view";
 import { isUuid } from "@/lib/uuid";
 
 /**
@@ -42,4 +49,22 @@ export async function undoServed(
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
   return undoTicketServed(ticketId);
+}
+
+export async function markNoShow(
+  _previous: OwnerOutcome<TicketRef> | null,
+  formData: FormData,
+): Promise<OwnerOutcome<TicketRef>> {
+  const ticketId = formData.get("ticketId");
+  if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
+  return markTicketNoShow(ticketId);
+}
+
+export async function removeTicket(
+  _previous: OwnerOutcome<TicketRef> | null,
+  formData: FormData,
+): Promise<OwnerOutcome<TicketRef>> {
+  const ticketId = formData.get("ticketId");
+  if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
+  return removeQueueTicket(ticketId);
 }

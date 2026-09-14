@@ -263,60 +263,11 @@ export type Database = {
         }
         Returns: Json
       }
-      get_customer_view: {
-        Args: { p_device_id?: string; p_slug: string }
-        Returns: Json
-      }
-      get_owner_queue: { Args: never; Returns: Json }
-      haversine_m: {
+      device_ticket: {
         Args: {
-          p_lat_a: number
-          p_lat_b: number
-          p_lng_a: number
-          p_lng_b: number
-        }
-        Returns: number
-      }
-      join_queue: {
-        Args: {
-          p_accuracy_m?: number
           p_device_id: string
-          p_lat: number
-          p_lng: number
-          p_name: string
-          p_slug: string
-        }
-        Returns: Json
-      }
-      lock_owner_shop: {
-        Args: never
-        Returns: {
-          created_at: string
-          current_queue_day_id: string | null
-          heads_up_threshold: number
-          id: string
-          is_active: boolean
-          join_radius_m: number
-          joining_state: Database["public"]["Enums"]["joining_state"]
-          lat: number
-          lng: number
-          max_queue_size: number
-          name: string
-          owner_user_id: string
-          slug: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "shops"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      mark_served: { Args: { p_ticket_id: string }; Returns: Json }
-      owner_ticket: {
-        Args: {
           p_shop: Database["public"]["Tables"]["shops"]["Row"]
-          p_status: Database["public"]["Enums"]["ticket_status"]
+          p_statuses: Database["public"]["Enums"]["ticket_status"][]
           p_ticket_id: string
         }
         Returns: {
@@ -347,7 +298,106 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_customer_view: {
+        Args: { p_device_id?: string; p_slug: string }
+        Returns: Json
+      }
+      get_owner_queue: { Args: never; Returns: Json }
+      haversine_m: {
+        Args: {
+          p_lat_a: number
+          p_lat_b: number
+          p_lng_a: number
+          p_lng_b: number
+        }
+        Returns: number
+      }
+      join_queue: {
+        Args: {
+          p_accuracy_m?: number
+          p_device_id: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_slug: string
+        }
+        Returns: Json
+      }
+      leave_queue: {
+        Args: { p_device_id: string; p_ticket_id: string }
+        Returns: Json
+      }
+      lock_owner_shop: {
+        Args: never
+        Returns: {
+          created_at: string
+          current_queue_day_id: string | null
+          heads_up_threshold: number
+          id: string
+          is_active: boolean
+          join_radius_m: number
+          joining_state: Database["public"]["Enums"]["joining_state"]
+          lat: number
+          lng: number
+          max_queue_size: number
+          name: string
+          owner_user_id: string
+          slug: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shops"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mark_no_show: { Args: { p_ticket_id: string }; Returns: Json }
+      mark_served: { Args: { p_ticket_id: string }; Returns: Json }
+      no_show_window: { Args: never; Returns: string }
+      owner_ticket: {
+        Args: {
+          p_shop: Database["public"]["Tables"]["shops"]["Row"]
+          p_statuses: Database["public"]["Enums"]["ticket_status"][]
+          p_ticket_id: string
+        }
+        Returns: {
+          called_at: string | null
+          carried_over_at: string | null
+          customer_name: string | null
+          device_id: string | null
+          finished_at: string | null
+          heads_up_sent_at: string | null
+          id: string
+          joined_at: string
+          last_call_choice:
+            | Database["public"]["Enums"]["last_call_choice"]
+            | null
+          number: number
+          origin: Database["public"]["Enums"]["ticket_origin"]
+          parent_ticket_id: string | null
+          queue_day_id: string
+          removed_reason: Database["public"]["Enums"]["removed_reason"] | null
+          served_at: string | null
+          shop_id: string
+          status: Database["public"]["Enums"]["ticket_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tickets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      rejoin_queue: {
+        Args: { p_device_id: string; p_ticket_id: string }
+        Returns: Json
+      }
+      remove_ticket: { Args: { p_ticket_id: string }; Returns: Json }
       served_ticket_json: {
+        Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
+        Returns: Json
+      }
+      ticket_ref_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
         Returns: Json
       }

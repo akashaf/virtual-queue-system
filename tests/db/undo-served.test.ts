@@ -26,6 +26,7 @@ interface CalledTicket {
   number: number;
   name: string | null;
   called_at: string;
+  no_show_in_ms: number;
 }
 
 async function join(slug: string, deviceId = crypto.randomUUID(), name = "Ali") {
@@ -86,6 +87,7 @@ describe("undo_served", () => {
       number: 1,
       name: "Ali",
       called_at: expect.any(String),
+      no_show_in_ms: expect.any(Number),
     });
     const { rows } = await db.query(
       "select status, served_at, finished_at from public.tickets where id = $1",

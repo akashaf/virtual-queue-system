@@ -8,6 +8,7 @@ import {
   resetTestData,
   serviceClient,
   SHOP_LNG,
+  signInAs,
   uniqueSlug,
 } from "./helpers";
 
@@ -35,6 +36,7 @@ interface CustomerView {
     number: number;
     status: string;
     position: number;
+    can_rejoin: boolean;
   } | null;
 }
 
@@ -127,6 +129,7 @@ describe("get_customer_view", () => {
         number: 2,
         status: "waiting",
         position: 1,
+        can_rejoin: false,
       },
     });
   });
@@ -167,7 +170,10 @@ describe("get_customer_view", () => {
     expect(result?.shop.waiting_count).toBe(0);
   });
 
-  test("forgets a Ticket once it reaches a final status", async () => {
+  test("keeps showing a Ticket that has ended, so the Customer is told what became of it", async () => {
+    // #7 replaced #5's active-only rule: No-show, Removed and Served are three
+    // different screens, and a page that only sees a Ticket vanish cannot tell
+    // them apart. The page taps past the state; the server does not forget it.
     const { shop } = await createShop();
     const mine = await join(shop.slug);
     await db.query(
@@ -175,7 +181,11 @@ describe("get_customer_view", () => {
       [mine.ticket.id],
     );
 
-    expect((await view(shop.slug, mine.deviceId))?.ticket).toBeNull();
+    expect((await view(shop.slug, mine.deviceId))?.ticket).toMatchObject({
+      id: mine.ticket.id,
+      status: "served",
+      can_rejoin: false,
+    });
   });
 
   test("never shows one Customer another Customer's Ticket or name", async () => {
@@ -223,5 +233,92 @@ describe("customer function grants", () => {
     });
 
     expect(error).not.toBeNull();
+  });
+});
+
+describe("get_customer_view after a Ticket has ended", () => {
+  /** Calls the front of the Queue and gives up on them, as the Owner's two buttons do. */
+  async function noShow(shop: { slug: string }, email: string, password: string) {
+    const client = await signInAs(email, password);
+    const called = await client.rpc("call_next");
+    const { id } = (called.data as unknown as { result: { id: string } }).result;
+    await db.query(
+      "update public.tickets set called_at = now() - interval '6 minutes' where id = $1",
+      [id],
+    );
+    const { error } = await client.rpc("mark_no_show", { p_ticket_id: id });
+    if (error) throw new Error(error.message);
+    return id;
+  }
+
+  test("still shows the Customer the Ticket they were told to leave on", async () => {
+    const { shop } = await createShop();
+    const mine = await join(shop.slug);
+    await serviceClient().rpc("leave_queue", {
+      p_ticket_id: mine.ticket.id,
+      p_device_id: mine.deviceId,
+    });
+
+    const result = await view(shop.slug, mine.deviceId);
+
+    expect(result?.ticket).toMatchObject({ id: mine.ticket.id, status: "left" });
+  });
+
+  test("offers a No-show Customer their way back in", async () => {
+    const { owner, shop } = await createShop();
+    const mine = await join(shop.slug);
+    const id = await noShow(shop, owner.email, owner.password);
+
+    const result = await view(shop.slug, mine.deviceId);
+
+    expect(result?.ticket).toMatchObject({ id, status: "no_show", can_rejoin: true });
+  });
+
+  test("withdraws the offer once it has been taken", async () => {
+    const { owner, shop } = await createShop();
+    const mine = await join(shop.slug);
+    const id = await noShow(shop, owner.email, owner.password);
+    await serviceClient().rpc("rejoin_queue", {
+      p_ticket_id: id,
+      p_device_id: mine.deviceId,
+    });
+
+    const result = await view(shop.slug, mine.deviceId);
+
+    // The newest Ticket is the one the device holds now.
+    expect(result?.ticket).toMatchObject({ status: "waiting", can_rejoin: false });
+  });
+
+  test("never offers it on a Ticket that is still in the Queue", async () => {
+    const { shop } = await createShop();
+    const mine = await join(shop.slug);
+
+    const result = await view(shop.slug, mine.deviceId);
+
+    expect(result?.ticket?.can_rejoin).toBe(false);
+  });
+
+  test("starts the next Queue Day with a clean page", async () => {
+    const { shop } = await createShop();
+    const mine = await join(shop.slug);
+    await serviceClient().rpc("leave_queue", {
+      p_ticket_id: mine.ticket.id,
+      p_device_id: mine.deviceId,
+    });
+    await db.query("update public.queue_days set closed_at = now() where shop_id = $1", [
+      shop.id,
+    ]);
+    const { rows } = await db.query(
+      "insert into public.queue_days (shop_id) values ($1) returning id",
+      [shop.id],
+    );
+    await db.query("update public.shops set current_queue_day_id = $2 where id = $1", [
+      shop.id,
+      rows[0].id,
+    ]);
+
+    const result = await view(shop.slug, mine.deviceId);
+
+    expect(result?.ticket).toBeNull();
   });
 });

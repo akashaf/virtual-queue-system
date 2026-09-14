@@ -1,8 +1,26 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { EllipsisVerticalIcon } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useQueueChanged } from "@/lib/queue-changed";
 import {
   applyMove,
@@ -14,7 +32,7 @@ import {
 } from "@/lib/owner/view";
 import { formatCountdown, formatMalaysiaTime, formatMinutesAgo } from "@/lib/time";
 import { formatTicketNumber } from "@/lib/ticket";
-import { callNext, markServed, undoServed } from "./actions";
+import { callNext, markNoShow, markServed, removeTicket, undoServed } from "./actions";
 import { ownerErrorMessage } from "./messages";
 
 /**
@@ -57,6 +75,8 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   // its own press went once it has gone.
   const call = useOwnerAction(callNext, settle);
   const undo = useOwnerAction(undoServed, settle);
+  const noShow = useOwnerAction(markNoShow, settle);
+  const remove = useOwnerAction(removeTicket, settle);
 
   /** Done is undoable for two minutes, so it says so until the window shuts. */
   const offerUndo = useCallback(
@@ -90,7 +110,15 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
       {called.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {called.map((ticket) => (
-            <CalledCard key={ticket.id} ticket={ticket} move={move} serve={serve} />
+            <CalledCard
+              key={ticket.id}
+              ticket={ticket}
+              elapsedMs={elapsedMs}
+              move={move}
+              serve={serve}
+              noShow={noShow}
+              remove={remove}
+            />
           ))}
         </ul>
       ) : null}
@@ -107,15 +135,21 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
           {waiting.map((ticket) => (
             <li
               key={ticket.id}
-              className="flex items-center gap-4 rounded-lg border px-4 py-3"
+              className="flex items-center gap-3 rounded-lg border px-4 py-3"
             >
               <span className="text-lg font-semibold tabular-nums">
                 {formatTicketNumber(ticket.number)}
               </span>
-              <span className="flex-1 truncate font-medium">{ticket.name}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="truncate font-medium">{ticket.name}</span>
+                {/* They are at the back with a high number, but they have been
+                    in the shop a while. */}
+                {ticket.rejoined ? <Badge variant="secondary">Rejoined</Badge> : null}
+              </span>
               <span className="text-sm text-muted-foreground tabular-nums">
                 {formatMalaysiaTime(ticket.joinedAt)}
               </span>
+              <TicketMenu ticket={ticket} move={move} remove={remove} />
             </li>
           ))}
         </ol>
@@ -188,42 +222,140 @@ function CallNextButton({
 
 function CalledCard({
   ticket,
+  elapsedMs,
   move,
   serve,
+  noShow,
+  remove,
 }: {
   ticket: CalledTicket;
+  elapsedMs: number;
   move: (intent: QueueMove) => void;
   serve: OwnerAction;
+  noShow: OwnerAction;
+  remove: OwnerAction;
 }) {
+  // The Customer may still be walking over, so the button waits with them.
+  const noShowInMs = ticket.noShowInMs - elapsedMs;
+  const tooEarly = noShowInMs > 0;
+
   return (
-    <li className="flex items-center gap-4 rounded-lg border-2 border-primary px-4 py-3">
-      <span className="text-lg font-semibold tabular-nums">
-        {formatTicketNumber(ticket.number)}
-      </span>
-      <span className="flex flex-1 flex-col truncate">
-        <span className="truncate font-medium">{ticket.name}</span>
-        {/* The browser's own clock, which may differ from the shop's. */}
-        <span className="text-sm text-muted-foreground" suppressHydrationWarning>
-          called {formatMinutesAgo(ticket.calledAt, new Date())}
+    <li className="flex flex-col gap-3 rounded-lg border-2 border-primary px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="text-lg font-semibold tabular-nums">
+          {formatTicketNumber(ticket.number)}
         </span>
-      </span>
-      <form
-        action={(formData) => {
-          move({ kind: "mark_served", ticketId: ticket.id });
-          serve.submit(formData);
-        }}
-      >
-        <input type="hidden" name="ticketId" value={ticket.id} />
-        <Button
-          type="submit"
-          size="sm"
-          className="h-11 px-5"
-          disabled={serve.pending}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate font-medium">{ticket.name}</span>
+          {/* The browser's own clock, which may differ from the shop's. */}
+          <span className="text-sm text-muted-foreground" suppressHydrationWarning>
+            called {formatMinutesAgo(ticket.calledAt, new Date())}
+          </span>
+        </span>
+        <TicketMenu ticket={ticket} move={move} remove={remove} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <form
+          className="flex-1"
+          action={(formData) => {
+            move({ kind: "mark_served", ticketId: ticket.id });
+            serve.submit(formData);
+          }}
         >
-          Done
-        </Button>
-      </form>
+          <input type="hidden" name="ticketId" value={ticket.id} />
+          <Button type="submit" className="h-11 w-full" disabled={serve.pending}>
+            Done
+          </Button>
+        </form>
+
+        <form
+          className="flex-1"
+          action={(formData) => {
+            move({ kind: "mark_no_show", ticketId: ticket.id });
+            noShow.submit(formData);
+          }}
+        >
+          <input type="hidden" name="ticketId" value={ticket.id} />
+          <Button
+            type="submit"
+            variant="outline"
+            className="h-11 w-full tabular-nums"
+            disabled={noShow.pending || tooEarly}
+          >
+            {tooEarly ? `No-show ${formatCountdown(noShowInMs)}` : "No-show"}
+          </Button>
+        </form>
+      </div>
     </li>
+  );
+}
+
+/**
+ * Remove, kept behind an overflow menu and a confirmation: it is the one action
+ * here with nothing to undo, and it reads to the Customer as being turned away.
+ */
+function TicketMenu({
+  ticket,
+  move,
+  remove,
+}: {
+  ticket: { id: string; number: number; name: string | null };
+  move: (intent: QueueMove) => void;
+  remove: OwnerAction;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const number = formatTicketNumber(ticket.number);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="size-11 shrink-0"
+            aria-label={`More for ${number}`}
+          >
+            <EllipsisVerticalIcon />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
+            Remove
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {number}
+              {ticket.name ? ` · ${ticket.name}` : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They lose their place, and their page tells them their ticket was
+              removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <form
+              action={(formData) => {
+                move({ kind: "remove_ticket", ticketId: ticket.id });
+                remove.submit(formData);
+              }}
+            >
+              <input type="hidden" name="ticketId" value={ticket.id} />
+              <AlertDialogAction type="submit" disabled={remove.pending}>
+                Remove
+              </AlertDialogAction>
+            </form>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

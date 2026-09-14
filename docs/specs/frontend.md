@@ -53,12 +53,16 @@ The page is one component that switches on `get_customer_view`. It shows only th
 | Last Call prompt | `waiting`, shop `last_call` | Modal-like card: "Shop is closing soon. Move to the next day's queue, or stay today? If you stay, you may not be served." Shows the current choice | **Move to next day** / **Stay today** (can change until close) |
 | Carried-over | `waiting`, `carried_over` | Waiting view plus the badge "Moved from previous day" | Leave |
 | Called | `called` | Full-screen high-contrast "It's your turn: #017, go to the counter" | **Leave** |
-| Served | `served` | "Thanks! See you next time" | — |
+| Served | `served` | "Thanks! See you next time" | **Join queue** (back to the join form) |
 | No-show | `no_show` | "You missed your turn" | **Join again** if `can_rejoin` (no location prompt); otherwise "Scan the QR code at the shop to join again" |
 | Left | `left` | "You left the queue" | Back to join form |
 | Removed | `removed` | "Your ticket was removed" (or "Shop closed, sorry, come back tomorrow" after Close Shop) | Back to join form |
 
-Once a Ticket reaches a final state, the page keeps showing that state until the customer taps to continue, even though the server no longer counts it as active. Keep the last Ticket id in `sessionStorage` to do this.
+Once a Ticket reaches a final state, the page keeps showing that state until the customer taps to continue.
+
+`get_customer_view` answers with that Ticket for the rest of the Queue Day (backend.md §5), because No-show, Removed and Served are three different screens and a page that only sees a Ticket disappear cannot tell them apart. Dismissal is the browser's business rather than the Shop's, so the **dismissed** Ticket's id is kept in `sessionStorage`: the page shows the ending until that id matches, and the join form afterwards. Per session, so a Customer returning later meets the join form rather than yesterday's news.
+
+Every final state therefore has a way on, Served included — otherwise a Customer who has had their haircut could not queue again that day, for a child or for a second cut.
 
 ### 3.2 Join flow
 1. The customer taps **Join queue**. This tap is the user gesture that everything below needs.

@@ -6,10 +6,12 @@ import {
   toCalledTicket,
   toOwnerQueue,
   toServedTicket,
+  toTicketRef,
   type CalledTicket,
   type OwnerOutcome,
   type OwnerQueue,
   type ServedTicket,
+  type TicketRef,
 } from "./view";
 
 /**
@@ -69,6 +71,30 @@ export async function undoTicketServed(
     "undo_served",
     await supabase.rpc("undo_served", { p_ticket_id: ticketId }),
     toCalledTicket,
+  );
+}
+
+/** The Customer never came to the chair. */
+export async function markTicketNoShow(
+  ticketId: string,
+): Promise<OwnerOutcome<TicketRef>> {
+  const supabase = await createClient();
+  return outcome(
+    "mark_no_show",
+    await supabase.rpc("mark_no_show", { p_ticket_id: ticketId }),
+    toTicketRef,
+  );
+}
+
+/** The Owner takes a Ticket out, from the Queue or from the chair. */
+export async function removeQueueTicket(
+  ticketId: string,
+): Promise<OwnerOutcome<TicketRef>> {
+  const supabase = await createClient();
+  return outcome(
+    "remove_ticket",
+    await supabase.rpc("remove_ticket", { p_ticket_id: ticketId }),
+    toTicketRef,
   );
 }
 

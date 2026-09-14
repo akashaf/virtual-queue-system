@@ -142,7 +142,9 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `haversine_m(lat_a, lng_a, lat_b, lng_b)` — metres between two points on a sphere of radius 6371 km.
 - `customer_view_json(shop, ticket)` — builds the payload below. Shared by `get_customer_view` and `join_queue`, so a join and the refetch that follows it cannot disagree.
 - `lock_owner_shop()` — the caller's Shop, locked, or `shop_inactive`. The first line of every owner mutation.
-- `owner_ticket(shop, ticket_id, status)` — one of the caller's Tickets in the expected status, or `ticket_not_found`.
+- `owner_ticket(shop, ticket_id, statuses[])` — one of the caller's Tickets in one of the expected statuses, or `ticket_not_found`. Takes an array because Remove accepts a Ticket from the Queue and from the chair alike.
+- `device_ticket(shop, ticket_id, device_id, statuses[])` — the same for a Customer, proved by the device cookie rather than by `auth.uid()`.
+- `no_show_window()`, `ticket_ref_json(ticket)` — the 5 minutes, and the `{ id, number }` an Owner's screen gets back from an ending.
 - `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
 - `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
 - `broadcast_queue_changed()` — the trigger function behind [§6](#6-realtime).
@@ -155,9 +157,13 @@ Some helpers are never called from outside the database, and are revoked from ev
   - A slug no Shop has raises `shop_inactive` too. A printed QR code outlives the Shop it was printed for, and a Customer holding an old one needs the same answer either way.
   - A Ticket that joins already inside the Heads-up Threshold gets `heads_up_sent_at = now()` and no alert, per §4: the Customer is looking at the page that is about to tell them how many are ahead, and marking it is what stops the next mutation alerting them for nothing. The threshold is measured against the Queue only, so Called Tickets do not push a new joiner out of it.
   - A null or blank name is refused as a `23514`, the same as one over 30 characters. The column itself allows null, because erasure leaves one behind.
-- `rejoin_queue(ticket_id, device_id)`
-  - Errors: `not_rejoinable`, `last_call`, `queue_full`.
-- `leave_queue(ticket_id, device_id)`
+- `rejoin_queue(ticket_id, device_id)` → the customer view
+  - The source must be a No-show, `origin = scan`, in the Shop's **current** Queue Day, held by this device, and not already rejoined from. Everything else is `not_rejoinable`, so an old Ticket can never become a way in from anywhere (§12 rule 6).
+  - Takes the new Ticket's name from the source, so the Customer is not asked again, and stamps `heads_up_sent_at` on a Ticket that rejoins already inside the threshold, exactly as `join_queue` does.
+  - Errors: `shop_inactive`, `last_call`, `not_rejoinable`, `already_in_queue`, `queue_full`. `already_in_queue` covers the Customer who scanned again rather than waiting for the button, which would otherwise be a `23505` from the one-active-Ticket index.
+- `leave_queue(ticket_id, device_id)` → the customer view
+  - Allowed from the chair as well as from the Queue (§12 rule 5).
+  - Errors: `ticket_not_found`, which is also what a Ticket belonging to another device gets: the device id is part of the lookup, not a check after it.
 - `choose_last_call(ticket_id, device_id, choice)`
   - Only allowed while `joining_state = last_call` and the Ticket is Waiting.
   - Can be changed until Close Shop.
@@ -165,16 +171,20 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Never returns other customers' names, and never the rest of the Queue.
   - `waiting_count` belongs to the Shop rather than to the Ticket, because the join form shows it before there is a Ticket to hang it on.
   - `shop.id` is the `shop:{id}` topic the page subscribes to ([§6](#6-realtime)); a Customer cannot listen for their own Shop without it. Nothing is authorised by it: the topic is public and carries no data, and every read still comes back through this function with the device cookie.
-  - `ticket` is the device's **active** Ticket — Waiting or Called — which the partial unique index makes at most one. A Ticket that has reached a final status is not returned; the page keeps showing that state from `sessionStorage` instead (frontend.md §3.1).
+  - `ticket` is the last Ticket this device took in the Shop's **current Queue Day**, whatever became of it — not only an active one. #7 changed this: No-show, Removed and Served are three different screens, and a page that only ever sees a Ticket disappear cannot tell them apart. `can_rejoin` needs it too, being a property of a No-show.
+  - Scoped to the current Queue Day, so a Customer returning tomorrow meets the join form. Which ending has already been *read* is the browser's business, and stays in `sessionStorage` (frontend.md §3.1).
+  - `can_rejoin` is the whole of the Rejoin offer: a No-show, from a scan, in today's Queue Day, not already rejoined from. The Shop-level reasons a Rejoin can still fail — Last Call, a full Queue — are deliberately left out, because they change from moment to moment and `rejoin_queue` answers them with a token the page can put into words.
   - Returns SQL `null` for a slug no Shop has, so the page can show a missing Shop and a Deactivated Shop the same way.
-  - Delivered so far (#6): `shop`, and `ticket` as far as `status` and `position`. `last_call_choice` and `carried_over` arrive with #11, `can_rejoin` with #7, and `estimate` with #12.
+  - Delivered so far (#7): `shop`, and `ticket` as far as `status`, `position` and `can_rejoin`. `last_call_choice` and `carried_over` arrive with #11, and `estimate` with #12.
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
 - `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once
 - `mark_served(ticket_id)`, `undo_served(ticket_id)` (errors `undo_expired`, `rejoined`), `mark_no_show(ticket_id)` (error `too_early`), `remove_ticket(ticket_id)`
+  - `mark_no_show` waits the full five minutes from `called_at`; the Customer may be walking over, and a No-show is final. It frees the device, which is what makes a Rejoin possible
+  - `remove_ticket` takes a Ticket from the Queue or the chair alike, with `removed_reason = owner`
   - `rejoined`: Done frees the device, so the Customer may already hold a new Ticket. Putting the old one back would give them two active Tickets, which the one-active-Ticket-per-device index refuses — and a raw `23505` is no way to tell an Owner that the person in front of them is queueing again
 - Every owner function raises `shop_inactive` when the caller runs no active Shop, because each one starts by locking their Shop
-- `mark_served` and `undo_served` raise `ticket_not_found` when the Ticket is not one of the caller's, is not in their current Queue Day, or is no longer in the status the action needs. One token for all three: an Owner learns nothing about another Shop's Queue, and a stale button on their own screen is told the same true thing — that Ticket is not one they can act on now. `mark_no_show` and `remove_ticket` join them with #7
+- Every function that names a Ticket raises `ticket_not_found` when it is not one of the caller's, is not in their current Queue Day, or is no longer in a status the action accepts. One token for all three: an Owner learns nothing about another Shop's Queue, and a stale button on their own screen is told the same true thing — that Ticket is not one they can act on now
 - `start_last_call()`
   - Sets `joining_state = last_call` and `queue_days.last_call_at`.
   - Returns a `last_call` alert for every Waiting Ticket.
@@ -185,12 +195,14 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Moves carry-choice Tickets to the new Queue Day, numbered 1..k in their original order, with `carried_over_at = now()` and `last_call_choice = null`.
   - Removes the remaining Waiting Tickets, each with a `shop_closed` alert.
   - Resets `joining_state = open`.
-- `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at }], called: [{ id, number, name, called_at }], just_served: [{ id, number, name, undo_expires_in_ms }] }` for the current Queue Day
+- `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at, origin }], called: [{ id, number, name, called_at, no_show_in_ms }], just_served: [{ id, number, name, undo_expires_in_ms }] }` for the current Queue Day
+  - `origin` is what the dashboard's "Rejoined" badge reads: the Ticket is at the back with a high number, but its Customer has been in the shop a while
+  - `no_show_in_ms` counts down to when No-show is allowed, measured by the database for the same reason `undo_expires_in_ms` is — a tablet with a wrong clock must not offer a button the function would answer `too_early`
   - `just_served` is the Tickets Served within the Undo window, most recent first. It is what makes the Undo survive a reload and appear on the Shop's other phone
   - `undo_expires_in_ms` is measured by the database rather than by the screen, so a tablet with a wrong clock cannot offer an Undo that `undo_served` would then refuse. The screen counts it down on its own clock from the moment it arrives
   - Takes no Shop argument: it finds the Shop from `auth.uid()`, so a request cannot name one.
   - Raises `shop_inactive` when the caller runs no active Shop. The dashboard treats that as a state, not a failure — a layout and its page render at the same time, so the page cannot lean on the layout's redirect having happened first.
-  - Delivered so far (#6): all four keys.
+  - Delivered so far (#7): all four keys.
 - `get_owner_history(days int default 30)` → today's Tickets with statuses and timestamps, plus Served counts per day (Malaysia time) and the month-to-date total
 
 ### Estimated Wait (inside `get_customer_view`)

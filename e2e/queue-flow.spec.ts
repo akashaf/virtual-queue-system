@@ -146,7 +146,7 @@ test("a Customer who rejoins after being served cannot be undone over", async ({
 
   // Done freed the device, so the same phone can take a new place — which is
   // what puts the old Ticket and the new one in each other's way.
-  await page.evaluate(() => sessionStorage.clear());
+  await page.getByRole("button", { name: "Join queue" }).click();
   await join(page, shop.slug, "Ali");
   await expect(page.getByText("#002")).toBeVisible();
 

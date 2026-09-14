@@ -1,26 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   checkCustomerName,
+  isFinalStatus,
   MAX_CUSTOMER_NAME_LENGTH,
   type CustomerView,
-  type JoinError,
+  type CustomerError,
   type NameProblem,
 } from "@/lib/customer/view";
 import { formatTicketNumber } from "@/lib/ticket";
 import { format, type Dictionary } from "@/lib/i18n";
 import { useQueueChanged } from "@/lib/queue-changed";
-import { joinQueue } from "./actions";
+import {
+  joinQueue,
+  leaveQueue,
+  rejoinQueue,
+  type TicketActionResult,
+} from "./actions";
 
 /**
- * The Ticket this tab last held. Kept per session rather than per device, so a
- * final state stays on screen for as long as the Customer is looking at it and
- * is gone by their next visit (frontend.md §3.1).
+ * The Ticket whose ending this tab has already been shown and tapped past.
+ *
+ * The server keeps answering with a finished Ticket for the rest of the Queue
+ * Day, because that is the only way the page can know *which* ending it was.
+ * Dismissal is the browser's business, not the Shop's, so it is kept here
+ * (frontend.md §3.1) — and per session, so a Customer coming back later meets
+ * the join form rather than yesterday's news.
  */
-const LAST_TICKET_KEY = "vq_last_ticket";
+const DISMISSED_TICKET_KEY = "vq_dismissed_ticket";
 
 const GEOLOCATION_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
@@ -36,9 +57,14 @@ type Stage =
   | { kind: "idle" }
   | { kind: "locating" }
   | { kind: "joining" }
+  | { kind: "leaving" }
+  | { kind: "rejoining" }
   | { kind: "location_denied" }
   | { kind: "location_unavailable" }
-  | { kind: "rejected"; reason: JoinError | "failed" };
+  | { kind: "rejected"; reason: CustomerError | "failed" };
+
+/** The stages that are just a wait, each with something to say while it lasts. */
+type BusyStage = "locating" | "joining" | "leaving" | "rejoining";
 
 export function CustomerQueue({
   slug,
@@ -60,8 +86,7 @@ export function CustomerQueue({
   // snapshot is false and the client's is true.
   const hydrated = useSyncExternalStore(subscribeToNothing, onClient, onServer);
 
-  const storageKey = `${LAST_TICKET_KEY}:${slug}`;
-  const ticketId = view.ticket?.id ?? null;
+  const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
 
   const refetch = useCallback(async () => {
     try {
@@ -74,21 +99,38 @@ export function CustomerQueue({
 
   useQueueChanged(view.shop.id, refetch);
 
-  // The server only ever answers with an *active* Ticket, so remembering the id
-  // is the page's only way of knowing that a Ticket it used to hold has since
-  // been finished — including across a reload, which is why it is not just state.
-  useEffect(() => {
-    if (ticketId !== null) sessionStorage.setItem(storageKey, ticketId);
-  }, [storageKey, ticketId]);
-
-  // sessionStorage is the external store; the server snapshot is "nothing yet",
-  // which is also what a tab that has never held a Ticket reads.
-  const remembered = useSyncExternalStore(
+  // sessionStorage is the external store; the server snapshot is "nothing
+  // dismissed", which is also what a tab that has never held a Ticket reads.
+  const dismissed = useSyncExternalStore(
     subscribeToNothing,
     () => sessionStorage.getItem(storageKey),
     () => null,
   );
-  const lastTicketId = ticketId ?? remembered;
+  const [dismissedNow, setDismissedNow] = useState<string | null>(null);
+
+  function dismiss(id: string) {
+    sessionStorage.setItem(storageKey, id);
+    setDismissedNow(id);
+  }
+
+  const ended =
+    view.ticket && isFinalStatus(view.ticket.status) ? view.ticket : null;
+  const showEnding =
+    ended !== null && ended.id !== dismissed && ended.id !== dismissedNow;
+
+  async function act(
+    run: () => Promise<TicketActionResult>,
+    busy: BusyStage,
+  ) {
+    setStage({ kind: busy });
+    const result = await run();
+    if (result.status === "done") {
+      setView(result.view);
+      setStage({ kind: "idle" });
+    } else {
+      setStage({ kind: "rejected", reason: result.reason });
+    }
+  }
 
   async function handleJoin(event: React.FormEvent) {
     event.preventDefault();
@@ -134,12 +176,8 @@ export function CustomerQueue({
     void refetch();
   }
 
-  if (stage.kind === "locating" || stage.kind === "joining") {
-    return (
-      <Busy
-        message={stage.kind === "locating" ? dict.checkingLocation : dict.joining}
-      />
-    );
+  if (stage.kind === "locating" || stage.kind === "joining" || stage.kind === "leaving" || stage.kind === "rejoining") {
+    return <Busy message={busyMessage(stage.kind, dict)} />;
   }
 
   if (stage.kind === "location_denied" || stage.kind === "location_unavailable") {
@@ -164,20 +202,26 @@ export function CustomerQueue({
     );
   }
 
-  // get_customer_view only ever returns a Waiting or a Called Ticket.
-  if (view.ticket) {
-    return view.ticket.status === "called" ? (
-      <Called ticket={view.ticket} dict={dict} />
-    ) : (
-      <Waiting ticket={view.ticket} dict={dict} />
+  if (showEnding && ended) {
+    return (
+      <Ended
+        ticket={ended}
+        dict={dict}
+        onRejoin={() => void act(() => rejoinQueue(ended.id), "rejoining")}
+        onDismiss={() => dismiss(ended.id)}
+      />
     );
   }
 
-  // A Ticket this tab held that the server no longer counts as active. The only
-  // way out of the Queue so far is the Owner pressing Done; No-show, Left and
-  // Removed arrive with #7, which is what gives the server a status to send.
-  if (lastTicketId !== null) {
-    return <Served dict={dict} />;
+  if (view.ticket && !isFinalStatus(view.ticket.status)) {
+    const ticket = view.ticket;
+    const leave = () => void act(() => leaveQueue(ticket.id), "leaving");
+
+    return ticket.status === "called" ? (
+      <Called ticket={ticket} dict={dict} onLeave={leave} />
+    ) : (
+      <Waiting ticket={ticket} dict={dict} onLeave={leave} />
+    );
   }
 
   if (view.shop.joiningState === "last_call") {
@@ -275,9 +319,11 @@ function JoinForm({
 function Waiting({
   ticket,
   dict,
+  onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
+  onLeave: () => void;
 }) {
   return (
     <div
@@ -293,6 +339,7 @@ function Waiting({
       </p>
       <p className="text-xl font-medium">{aheadLabel(ticket.position, dict)}</p>
       <p className="text-sm text-muted-foreground">{dict.inPersonNote}</p>
+      <LeaveButton dict={dict} onLeave={onLeave} className="mt-4" />
     </div>
   );
 }
@@ -300,9 +347,11 @@ function Waiting({
 function Called({
   ticket,
   dict,
+  onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
+  onLeave: () => void;
 }) {
   return (
     // Over the whole screen and in the shop's loudest colours: this is the one
@@ -317,20 +366,147 @@ function Called({
         {formatTicketNumber(ticket.number)}
       </p>
       <p className="text-2xl font-medium">{dict.goToCounter}</p>
+      <LeaveButton
+        dict={dict}
+        onLeave={onLeave}
+        className="mt-6 border-primary-foreground/40 text-primary-foreground"
+      />
     </div>
   );
 }
 
-function Served({ dict }: { dict: Dictionary }) {
+/**
+ * What became of a Ticket that has ended, kept on screen until the Customer taps
+ * past it.
+ *
+ * Served has a way on for the same reason the others do. The server now answers
+ * with a finished Ticket for the rest of the Queue Day, so without one a
+ * Customer who has had their haircut could not queue again that day — for their
+ * child, or for a second cut — however long they waited.
+ */
+function Ended({
+  ticket,
+  dict,
+  onRejoin,
+  onDismiss,
+}: {
+  ticket: NonNullable<CustomerView["ticket"]>;
+  dict: Dictionary;
+  onRejoin: () => void;
+  onDismiss: () => void;
+}) {
+  switch (ticket.status) {
+    case "served":
+      return (
+        <Ending
+          title={dict.servedThanks}
+          action={dict.joinButton}
+          onAction={onDismiss}
+        />
+      );
+
+    case "no_show":
+      return ticket.canRejoin ? (
+        <Ending
+          title={dict.noShowTitle}
+          action={dict.joinAgain}
+          onAction={onRejoin}
+        />
+      ) : (
+        <Ending title={dict.noShowTitle} detail={dict.scanToJoinAgain} />
+      );
+
+    case "left":
+      return (
+        <Ending
+          title={dict.leftTitle}
+          action={dict.joinButton}
+          onAction={onDismiss}
+        />
+      );
+
+    default:
+      return (
+        <Ending
+          title={dict.removedTitle}
+          action={dict.joinButton}
+          onAction={onDismiss}
+        />
+      );
+  }
+}
+
+function Ending({
+  title,
+  detail,
+  action,
+  onAction,
+}: {
+  title: string;
+  detail?: string;
+  action?: string;
+  onAction?: () => void;
+}) {
   return (
-    <p
-      role="status"
-      aria-live="polite"
-      className="my-auto text-center text-2xl font-semibold tracking-tight"
-    >
-      {dict.servedThanks}
-    </p>
+    <div className="flex flex-1 flex-col justify-center gap-4 text-center">
+      <p role="status" aria-live="polite" className="text-2xl font-semibold tracking-tight">
+        {title}
+      </p>
+      {detail ? <p className="text-muted-foreground">{detail}</p> : null}
+      {action && onAction ? (
+        <Button type="button" size="lg" className="h-12 text-base" onClick={onAction}>
+          {action}
+        </Button>
+      ) : null}
+    </div>
   );
+}
+
+/**
+ * Leaving is confirmed, in the chair as much as in the Queue: a mis-tap costs
+ * the Customer their place, and the only way back is the QR code at the shop.
+ */
+function LeaveButton({
+  dict,
+  onLeave,
+  className,
+}: {
+  dict: Dictionary;
+  onLeave: () => void;
+  className?: string;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="outline" className={`h-12 px-6 ${className ?? ""}`}>
+          {dict.leaveQueue}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{dict.leaveConfirmTitle}</AlertDialogTitle>
+          <AlertDialogDescription>{dict.leaveConfirmBody}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{dict.leaveConfirmStay}</AlertDialogCancel>
+          <AlertDialogAction onClick={onLeave}>
+            {dict.leaveConfirmLeave}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function busyMessage(stage: BusyStage, dict: Dictionary): string {
+  switch (stage) {
+    case "locating":
+      return dict.checkingLocation;
+    case "leaving":
+    case "rejoining":
+    case "joining":
+      return dict.joining;
+  }
 }
 
 function Busy({ message }: { message: string }) {
@@ -392,7 +568,7 @@ function aheadLabel(position: number, dict: Dictionary): string {
   return format(dict.aheadOfYou, { count: position });
 }
 
-function rejectionMessage(reason: JoinError | "failed", dict: Dictionary): string {
+function rejectionMessage(reason: CustomerError | "failed", dict: Dictionary): string {
   switch (reason) {
     case "too_far":
       return dict.tooFar;
@@ -404,6 +580,10 @@ function rejectionMessage(reason: JoinError | "failed", dict: Dictionary): strin
       return dict.alreadyInQueue;
     case "shop_inactive":
       return dict.shopUnavailable;
+    case "not_rejoinable":
+      return dict.cannotRejoin;
+    case "ticket_not_found":
+      return dict.ticketGone;
     case "failed":
       return dict.joinFailed;
   }

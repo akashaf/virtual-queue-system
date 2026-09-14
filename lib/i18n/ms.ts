@@ -45,4 +45,22 @@ export const ms: Dictionary = {
   yourTurn: "Giliran anda",
   goToCounter: "Sila ke kaunter",
   servedThanks: "Terima kasih! Jumpa lagi",
+
+  // Keluar
+  leaveQueue: "Keluar giliran",
+  leaveConfirmTitle: "Keluar dari giliran?",
+  leaveConfirmBody:
+    "Anda akan kehilangan tempat anda. Untuk menyertai semula, anda perlu mengimbas kod QR di kedai.",
+  leaveConfirmStay: "Kekal dalam giliran",
+  leaveConfirmLeave: "Keluar",
+
+  // Cara lain giliran boleh berakhir
+  noShowTitle: "Anda terlepas giliran anda",
+  joinAgain: "Sertai semula",
+  scanToJoinAgain: "Imbas kod QR di kedai untuk menyertai semula",
+  cannotRejoin:
+    "Anda tidak boleh menyertai semula dengan tiket ini. Imbas kod QR di kedai.",
+  leftTitle: "Anda telah keluar dari giliran",
+  removedTitle: "Tiket anda telah dibuang",
+  ticketGone: "Tiket itu telah pun berakhir",
 };

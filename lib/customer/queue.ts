@@ -1,10 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  isJoinError,
+  isCustomerError,
   toCustomerView,
   type CustomerView,
-  type JoinError,
+  type CustomerError,
 } from "./view";
 
 /**
@@ -39,7 +39,7 @@ export interface CreateTicketRequest {
 
 export type CreateTicketOutcome =
   | { ok: true; view: CustomerView }
-  | { ok: false; reason: JoinError | "failed" };
+  | { ok: false; reason: CustomerError | "failed" };
 
 /**
  * Creates the Customer's Ticket, or says why not.
@@ -61,13 +61,60 @@ export async function createTicket(
   });
 
   if (error) {
-    if (isJoinError(error.message)) return { ok: false, reason: error.message };
+    if (isCustomerError(error.message)) return { ok: false, reason: error.message };
     console.error("join_queue failed", error);
     return { ok: false, reason: "failed" };
   }
 
   // `join_queue` returns jsonb, which the generated types can only call `Json`;
   // the shape is pinned by the `{ result, alerts }` contract in backend.md §5.
+  const { result } = data as unknown as { result: unknown };
+  return { ok: true, view: toCustomerView(result) };
+}
+
+export type TicketOutcome =
+  | { ok: true; view: CustomerView }
+  | { ok: false; reason: CustomerError | "failed" };
+
+/**
+ * The Customer gives up their place, from the Queue or from the chair.
+ *
+ * The device id is the whole of their claim, so it goes to the function rather
+ * than being checked here: a Ticket another device holds is not this one's to
+ * find, and says so with the same token as a Ticket that has already ended.
+ */
+export async function leaveTicket(
+  ticketId: string,
+  deviceId: string,
+): Promise<TicketOutcome> {
+  return customerCall("leave_queue", { p_ticket_id: ticketId, p_device_id: deviceId });
+}
+
+/**
+ * A Customer who missed their turn takes a new place at the back.
+ *
+ * No coordinates: ADR 0002's exemption lives in `rejoin_queue`, which keeps it
+ * narrow by only ever accepting a No-show from a scan in the current Queue Day.
+ */
+export async function rejoinTicket(
+  ticketId: string,
+  deviceId: string,
+): Promise<TicketOutcome> {
+  return customerCall("rejoin_queue", { p_ticket_id: ticketId, p_device_id: deviceId });
+}
+
+async function customerCall(
+  fn: "leave_queue" | "rejoin_queue",
+  args: { p_ticket_id: string; p_device_id: string },
+): Promise<TicketOutcome> {
+  const { data, error } = await createAdminClient().rpc(fn, args);
+
+  if (error) {
+    if (isCustomerError(error.message)) return { ok: false, reason: error.message };
+    console.error(`${fn} failed`, error);
+    return { ok: false, reason: "failed" };
+  }
+
   const { result } = data as unknown as { result: unknown };
   return { ok: true, view: toCustomerView(result) };
 }

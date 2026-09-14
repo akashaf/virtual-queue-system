@@ -59,7 +59,13 @@ interface JoinEnvelope {
       joining_state: string;
       waiting_count: number;
     };
-    ticket: { id: string; number: number; status: string; position: number } | null;
+    ticket: {
+      id: string;
+      number: number;
+      status: string;
+      position: number;
+      can_rejoin: boolean;
+    } | null;
   };
   alerts: unknown[];
 }
@@ -88,6 +94,7 @@ describe("join_queue", () => {
       number: 1,
       status: "waiting",
       position: 0,
+      can_rejoin: false,
     });
     // Joining raises none: the Customer is looking at the page already.
     expect(alerts).toEqual([]);

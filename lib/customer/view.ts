@@ -18,12 +18,21 @@ export interface CustomerView {
     /** Waiting Tickets in the current Queue Day, shown before joining too. */
     waitingCount: number;
   };
+  /**
+   * The last Ticket this device took in the Shop's current Queue Day, whatever
+   * became of it. Not only an active one: a Customer whose Ticket the Owner
+   * ended cannot otherwise be told which of No-show, Removed and Served happened
+   * to them, because all three look the same from a page that only sees a Ticket
+   * disappear.
+   */
   ticket: {
     id: string;
     number: number;
     status: TicketStatus;
     /** Waiting Tickets with a lower number. Called Tickets are ahead of nobody. */
     position: number;
+    /** Whether this Ticket is a No-show the Customer may still come back from. */
+    canRejoin: boolean;
   } | null;
 }
 
@@ -41,6 +50,7 @@ interface CustomerViewJson {
     number: number;
     status: TicketStatus;
     position: number;
+    can_rejoin: boolean;
   } | null;
 }
 
@@ -61,26 +71,47 @@ export function toCustomerView(json: unknown): CustomerView {
       number: ticket.number,
       status: ticket.status,
       position: ticket.position,
+      canRejoin: ticket.can_rejoin,
     },
   };
 }
 
 /**
- * The reasons `join_queue` refuses, raised as the exception message. Anything
- * else is a bug rather than a Customer's situation, and is reported as such.
+ * The reasons a Customer function refuses, raised as the exception message.
+ * Anything else is a bug rather than a Customer's situation, and is reported as
+ * such.
+ *
+ * One list for all three of Join, Leave and Rejoin: they overlap heavily —
+ * a Shop switched off or closing to new Customers refuses both ways in — and the
+ * page needs one sentence for each token however it got there.
  */
-export const JOIN_ERRORS = [
+export const CUSTOMER_ERRORS = [
   "shop_inactive",
   "last_call",
   "already_in_queue",
   "too_far",
   "queue_full",
+  "not_rejoinable",
+  "ticket_not_found",
 ] as const;
 
-export type JoinError = (typeof JOIN_ERRORS)[number];
+export type CustomerError = (typeof CUSTOMER_ERRORS)[number];
 
-export function isJoinError(message: string | undefined): message is JoinError {
-  return JOIN_ERRORS.includes(message as JoinError);
+export function isCustomerError(
+  message: string | undefined,
+): message is CustomerError {
+  return CUSTOMER_ERRORS.includes(message as CustomerError);
+}
+
+/**
+ * The statuses a Ticket never comes back from. The page shows one of these until
+ * the Customer taps past it, rather than dropping them straight back on the join
+ * form as though nothing had happened.
+ */
+const FINAL_STATUSES: TicketStatus[] = ["served", "no_show", "left", "removed"];
+
+export function isFinalStatus(status: TicketStatus): boolean {
+  return FINAL_STATUSES.includes(status);
 }
 
 /** The longest name the `tickets_customer_name_length` constraint will take. */

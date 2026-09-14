@@ -44,6 +44,23 @@ export const en = {
   yourTurn: "It's your turn",
   goToCounter: "Go to the counter",
   servedThanks: "Thanks! See you next time",
+
+  // Leaving
+  leaveQueue: "Leave queue",
+  leaveConfirmTitle: "Leave the queue?",
+  leaveConfirmBody:
+    "You'll lose your place. To join again you'll need to scan the QR code at the shop.",
+  leaveConfirmStay: "Stay in the queue",
+  leaveConfirmLeave: "Leave",
+
+  // How else a Ticket can end
+  noShowTitle: "You missed your turn",
+  joinAgain: "Join again",
+  scanToJoinAgain: "Scan the QR code at the shop to join again",
+  cannotRejoin: "You can't join again from this ticket. Scan the QR code at the shop.",
+  leftTitle: "You left the queue",
+  removedTitle: "Your ticket was removed",
+  ticketGone: "That ticket has already ended",
 };
 
 export type Dictionary = Record<keyof typeof en, string>;

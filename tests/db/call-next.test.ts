@@ -27,6 +27,7 @@ interface CalledTicket {
   number: number;
   name: string | null;
   called_at: string;
+  no_show_in_ms: number;
 }
 
 async function join(slug: string, name: string) {
@@ -66,6 +67,8 @@ describe("call_next", () => {
       number: 1,
       name: "Ali",
       called_at: expect.any(String),
+      // The five minutes before the Owner may give up on them, just started.
+      no_show_in_ms: 300_000,
     });
   });
 

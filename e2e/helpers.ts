@@ -62,6 +62,20 @@ export async function signInAsOwner(page: Page, email: string, password: string)
   await expect(page).toHaveURL("/dashboard");
 }
 
+/**
+ * Moves a Shop's calls back in time, so a test can reach the five-minute No-show
+ * window without waiting five minutes for it.
+ */
+export async function backdateCalls(shopId: string, minutes: number) {
+  const calledAt = new Date(Date.now() - minutes * 60_000).toISOString();
+  const { error } = await admin
+    .from("tickets")
+    .update({ called_at: calledAt })
+    .eq("shop_id", shopId)
+    .eq("status", "called");
+  if (error) throw error;
+}
+
 /** Switches a Shop off, the way `PATCH /api/operator/shops/[slug]` will. */
 export async function deactivateShop(id: string) {
   const { error } = await admin.from("shops").update({ is_active: false }).eq("id", id);
