@@ -36,6 +36,14 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **`db:reset` before the migration edit is not a reset.** A test asserting a new constraint
   passed against the old function for exactly this reason. Reset after the *last* SQL edit,
   then run the tests.
+- **`supabase config diff` does not tell you whether phone sign-in is on.** It reports
+  `auth.sms.twilio.enabled | remote: true` even after phone auth is switched off, because that
+  key means *Twilio is the selected SMS provider*, not *phone sign-in is enabled*. Trusting it
+  cost this repo three rounds of telling the user a dashboard change had not worked when it
+  had. Ask the Auth service, which answers for the running system:
+  `curl -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" https://<ref>.supabase.co/auth/v1/settings`
+  and read `external.phone`. More generally, `config diff` compares against the CLI's config
+  model, which is not always shaped like the thing the dashboard toggles.
 - **Never run `supabase config push` from the repo.** `supabase/config.toml` is the local
   development config and much of it is wrong for production — `site_url`, redirect URLs,
   pooler sizes, OTP and email limits. It has no per-key flag, and a non-interactive run
