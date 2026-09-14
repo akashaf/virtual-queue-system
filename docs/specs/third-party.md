@@ -8,12 +8,12 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 
 | Service | Role | Plan at launch | Monthly cost |
 |---|---|---|---|
-| Netlify | Hosting (Next.js runtime), Server Actions, Route Handlers, Scheduled Functions | **Paid plan** (Personal or Pro): on the credit-based Free plan the site is paused when monthly credits run out, which would take every Shop's queue offline | ~US$9 (Personal) or ~US$20 per member (Pro) |
+| Netlify | Hosting (Next.js runtime), Server Actions, Route Handlers, Scheduled Functions | **Free plan** until the first paying Shop ([ADR 0003](../adr/0003-netlify-free-plan-until-first-paying-shop.md)). The site is paused if monthly credits run out, which would take every Shop's Queue offline; see [§8](#8-upgrade-triggers) | US$0, then ~US$9 (Personal) or ~US$20 per member (Pro) |
 | Supabase | Postgres, Auth (Owners only), Realtime | Free, then Pro when limits are near | US$0, then ~US$25 |
 | Browser push services (FCM for Chrome/Android, Mozilla Autopush, Apple Push for installed web apps) | Deliver Web Push | No account needed; uses the VAPID keys we generate | US$0 |
 | Sentry | Error tracking for client and server | Free Developer plan | US$0 |
-| npm libraries: `@supabase/supabase-js`, `@supabase/ssr`, `web-push`, `qrcode`, `@sentry/nextjs`, shadcn/ui (Radix), `sonner` | Code dependencies | Open source | US$0 |
-| Dev tooling: Supabase CLI, Vitest, Playwright | Local database, tests | Open source | US$0 |
+| npm libraries: `@supabase/supabase-js`, `@supabase/ssr`, `server-only`, `web-push`, `qrcode`, `@sentry/nextjs`, shadcn/ui (Radix, with shadcn's `cn` class merger), `sonner` | Code dependencies | Open source | US$0 |
+| Dev tooling: Supabase CLI (a devDependency, run with `bunx supabase`), a Docker-compatible runtime such as Colima, Vitest, `pg`, Playwright | Local database, tests | Open source | US$0 |
 
 **Not used in the MVP (deferred):**
 - **Resend** or other email: owner forgot-password needs a custom domain first
@@ -35,31 +35,36 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
     [functions]
       directory = "netlify/functions"
     ```
-- **Next.js 16 support:** the Next.js docs say Netlify is building a verified adapter on the new Adapter API and currently uses its own integration. **Before writing features, deploy the empty app and confirm it builds and runs on Next 16.** Specifically test these three features, each of which has a fallback in [backend.md](./backend.md):
+- **Next.js 16 support:** the Next.js docs say Netlify is building a verified adapter on the new Adapter API and currently uses its own integration. **Verified on 2026-09-14** with a throwaway deploy (details on issue #3): these all work on Netlify, so no fallbacks are needed:
   - Server Actions
-  - `proxy.ts` (Node.js runtime)
-  - `after()`
-- **Functions region:** Netlify runs functions in US East (Ohio) by default. Switch to **Asia Pacific (Singapore)** in *Site configuration → Build & deploy → Functions region* so functions sit next to Supabase `ap-southeast-1` and Malaysian customers. Check that your plan allows changing it. If it doesn't, every action pays two trans-Pacific hops (browser → US → Singapore database), so choose a plan that does.
-- **Domain:** `<site-name>.netlify.app`.
+  - `proxy.ts`, running on the Node.js runtime
+  - `after()`, whose work completes after the response has been sent
+- **Node version:** Netlify functions ran **Node 22.14.0** at verification, while local development used Node 26. Pin the version (the `NODE_VERSION` environment variable or `engines` in `package.json`) so local and production stay close.
+- **Functions region:** Netlify runs functions in US East (Ohio) by default. Switch to **Asia Pacific (Singapore)** in *Site configuration → Build & deploy → Functions region* so functions sit next to Supabase `ap-southeast-1` and Malaysian customers. **Not yet confirmed whether the Free plan allows changing it.** If it doesn't, every action pays two trans-Pacific hops (browser → US → Singapore database); that is accepted until the upgrade in [§8](#8-upgrade-triggers), see [ADR 0003](../adr/0003-netlify-free-plan-until-first-paying-shop.md).
+- **Domain:** `virtual-queue-system.netlify.app`.
   - This is the host every printed QR code points to, **so never rename the Netlify site**. Renaming changes the subdomain and breaks every printed QR code.
-  - Set `APP_BASE_URL` to it.
+  - Set `APP_BASE_URL` to `https://virtual-queue-system.netlify.app`.
 - **Environment variables:** everything in [backend.md §10](./backend.md#10-environment-variables).
   - Set them under *Site configuration → Environment variables* with the **Functions** and **Runtime** scopes (the `NEXT_PUBLIC_*` values also need **Builds**).
   - Mark `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, `OPERATOR_API_KEY` and `CRON_SECRET` as secret values where the plan supports it.
-  - Use per-context values: **Production** points at the real Supabase project; **Deploy Previews** and **Branch deploys** point at a separate Supabase project, or aren't enabled.
+  - Only **Production** is deployed, and it points at the real Supabase project. Deploy Previews and Branch deploys stay disabled (below); if they're ever enabled, give them values for a separate Supabase project.
 - **Scheduled Functions:** one function, `netlify/functions/daily.mts`, scheduled `0 19 * * *` (UTC). It only calls `POST /api/cron/daily` with the `CRON_SECRET` header; see [backend.md §9](./backend.md#9-scheduled-jobs-netlify-scheduled-functions). Scheduled functions only run on published production deploys, and can be triggered with *Run now* in the Netlify UI for testing.
 - **Function limits:** Netlify functions have a short synchronous execution limit. All queue work is one database call, and pushes go out in parallel with `Promise.allSettled`, so no request should come close to it.
-- **Deploy Previews:** public by default. Either turn on password protection (plan-dependent) or disable Deploy Previews, because a preview wired to real data would expose the Operator API. Production must stay public for customers.
+- **Deploy Previews:** public by default. **Disable Deploy Previews and Branch deploys**, because a preview wired to real data would expose the Operator API and password protection isn't available on the Free plan. Production must stay public for customers.
 
 ## 3. Supabase
 
-- **Project:** region `ap-southeast-1` (Singapore). All schema, functions, RLS policies and the Realtime trigger are managed as **Supabase CLI migrations** in `supabase/migrations/`. Never edit the database directly in the dashboard.
+- **Project:** `queue-service`, region `ap-southeast-1` (Singapore), linked to the repo with `bunx supabase link`. All schema, functions, RLS policies and the Realtime trigger are managed as **Supabase CLI migrations** in `supabase/migrations/`, applied with `bunx supabase db push` (needs the database password). Never edit the database directly in the dashboard.
+- **Local development:** `bun run db:start` runs the full stack locally in Docker (a Docker-compatible runtime such as Colima is required). Automated tests, including the queue-function tests, **always run against the local stack, never the cloud project**, because they create and delete data and depend on resets.
 - **Auth settings:**
   - Email provider on, **public sign-ups disabled**. Owners are created only through the Operator API with `auth.admin.createUser`.
+    - In `supabase/config.toml`, block sign-ups with `[auth] enable_signup = false` and keep `[auth.email] enable_signup = true`. The email setting switches the whole email provider, so setting it to false also blocks Owner password sign-in.
   - Email confirmation isn't needed, because created users are pre-confirmed.
   - **JWT expiry: 600 s**, so revoked sessions stop working within 10 minutes.
   - Sessions: refresh tokens keep Owners signed in. Inactivity timeout and time-boxed sessions are Pro-plan settings; turn on a 30-day inactivity timeout after upgrading. Until then sessions last until revoked.
   - The built-in email sender is not used, because it only delivers to project team addresses and is heavily rate limited.
+  - `site_url` is `https://virtual-queue-system.netlify.app`.
+  - **Applying auth settings to the cloud project:** `supabase/config.toml` is the local development config, and many of its values (such as `site_url`, redirect URLs, pooler sizes, OTP and email limits) are wrong for production. **Never run `supabase config push` from the repo.** Instead, write a temporary `supabase/config.toml` in a scratch directory that declares only the keys to change, check `bunx supabase config diff --workdir <dir> --project-ref <ref>`, then run `config push` with the same flags; undeclared keys are left unchanged. Without a terminal, `config push` applies changes without asking for confirmation, so always diff first.
 - **Realtime:** Broadcast only, sent from Postgres with `realtime.send`, on public topics `shop:{id}`. Postgres Changes is not used, so RLS never has to be evaluated per subscriber.
 - **Keys:**
   - The anon key goes to browsers. It can only open Realtime and Auth, and has no table or function grants.
@@ -113,7 +118,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 ## 6. QR codes
 
 - Generated server-side with the `qrcode` npm package at `GET /api/operator/shops/[slug]/qr.png`. No external QR service.
-- Content: `https://<site-name>.netlify.app/s/<slug>`. PNG, 1024 px, error correction M, 4-module quiet zone.
+- Content: `https://virtual-queue-system.netlify.app/s/<slug>`. PNG, 1024 px, error correction M, 4-module quiet zone.
 - The Operator designs the printed poster separately, for example in Canva. Test-scan the printed poster with an iPhone Camera and an Android Camera before handing it over.
 
 ## 7. Operator runbook: onboarding a Shop
@@ -129,8 +134,8 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 
 | Trigger | Change |
 |---|---|
-| First paying Shop goes live | Netlify paid plan (so the site can't be paused for running out of credits, and the functions region can be set to Singapore). Supabase Pro strongly recommended (no pausing, backups, session timeouts) |
-| Netlify credit usage passes ~70% mid-month | Move up a Netlify plan or add credits before the site is paused |
+| First paying Shop goes live | Move from the Netlify Free plan to a paid plan, so the site can't be paused for running out of credits and the functions region can be set to Singapore ([ADR 0003](../adr/0003-netlify-free-plan-until-first-paying-shop.md)). Supabase Pro strongly recommended (no pausing, backups, session timeouts) |
+| Netlify credit usage passes ~70% mid-month (check the Netlify usage page regularly while on Free) | Upgrade to a paid Netlify plan before the site is paused |
 | Buy a domain | Add it to Netlify, reprint QR codes, add Resend with DNS records, enable owner forgot-password |
 | Owners report missed alerts on iPhone | Phase 2: WhatsApp Cloud API (needs Meta Business verification, customer phone numbers and a per-message cost, to be weighed against RM0.25) |
 | More than ~20 Shops or manual invoicing is painful | Phase 2: automated invoicing and a payment gateway |

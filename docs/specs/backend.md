@@ -20,7 +20,7 @@ Out of scope: payments, WhatsApp/SMS, multi-shop Owners, Barbers, In-person Cust
 Browser (customer / owner)
   │  Server Actions (mutations)      Route Handlers (reads, operator API, cron)
   ▼                                   ▼
-Next.js 16 on Netlify (functions region ap-southeast-1) ── after() ──► web-push ──► browser push services
+Next.js 16 on Netlify (Free plan; functions region ap-southeast-1 if the plan allows) ── after() ──► web-push ──► browser push services
   │  supabase-js (@supabase/ssr)
   ▼
 Supabase (ap-southeast-1): Postgres + Auth + Realtime
@@ -262,12 +262,12 @@ export const config = { schedule: '0 19 * * *' } // 19:00 UTC = 03:00 Malaysia t
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:`) | public / server | Web Push |
 | `OPERATOR_API_KEY` | server | Admin API |
 | `CRON_SECRET` | server | Cron route |
-| `APP_BASE_URL` | server | QR target, e.g. `https://<project>.vercel.app` |
+| `APP_BASE_URL` | server | QR target: `https://virtual-queue-system.netlify.app` in production |
 | `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | client / build | Error tracking |
 
 ## 11. Testing
 
-- **Queue rules (Vitest against `supabase start`):** one test file per function covering:
+- **Queue rules (Vitest against `supabase start`):** these tests always run against the local stack, never the cloud project. One test file per function, covering:
   - Every row of the state machine table, including guards and error codes
   - Concurrent `call_next` from two connections calls two different Tickets
   - A concurrent join at `max_queue_size - 1` admits exactly one
