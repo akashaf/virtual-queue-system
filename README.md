@@ -1,37 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Barbershop Virtual Queue
 
-## Getting Started
+Walk-in customers join a barbershop's queue from their phone and are alerted when their turn approaches; Owners run the queue from a dashboard.
 
-First, run the development server:
+- Domain language: [CONTEXT.md](CONTEXT.md)
+- Decisions: [docs/adr/](docs/adr/)
+- MVP specs: [docs/specs/](docs/specs/)
+
+## Development
+
+Requires [bun](https://bun.sh) and a Docker-compatible runtime for local Supabase (e.g. `colima start`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bunx playwright install chromium   # once
+bun run db:start                   # local Postgres, Auth and Realtime
+bun run db:env > .env.local        # then add the remaining values from .env.example
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Schema, functions, RLS and triggers are changed only through migrations in `supabase/migrations/` (`bunx supabase migration new <name>`, then `bun run db:reset`). Never edit the database in the Studio.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Seam |
+|---|---|
+| `bun run test:unit` | Pure modules and Route Handlers (Request in, Response out) |
+| `bun run test:db` | Postgres functions against local Supabase (needs `db:start`) |
+| `bun run e2e` | Playwright in Chromium against `next dev` |
+| `bun run test` | Unit and database suites together |
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# virtual-queue-system
+Also: `bun run typecheck` and `bun run lint`.
