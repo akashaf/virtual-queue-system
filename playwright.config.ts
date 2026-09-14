@@ -1,7 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
-const baseURL = `http://127.0.0.1:${PORT}`;
+// Set E2E_BASE_URL to run against a deployed site instead of a local dev server.
+const remoteBaseURL = process.env.E2E_BASE_URL;
+const baseURL = remoteBaseURL ?? `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "e2e",
@@ -14,10 +16,12 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Pixel 7"] } }],
-  webServer: {
-    command: `bunx next dev --port ${PORT}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: remoteBaseURL
+    ? undefined
+    : {
+        command: `bunx next dev --port ${PORT}`,
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });
