@@ -8,7 +8,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
   - Read `node_modules/next/dist/docs/` before implementing.
   - `params` and `searchParams` are Promises.
   - Session refresh lives in `proxy.ts`.
-- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Card, Dialog, AlertDialog, Sonner toast, Badge, Tabs).
+- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Card, Dialog, AlertDialog, DropdownMenu, Sonner toast, Badge, Tabs).
   - Design mobile-first: 360 px minimum width, touch targets ≥ 44 px.
 - **Data:**
   - Server Components render the first view.

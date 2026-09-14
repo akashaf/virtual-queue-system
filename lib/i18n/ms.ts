@@ -19,6 +19,7 @@ export const ms: Dictionary = {
   // Sedang menyertai
   checkingLocation: "Memastikan anda berada di kedai…",
   joining: "Menyertai giliran…",
+  leaving: "Keluar dari giliran…",
   tryAgain: "Cuba lagi",
 
   // Sebab menyertai tidak berjaya

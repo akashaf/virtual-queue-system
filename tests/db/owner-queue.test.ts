@@ -42,6 +42,8 @@ interface OwnerQueue {
     id: string;
     number: number;
     name: string;
+    called_at: string;
+    no_show_in_ms: number;
     undo_expires_in_ms: number;
   }[];
 }
@@ -271,7 +273,14 @@ describe("get_owner_queue just served", () => {
     const queue = await ownerQueue(owner.email, owner.password);
 
     expect(queue.just_served).toEqual([
-      { id, number: 1, name: "Ali", undo_expires_in_ms: expect.any(Number) },
+      {
+        id,
+        number: 1,
+        name: "Ali",
+        called_at: expect.any(String),
+        no_show_in_ms: expect.any(Number),
+        undo_expires_in_ms: expect.any(Number),
+      },
     ]);
     // It is neither waiting nor in a chair any more; only undoable.
     expect(queue.waiting).toEqual([]);

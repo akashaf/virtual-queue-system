@@ -23,6 +23,7 @@ import {
   type NameProblem,
 } from "@/lib/customer/view";
 import { formatTicketNumber } from "@/lib/ticket";
+import { cn } from "@/lib/utils";
 import { format, type Dictionary } from "@/lib/i18n";
 import { useQueueChanged } from "@/lib/queue-changed";
 import {
@@ -64,7 +65,10 @@ type Stage =
   | { kind: "rejected"; reason: CustomerError | "failed" };
 
 /** The stages that are just a wait, each with something to say while it lasts. */
-type BusyStage = "locating" | "joining" | "leaving" | "rejoining";
+type BusyStage = Extract<
+  Stage,
+  { kind: "locating" | "joining" | "leaving" | "rejoining" }
+>["kind"];
 
 export function CustomerQueue({
   slug,
@@ -99,24 +103,19 @@ export function CustomerQueue({
 
   useQueueChanged(view.shop.id, refetch);
 
-  // sessionStorage is the external store; the server snapshot is "nothing
+  // sessionStorage is where dismissal lives, so the page reads it from there
+  // rather than shadowing it in state. The server snapshot is "nothing
   // dismissed", which is also what a tab that has never held a Ticket reads.
   const dismissed = useSyncExternalStore(
-    subscribeToNothing,
+    subscribeToDismissals,
     () => sessionStorage.getItem(storageKey),
     () => null,
   );
-  const [dismissedNow, setDismissedNow] = useState<string | null>(null);
-
-  function dismiss(id: string) {
-    sessionStorage.setItem(storageKey, id);
-    setDismissedNow(id);
-  }
 
   const ended =
-    view.ticket && isFinalStatus(view.ticket.status) ? view.ticket : null;
-  const showEnding =
-    ended !== null && ended.id !== dismissed && ended.id !== dismissedNow;
+    view.ticket && isFinalStatus(view.ticket.status) && view.ticket.id !== dismissed
+      ? view.ticket
+      : null;
 
   async function act(
     run: () => Promise<TicketActionResult>,
@@ -176,7 +175,7 @@ export function CustomerQueue({
     void refetch();
   }
 
-  if (stage.kind === "locating" || stage.kind === "joining" || stage.kind === "leaving" || stage.kind === "rejoining") {
+  if (isBusy(stage)) {
     return <Busy message={busyMessage(stage.kind, dict)} />;
   }
 
@@ -202,13 +201,13 @@ export function CustomerQueue({
     );
   }
 
-  if (showEnding && ended) {
+  if (ended) {
     return (
       <Ended
         ticket={ended}
         dict={dict}
         onRejoin={() => void act(() => rejoinQueue(ended.id), "rejoining")}
-        onDismiss={() => dismiss(ended.id)}
+        onDismiss={() => rememberDismissed(storageKey, ended.id)}
       />
     );
   }
@@ -413,7 +412,15 @@ function Ended({
           onAction={onRejoin}
         />
       ) : (
-        <Ending title={dict.noShowTitle} detail={dict.scanToJoinAgain} />
+        // Still a way on, even though the offer has gone. The server keeps
+        // answering with this Ticket all day, so without one the Customer would
+        // scan the QR code as told and land straight back on this screen.
+        <Ending
+          title={dict.noShowTitle}
+          detail={dict.scanToJoinAgain}
+          action={dict.joinButton}
+          onAction={onDismiss}
+        />
       );
 
     case "left":
@@ -425,7 +432,7 @@ function Ended({
         />
       );
 
-    default:
+    case "removed":
       return (
         <Ending
           title={dict.removedTitle}
@@ -433,6 +440,10 @@ function Ended({
           onAction={onDismiss}
         />
       );
+
+    // Waiting and Called are not endings, and never reach here.
+    default:
+      return null;
   }
 }
 
@@ -478,7 +489,7 @@ function LeaveButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="outline" className={`h-12 px-6 ${className ?? ""}`}>
+        <Button type="button" variant="outline" className={cn("h-12 px-6", className)}>
           {dict.leaveQueue}
         </Button>
       </AlertDialogTrigger>
@@ -498,11 +509,21 @@ function LeaveButton({
   );
 }
 
+function isBusy(stage: Stage): stage is Stage & { kind: BusyStage } {
+  return (
+    stage.kind === "locating" ||
+    stage.kind === "joining" ||
+    stage.kind === "leaving" ||
+    stage.kind === "rejoining"
+  );
+}
+
 function busyMessage(stage: BusyStage, dict: Dictionary): string {
   switch (stage) {
     case "locating":
       return dict.checkingLocation;
     case "leaving":
+      return dict.leaving;
     case "rejoining":
     case "joining":
       return dict.joining;
@@ -590,6 +611,24 @@ function rejectionMessage(reason: CustomerError | "failed", dict: Dictionary): s
 }
 
 const subscribeToNothing = () => () => {};
+
+/**
+ * sessionStorage fires no events of its own for the tab that writes to it, so
+ * the few readers of the dismissed-Ticket key are kept here and told directly.
+ */
+const dismissalListeners = new Set<() => void>();
+
+function subscribeToDismissals(onChange: () => void) {
+  dismissalListeners.add(onChange);
+  return () => {
+    dismissalListeners.delete(onChange);
+  };
+}
+
+function rememberDismissed(key: string, ticketId: string) {
+  sessionStorage.setItem(key, ticketId);
+  for (const listener of dismissalListeners) listener();
+}
 const onClient = () => true;
 const onServer = () => false;
 

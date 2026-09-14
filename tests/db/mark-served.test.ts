@@ -26,6 +26,8 @@ interface ServedTicket {
   id: string;
   number: number;
   name: string | null;
+  called_at: string;
+  no_show_in_ms: number;
   undo_expires_in_ms: number;
 }
 
@@ -73,6 +75,8 @@ describe("mark_served", () => {
       id: ticket.id,
       number: 1,
       name: "Ali",
+      called_at: expect.any(String),
+      no_show_in_ms: expect.any(Number),
       undo_expires_in_ms: 120_000,
     });
     const { rows } = await db.query(
@@ -82,6 +86,21 @@ describe("mark_served", () => {
     expect(rows[0].status).toBe("served");
     expect(rows[0].served_at).not.toBeNull();
     expect(rows[0].finished_at).not.toBeNull();
+  });
+
+  test("keeps the call it came from, so an Undo does not restart the chair's clock", async () => {
+    const { ticket, client } = await shopWithCalledTicket();
+    await db.query(
+      "update public.tickets set called_at = now() - interval '4 minutes' where id = $1",
+      [ticket.id],
+    );
+
+    const served = await markServed(client, ticket.id);
+
+    // One minute of the No-show wait left, not the whole five: the Customer has
+    // been in that chair for four, and Undo puts them back in the same one.
+    expect(served.ticket!.no_show_in_ms).toBeGreaterThan(58_000);
+    expect(served.ticket!.no_show_in_ms).toBeLessThanOrEqual(60_000);
   });
 
   test("refuses a Ticket that is not in a chair", async () => {

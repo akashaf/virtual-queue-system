@@ -18,6 +18,7 @@ export const en = {
   // Joining
   checkingLocation: "Checking you're at the shop…",
   joining: "Joining the queue…",
+  leaving: "Leaving the queue…",
   tryAgain: "Try again",
 
   // Why a join did not work

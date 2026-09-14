@@ -29,7 +29,14 @@ const json = {
     },
   ],
   just_served: [
-    { id: "t-x", number: 8, name: "Mei", undo_expires_in_ms: 94_000 },
+    {
+      id: "t-x",
+      number: 8,
+      name: "Mei",
+      called_at: "2026-09-14T07:20:00Z",
+      no_show_in_ms: 61_000,
+      undo_expires_in_ms: 94_000,
+    },
   ],
 };
 
@@ -43,14 +50,14 @@ describe("toOwnerQueue", () => {
           number: 1,
           name: "Ali",
           joinedAt: "2026-09-14T07:05:00Z",
-          rejoined: false,
+          origin: "scan",
         },
         {
           id: "t-2",
           number: 2,
           name: "Siti",
           joinedAt: "2026-09-14T07:09:00Z",
-          rejoined: true,
+          origin: "rejoin",
         },
       ],
       called: [
@@ -62,7 +69,16 @@ describe("toOwnerQueue", () => {
           noShowInMs: 42_000,
         },
       ],
-      justServed: [{ id: "t-x", number: 8, name: "Mei", undoExpiresInMs: 94_000 }],
+      justServed: [
+        {
+          id: "t-x",
+          number: 8,
+          name: "Mei",
+          calledAt: "2026-09-14T07:20:00Z",
+          noShowInMs: 61_000,
+          undoExpiresInMs: 94_000,
+        },
+      ],
     });
   });
 
@@ -118,15 +134,25 @@ describe("applyMove", () => {
       id: "t-0",
       number: 9,
       name: "Zul",
+      calledAt: "2026-09-14T07:02:00Z",
+      noShowInMs: 42_000,
       undoExpiresInMs: UNDO_WINDOW_MS,
     });
   });
 
-  test("Undo puts a Ticket back in the chair", () => {
+  test("Undo puts a Ticket back in the chair it never really left", () => {
     const moved = applyMove(queue, { kind: "undo_served", ticketId: "t-x" }, now);
 
     expect(moved.justServed).toEqual([]);
-    expect(moved.called.map((ticket) => ticket.number)).toEqual([9, 8]);
+    // The call it came from, not a new one: undo_served leaves called_at alone,
+    // so inventing a fresh five minutes here would disable No-show for nothing.
+    expect(moved.called[1]).toEqual({
+      id: "t-x",
+      number: 8,
+      name: "Mei",
+      calledAt: "2026-09-14T07:20:00Z",
+      noShowInMs: 61_000,
+    });
   });
 
   test("No-show takes the Customer out of the chair", () => {

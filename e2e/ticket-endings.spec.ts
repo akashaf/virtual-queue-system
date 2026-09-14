@@ -142,5 +142,10 @@ test("a Customer may only rejoin once from one scan", async ({ page, browser }) 
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Join again" })).toHaveCount(0);
 
+  // The offer has gone, but the screen has not: tapping past it is what makes
+  // scanning the QR code — the very thing it asks for — lead anywhere.
+  await page.getByRole("button", { name: "Join queue" }).click();
+  await expect(page.getByLabel("Your name")).toBeVisible();
+
   await owner.close();
 });

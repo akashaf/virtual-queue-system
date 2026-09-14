@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { EllipsisVerticalIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -58,6 +65,8 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
 
   /** Moves the screen before the round trip; the refetch replaces it with the truth. */
   const move = useCallback((intent: QueueMove) => {
+    // Whichever Undo was pressed, the toast offering it is now stale.
+    if (intent.kind === "undo_served") toast.dismiss(undoToastId(intent.ticketId));
     setQueue((current) => applyMove(current, intent, new Date()));
   }, []);
 
@@ -144,7 +153,9 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
                 <span className="truncate font-medium">{ticket.name}</span>
                 {/* They are at the back with a high number, but they have been
                     in the shop a while. */}
-                {ticket.rejoined ? <Badge variant="secondary">Rejoined</Badge> : null}
+                {ticket.origin === "rejoin" ? (
+                  <Badge variant="secondary">Rejoined</Badge>
+                ) : null}
               </span>
               <span className="text-sm text-muted-foreground tabular-nums">
                 {formatMalaysiaTime(ticket.joinedAt)}
@@ -199,23 +210,50 @@ function CallNextButton({
   move: (intent: QueueMove) => void;
   call: OwnerAction;
 }) {
-  const { submit, pending } = call;
-
   return (
-    <form
-      action={(formData) => {
-        move({ kind: "call_next" });
-        submit(formData);
-      }}
-    >
+    <MoveForm move={move} intent={{ kind: "call_next" }} action={call}>
       <Button
         type="submit"
         size="lg"
         className="h-14 w-full text-base"
-        disabled={pending || nobodyWaiting}
+        disabled={call.pending || nobodyWaiting}
       >
         Call next
       </Button>
+    </MoveForm>
+  );
+}
+
+/**
+ * One press: the screen moves, then the Server Action goes. Every button here
+ * has the same shape, and the Ticket it names comes from the move itself rather
+ * than being passed alongside it and able to disagree.
+ */
+function MoveForm({
+  move,
+  intent,
+  action,
+  className,
+  children,
+}: {
+  move: (intent: QueueMove) => void;
+  intent: QueueMove;
+  action: OwnerAction;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <form
+      className={className}
+      action={(formData) => {
+        move(intent);
+        action.submit(formData);
+      }}
+    >
+      {"ticketId" in intent ? (
+        <input type="hidden" name="ticketId" value={intent.ticketId} />
+      ) : null}
+      {children}
     </form>
   );
 }
@@ -256,27 +294,23 @@ function CalledCard({
       </div>
 
       <div className="flex items-center gap-2">
-        <form
+        <MoveForm
           className="flex-1"
-          action={(formData) => {
-            move({ kind: "mark_served", ticketId: ticket.id });
-            serve.submit(formData);
-          }}
+          move={move}
+          intent={{ kind: "mark_served", ticketId: ticket.id }}
+          action={serve}
         >
-          <input type="hidden" name="ticketId" value={ticket.id} />
           <Button type="submit" className="h-11 w-full" disabled={serve.pending}>
             Done
           </Button>
-        </form>
+        </MoveForm>
 
-        <form
+        <MoveForm
           className="flex-1"
-          action={(formData) => {
-            move({ kind: "mark_no_show", ticketId: ticket.id });
-            noShow.submit(formData);
-          }}
+          move={move}
+          intent={{ kind: "mark_no_show", ticketId: ticket.id }}
+          action={noShow}
         >
-          <input type="hidden" name="ticketId" value={ticket.id} />
           <Button
             type="submit"
             variant="outline"
@@ -285,7 +319,7 @@ function CalledCard({
           >
             {tooEarly ? `No-show ${formatCountdown(noShowInMs)}` : "No-show"}
           </Button>
-        </form>
+        </MoveForm>
       </div>
     </li>
   );
@@ -341,17 +375,15 @@ function TicketMenu({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep them</AlertDialogCancel>
-            <form
-              action={(formData) => {
-                move({ kind: "remove_ticket", ticketId: ticket.id });
-                remove.submit(formData);
-              }}
+            <MoveForm
+              move={move}
+              intent={{ kind: "remove_ticket", ticketId: ticket.id }}
+              action={remove}
             >
-              <input type="hidden" name="ticketId" value={ticket.id} />
               <AlertDialogAction type="submit" disabled={remove.pending}>
                 Remove
               </AlertDialogAction>
-            </form>
+            </MoveForm>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -364,6 +396,7 @@ function TicketMenu({
  * either dismisses the toast, so a Ticket already back in a chair is never still
  * being offered.
  */
+/** The one Undo control, used both in the toast and in "Just served". */
 function UndoButton({
   ticketId,
   move,
@@ -374,16 +407,7 @@ function UndoButton({
   undo: OwnerAction;
 }) {
   return (
-    <form
-      action={(formData) => {
-        // Both Undo controls dismiss the toast, so a Ticket already back in a
-        // chair is never still being offered by the one that was not pressed.
-        toast.dismiss(undoToastId(ticketId));
-        move({ kind: "undo_served", ticketId });
-        undo.submit(formData);
-      }}
-    >
-      <input type="hidden" name="ticketId" value={ticketId} />
+    <MoveForm move={move} intent={{ kind: "undo_served", ticketId }} action={undo}>
       <Button
         type="submit"
         size="sm"
@@ -393,7 +417,7 @@ function UndoButton({
       >
         Undo
       </Button>
-    </form>
+    </MoveForm>
   );
 }
 

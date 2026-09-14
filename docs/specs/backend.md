@@ -92,6 +92,7 @@ Indexes and constraints:
 - Partial unique index `(shop_id, device_id) WHERE status IN ('waiting','called')` enforces one active Ticket per device per Shop. Scoped to the Shop rather than the Queue Day, so a Ticket left open across a Close Shop still blocks a second one. A null `device_id`, which is what erasure leaves behind, never collides
 - Partial index `(queue_day_id, number) WHERE status = 'waiting'` serves both numbers a Customer sees: their position and the waiting count
 - `(shop_id, served_at) WHERE status = 'served'` for billing queries
+- `(queue_day_id, device_id, joined_at desc)` finds the Ticket a device last took in a Queue Day, which is what `get_customer_view` answers with
 - `tickets.customer_name` is null or 1-30 characters; `tickets.number` is at least 1
 
 ### `push_subscriptions`
@@ -142,8 +143,9 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `haversine_m(lat_a, lng_a, lat_b, lng_b)` — metres between two points on a sphere of radius 6371 km.
 - `customer_view_json(shop, ticket)` — builds the payload below. Shared by `get_customer_view` and `join_queue`, so a join and the refetch that follows it cannot disagree.
 - `lock_owner_shop()` — the caller's Shop, locked, or `shop_inactive`. The first line of every owner mutation.
+- `lock_ticket_shop(ticket_id)` — the Shop a Ticket belongs to, locked, or a null row. The same first line for the two mutations a Customer makes, which name a Ticket rather than a Shop. It answers with a null row rather than raising, because Leave and Rejoin each have their own word for a Ticket they cannot act on.
 - `owner_ticket(shop, ticket_id, statuses[])` — one of the caller's Tickets in one of the expected statuses, or `ticket_not_found`. Takes an array because Remove accepts a Ticket from the Queue and from the chair alike.
-- `device_ticket(shop, ticket_id, device_id, statuses[])` — the same for a Customer, proved by the device cookie rather than by `auth.uid()`.
+- `add_ticket(shop, name, device_id, origin, parent_ticket_id?)` — the part Join and Rejoin do identically: check the Queue's size (`queue_full`), take the next number, stamp `heads_up_sent_at` on a Ticket that arrives already inside the threshold, insert. How the Customer earned the place — a location check for a scan, a No-show to come back from for a Rejoin — stays with the caller. The Shop must already be locked, which is what makes the size check safe against a simultaneous join.
 - `no_show_window()`, `ticket_ref_json(ticket)` — the 5 minutes, and the `{ id, number }` an Owner's screen gets back from an ending.
 - `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
 - `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
@@ -171,6 +173,7 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Never returns other customers' names, and never the rest of the Queue.
   - `waiting_count` belongs to the Shop rather than to the Ticket, because the join form shows it before there is a Ticket to hang it on.
   - `shop.id` is the `shop:{id}` topic the page subscribes to ([§6](#6-realtime)); a Customer cannot listen for their own Shop without it. Nothing is authorised by it: the topic is public and carries no data, and every read still comes back through this function with the device cookie.
+  - `position` is the number of Waiting Tickets with a lower number, and is `0` for any other status: a Called Ticket is in a chair and a finished one is out of the Queue altogether, so counting past them would report somebody else's wait
   - `ticket` is the last Ticket this device took in the Shop's **current Queue Day**, whatever became of it — not only an active one. #7 changed this: No-show, Removed and Served are three different screens, and a page that only ever sees a Ticket disappear cannot tell them apart. `can_rejoin` needs it too, being a property of a No-show.
   - Scoped to the current Queue Day, so a Customer returning tomorrow meets the join form. Which ending has already been *read* is the browser's business, and stays in `sessionStorage` (frontend.md §3.1).
   - `can_rejoin` is the whole of the Rejoin offer: a No-show, from a scan, in today's Queue Day, not already rejoined from. The Shop-level reasons a Rejoin can still fail — Last Call, a full Queue — are deliberately left out, because they change from moment to moment and `rejoin_queue` answers them with a token the page can put into words.
@@ -198,7 +201,7 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at, origin }], called: [{ id, number, name, called_at, no_show_in_ms }], just_served: [{ id, number, name, undo_expires_in_ms }] }` for the current Queue Day
   - `origin` is what the dashboard's "Rejoined" badge reads: the Ticket is at the back with a high number, but its Customer has been in the shop a while
   - `no_show_in_ms` counts down to when No-show is allowed, measured by the database for the same reason `undo_expires_in_ms` is — a tablet with a wrong clock must not offer a button the function would answer `too_early`
-  - `just_served` is the Tickets Served within the Undo window, most recent first. It is what makes the Undo survive a reload and appear on the Shop's other phone
+  - `just_served` is the Tickets Served within the Undo window, most recent first, each also carrying the `called_at` and `no_show_in_ms` of the call it came from. It is what makes the Undo survive a reload and appear on the Shop's other phone — and `undo_served` leaves `called_at` alone, so the screen has to be able to put the Customer back in the chair they were already in rather than starting their clock again
   - `undo_expires_in_ms` is measured by the database rather than by the screen, so a tablet with a wrong clock cannot offer an Undo that `undo_served` would then refuse. The screen counts it down on its own clock from the moment it arrives
   - Takes no Shop argument: it finds the Shop from `auth.uid()`, so a request cannot name one.
   - Raises `shop_inactive` when the caller runs no active Shop. The dashboard treats that as a state, not a failure — a layout and its page render at the same time, so the page cannot lean on the layout's redirect having happened first.

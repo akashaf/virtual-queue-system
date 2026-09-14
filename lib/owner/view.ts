@@ -10,10 +10,10 @@ export interface WaitingTicket {
   name: string | null;
   joinedAt: string;
   /**
-   * Whether this Ticket came from a Rejoin. It sits at the back with a high
-   * number, but its Customer has been in the shop a while — worth saying.
+   * How the Customer got here. A Rejoin sits at the back with a high number, but
+   * its Customer has been in the shop a while — worth saying on the screen.
    */
-  rejoined: boolean;
+  origin: TicketOrigin;
 }
 
 export interface CalledTicket {
@@ -34,6 +34,13 @@ export interface ServedTicket {
   id: string;
   number: number;
   name: string | null;
+  /**
+   * The call this Ticket came from, kept because Undo puts the Customer back in
+   * the chair they were already in — `undo_served` deliberately leaves
+   * `called_at` alone, so the screen must not start the clock again either.
+   */
+  calledAt: string;
+  noShowInMs: number;
   /**
    * How long is left to take this Done back, measured by the database rather
    * than by the screen: a tablet with a wrong clock must not offer an Undo that
@@ -63,6 +70,8 @@ interface ServedTicketJson {
   id: string;
   number: number;
   name: string | null;
+  called_at: string;
+  no_show_in_ms: number;
   undo_expires_in_ms: number;
 }
 
@@ -96,6 +105,8 @@ export function toServedTicket(json: unknown): ServedTicket {
     id: ticket.id,
     number: ticket.number,
     name: ticket.name,
+    calledAt: ticket.called_at,
+    noShowInMs: ticket.no_show_in_ms,
     undoExpiresInMs: ticket.undo_expires_in_ms,
   };
 }
@@ -121,7 +132,7 @@ export function toOwnerQueue(json: unknown): OwnerQueue {
       number: ticket.number,
       name: ticket.name,
       joinedAt: ticket.joined_at,
-      rejoined: ticket.origin === "rejoin",
+      origin: ticket.origin,
     })),
     called: called.map(toCalledTicket),
     justServed: justServed.map(toServedTicket),
@@ -176,6 +187,20 @@ export type QueueMove =
  * `now` is a parameter because the timestamps this invents are the caller's
  * clock, and because a pure function is one that can be tested.
  */
+function inChair(
+  ticket: { id: string; number: number; name: string | null },
+  calledAt: string,
+  noShowInMs: number,
+): CalledTicket {
+  return {
+    id: ticket.id,
+    number: ticket.number,
+    name: ticket.name,
+    calledAt,
+    noShowInMs,
+  };
+}
+
 export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQueue {
   switch (move.kind) {
     case "call_next": {
@@ -185,15 +210,10 @@ export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQ
       return {
         ...queue,
         waiting: rest,
+        // A call just made: the whole No-show wait is still ahead of it.
         called: [
           ...queue.called,
-          {
-            id: next.id,
-            number: next.number,
-            name: next.name,
-            calledAt: now.toISOString(),
-            noShowInMs: NO_SHOW_WINDOW_MS,
-          },
+          inChair(next, now.toISOString(), NO_SHOW_WINDOW_MS),
         ],
       };
     }
@@ -210,6 +230,8 @@ export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQ
             id: served.id,
             number: served.number,
             name: served.name,
+            calledAt: served.calledAt,
+            noShowInMs: served.noShowInMs,
             undoExpiresInMs: UNDO_WINDOW_MS,
           },
           ...queue.justServed,
@@ -234,17 +256,11 @@ export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQ
       return {
         ...queue,
         justServed: queue.justServed.filter((ticket) => ticket.id !== move.ticketId),
-        // The real called_at is the one the Customer was first summoned at, and
-        // the database keeps it; the refetch brings it back a moment later.
+        // Back in the chair they never really left: `undo_served` keeps the
+        // original call, so the screen restores it rather than starting again.
         called: [
           ...queue.called,
-          {
-            id: undone.id,
-            number: undone.number,
-            name: undone.name,
-            calledAt: now.toISOString(),
-            noShowInMs: NO_SHOW_WINDOW_MS,
-          },
+          inChair(undone, undone.calledAt, undone.noShowInMs),
         ],
       };
     }
