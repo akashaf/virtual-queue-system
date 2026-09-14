@@ -46,3 +46,9 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Local Netlify folder
+.netlify
+
+# Claude Code local settings
+.claude/settings.local.json

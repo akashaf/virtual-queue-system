@@ -4,6 +4,11 @@
   command = "bun run build"
   publish = ".next"
 
+[build.environment]
+  # Netlify's functions runtime was Node 22.14.0 when #3 verified the platform.
+  # Pin the major so a silent Netlify default bump can't change production under us.
+  NODE_VERSION = "22"
+
 [functions]
   # Scheduled functions (e.g. the daily cleanup job) live here.
   directory = "netlify/functions"

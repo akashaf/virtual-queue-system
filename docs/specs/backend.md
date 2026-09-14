@@ -20,7 +20,7 @@ Out of scope: payments, WhatsApp/SMS, multi-shop Owners, Barbers, In-person Cust
 Browser (customer / owner)
   │  Server Actions (mutations)      Route Handlers (reads, operator API, cron)
   ▼                                   ▼
-Next.js 16 on Netlify (Free plan; functions region ap-southeast-1 if the plan allows) ── after() ──► web-push ──► browser push services
+Next.js 16 on Netlify (Free plan; functions region us-east-2, Singapore is paid-only) ── after() ──► web-push ──► browser push services
   │  supabase-js (@supabase/ssr)
   ▼
 Supabase (ap-southeast-1): Postgres + Auth + Realtime
