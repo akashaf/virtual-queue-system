@@ -11,6 +11,7 @@ describe("toCustomerView", () => {
     expect(
       toCustomerView({
         shop: {
+          id: "s-1",
           name: "Kedai Ali",
           is_active: true,
           joining_state: "open",
@@ -20,6 +21,7 @@ describe("toCustomerView", () => {
       }),
     ).toEqual({
       shop: {
+        id: "s-1",
         name: "Kedai Ali",
         isActive: true,
         joiningState: "open",
@@ -31,12 +33,19 @@ describe("toCustomerView", () => {
 
   test("keeps a device with no Ticket as no Ticket", () => {
     const view = toCustomerView({
-      shop: { name: "Kedai Ali", is_active: false, joining_state: "last_call", waiting_count: 0 },
+      shop: {
+        id: "s-1",
+        name: "Kedai Ali",
+        is_active: false,
+        joining_state: "last_call",
+        waiting_count: 0,
+      },
       ticket: null,
     });
 
     expect(view.ticket).toBeNull();
     expect(view.shop).toEqual({
+      id: "s-1",
       name: "Kedai Ali",
       isActive: false,
       joiningState: "last_call",

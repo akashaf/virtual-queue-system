@@ -10,6 +10,8 @@ type TicketStatus = Database["public"]["Enums"]["ticket_status"];
  */
 export interface CustomerView {
   shop: {
+    /** The `shop:{id}` topic the page listens on for `queue_changed` pings. */
+    id: string;
     name: string;
     isActive: boolean;
     joiningState: JoiningState;
@@ -28,6 +30,7 @@ export interface CustomerView {
 /** The JSON `get_customer_view` and `join_queue` return, in the database's own names. */
 interface CustomerViewJson {
   shop: {
+    id: string;
     name: string;
     is_active: boolean;
     joining_state: JoiningState;
@@ -47,6 +50,7 @@ export function toCustomerView(json: unknown): CustomerView {
 
   return {
     shop: {
+      id: shop.id,
       name: shop.name,
       isActive: shop.is_active,
       joiningState: shop.joining_state,

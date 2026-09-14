@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { toOwnerQueue } from "./queue";
+import { toOwnerQueue } from "./view";
 
 const json = {
   shop: { id: "s-1", name: "Kedai Ali", joining_state: "open" },
@@ -8,6 +8,9 @@ const json = {
     { id: "t-2", number: 2, name: "Siti", joined_at: "2026-09-14T07:09:00Z" },
   ],
   called: [{ id: "t-0", number: 9, name: "Zul", called_at: "2026-09-14T07:02:00Z" }],
+  just_served: [
+    { id: "t-x", number: 8, name: "Mei", undo_expires_in_ms: 94_000 },
+  ],
 };
 
 describe("toOwnerQueue", () => {
@@ -19,14 +22,16 @@ describe("toOwnerQueue", () => {
         { id: "t-2", number: 2, name: "Siti", joinedAt: "2026-09-14T07:09:00Z" },
       ],
       called: [{ id: "t-0", number: 9, name: "Zul", calledAt: "2026-09-14T07:02:00Z" }],
+      justServed: [{ id: "t-x", number: 8, name: "Mei", undoExpiresInMs: 94_000 }],
     });
   });
 
   test("handles an empty Queue", () => {
-    const queue = toOwnerQueue({ ...json, waiting: [], called: [] });
+    const queue = toOwnerQueue({ ...json, waiting: [], called: [], just_served: [] });
 
     expect(queue.waiting).toEqual([]);
     expect(queue.called).toEqual([]);
+    expect(queue.justServed).toEqual([]);
   });
 
   test("keeps an erased name as null rather than inventing one", () => {

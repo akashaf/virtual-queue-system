@@ -58,6 +58,7 @@ describe("GET /api/s/[slug]/me", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       shop: {
+        id: shop.id,
         name: shop.name,
         isActive: true,
         joiningState: "open",

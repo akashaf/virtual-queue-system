@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatMalaysiaTime } from "./time";
+import { formatCountdown, formatMalaysiaTime, formatMinutesAgo } from "./time";
 
 describe("formatMalaysiaTime", () => {
   test("shows a UTC timestamp on a Malaysian clock, eight hours ahead", () => {
@@ -21,5 +21,41 @@ describe("formatMalaysiaTime", () => {
 
   test("accepts a Date as well as the database's ISO string", () => {
     expect(formatMalaysiaTime(new Date("2026-09-14T07:05:00Z"))).toBe("3:05 pm");
+  });
+});
+
+describe("formatMinutesAgo", () => {
+  const called = "2026-09-14T07:05:00Z";
+  const at = (iso: string) => new Date(iso);
+
+  test("calls the first minute just now, because a number would be noise", () => {
+    expect(formatMinutesAgo(called, at("2026-09-14T07:05:00Z"))).toBe("just now");
+    expect(formatMinutesAgo(called, at("2026-09-14T07:05:59Z"))).toBe("just now");
+  });
+
+  test("counts whole minutes once one has passed", () => {
+    expect(formatMinutesAgo(called, at("2026-09-14T07:06:00Z"))).toBe("1 min ago");
+    expect(formatMinutesAgo(called, at("2026-09-14T07:06:59Z"))).toBe("1 min ago");
+    expect(formatMinutesAgo(called, at("2026-09-14T07:12:00Z"))).toBe("7 min ago");
+  });
+
+  test("does not run backwards when a clock is a little ahead", () => {
+    expect(formatMinutesAgo(called, at("2026-09-14T07:04:00Z"))).toBe("just now");
+  });
+});
+
+describe("formatCountdown", () => {
+  test("shows the whole undo window as minutes and padded seconds", () => {
+    expect(formatCountdown(120_000)).toBe("2:00");
+  });
+
+  test("rounds part-seconds up, so the last second is not skipped", () => {
+    expect(formatCountdown(9_400)).toBe("0:10");
+    expect(formatCountdown(500)).toBe("0:01");
+  });
+
+  test("stops at zero rather than going negative", () => {
+    expect(formatCountdown(0)).toBe("0:00");
+    expect(formatCountdown(-5_000)).toBe("0:00");
   });
 });

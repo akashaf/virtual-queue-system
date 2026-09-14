@@ -138,8 +138,8 @@ Behaviour:
 app/
   page.tsx
   s/[slug]/page.tsx, customer-queue.tsx, language-toggle.tsx, actions.ts
-  login/page.tsx, actions.ts
-  dashboard/layout.tsx, page.tsx, queue-board.tsx, actions.ts
+  login/page.tsx, actions.ts, messages.ts
+  dashboard/layout.tsx, page.tsx, queue-board.tsx, actions.ts, messages.ts
   dashboard/history/page.tsx
   api/s/[slug]/me/route.ts
   api/owner/queue/route.ts, api/owner/history/route.ts
@@ -148,9 +148,10 @@ app/
 lib/supabase/{server,client,admin}.ts, lib/supabase/database.types.ts (generated)
 lib/auth/owner.ts             (the Owner's Shop, the authoritative session check)
 lib/customer/{view,queue}.ts  (view.ts is pure and shared with the client component)
-lib/owner/queue.ts
+lib/owner/{view,queue}.ts     (same split: view.ts is pure, queue.ts calls the database)
 lib/operator/{auth,shop-input,shop-resource}.ts
-lib/push.ts, lib/device-cookie.ts, lib/time.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
+lib/queue-changed.ts          (the ping, the poll and the visibilitychange refetch, shared by both screens)
+lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
 components/ui/…              (shadcn)
 public/sw.js, public/sounds/{chime,called}.mp3
 proxy.ts

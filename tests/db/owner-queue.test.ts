@@ -26,6 +26,12 @@ interface OwnerQueue {
   shop: { id: string; name: string; joining_state: string };
   waiting: { id: string; number: number; name: string; joined_at: string }[];
   called: { id: string; number: number; name: string; called_at: string }[];
+  just_served: {
+    id: string;
+    number: number;
+    name: string;
+    undo_expires_in_ms: number;
+  }[];
 }
 
 async function join(slug: string, name: string) {
@@ -57,6 +63,7 @@ describe("get_owner_queue", () => {
       shop: { id: shop.id, name: shop.name, joining_state: "open" },
       waiting: [],
       called: [],
+      just_served: [],
     });
   });
 
@@ -155,6 +162,87 @@ describe("get_owner_queue", () => {
     const { error } = await anonClient().rpc("get_owner_queue");
 
     expect(error).not.toBeNull();
+  });
+});
+
+describe("get_owner_queue just served", () => {
+  /** Calls and then serves the front of the Queue, as the two buttons do. */
+  async function serveNext(email: string, password: string) {
+    const client = await signInAs(email, password);
+    const called = await client.rpc("call_next");
+    if (called.error) throw new Error(called.error.message);
+    const { id } = (called.data as unknown as { result: { id: string } }).result;
+    const served = await client.rpc("mark_served", { p_ticket_id: id });
+    if (served.error) throw new Error(served.error.message);
+    return id;
+  }
+
+  test("keeps a Served Ticket listed while its Undo window is open", async () => {
+    const { owner, shop } = await createShop();
+    await join(shop.slug, "Ali");
+    const id = await serveNext(owner.email, owner.password);
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    expect(queue.just_served).toEqual([
+      { id, number: 1, name: "Ali", undo_expires_in_ms: expect.any(Number) },
+    ]);
+    // It is neither waiting nor in a chair any more; only undoable.
+    expect(queue.waiting).toEqual([]);
+    expect(queue.called).toEqual([]);
+  });
+
+  test("counts the Undo window down rather than restarting it on each read", async () => {
+    const { owner, shop } = await createShop();
+    await join(shop.slug, "Ali");
+    const id = await serveNext(owner.email, owner.password);
+    await db.query(
+      "update public.tickets set served_at = now() - interval '90 seconds' where id = $1",
+      [id],
+    );
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    // 2 minutes less the 90 seconds already gone, give or take the round trip.
+    expect(queue.just_served[0].undo_expires_in_ms).toBeGreaterThan(28_000);
+    expect(queue.just_served[0].undo_expires_in_ms).toBeLessThanOrEqual(30_000);
+  });
+
+  test("drops a Ticket once its Undo window has passed", async () => {
+    const { owner, shop } = await createShop();
+    await join(shop.slug, "Ali");
+    const id = await serveNext(owner.email, owner.password);
+    await db.query(
+      "update public.tickets set served_at = now() - interval '121 seconds' where id = $1",
+      [id],
+    );
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    expect(queue.just_served).toEqual([]);
+  });
+
+  test("lists the most recent Done first", async () => {
+    const { owner, shop } = await createShop();
+    await join(shop.slug, "Ali");
+    await join(shop.slug, "Siti");
+    await serveNext(owner.email, owner.password);
+    await serveNext(owner.email, owner.password);
+
+    const queue = await ownerQueue(owner.email, owner.password);
+
+    expect(queue.just_served.map((ticket) => ticket.name)).toEqual(["Siti", "Ali"]);
+  });
+
+  test("shows an Owner their own Shop's Done, never another Owner's", async () => {
+    const theirs = await createShop();
+    await join(theirs.shop.slug, "Ali");
+    await serveNext(theirs.owner.email, theirs.owner.password);
+    const mine = await createShop();
+
+    const queue = await ownerQueue(mine.owner.email, mine.owner.password);
+
+    expect(queue.just_served).toEqual([]);
   });
 });
 

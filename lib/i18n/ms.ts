@@ -40,4 +40,9 @@ export const ms: Dictionary = {
   aheadOfYouOne: "1 orang di hadapan anda",
   aheadOfYou: "{count} orang di hadapan anda",
   inPersonNote: "Pelanggan yang menunggu di kedai mungkin dilayan di antaranya",
+
+  // Dipanggil, dan selesai
+  yourTurn: "Giliran anda",
+  goToCounter: "Sila ke kaunter",
+  servedThanks: "Terima kasih! Jumpa lagi",
 };

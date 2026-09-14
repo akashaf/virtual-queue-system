@@ -156,16 +156,18 @@ Two helpers are not called from outside the database:
 - `choose_last_call(ticket_id, device_id, choice)`
   - Only allowed while `joining_state = last_call` and the Ticket is Waiting.
   - Can be changed until Close Shop.
-- `get_customer_view(slug, device_id)` → `{ shop: { name, is_active, joining_state, waiting_count }, ticket: { id, number, status, position, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
+- `get_customer_view(slug, device_id)` → `{ shop: { id, name, is_active, joining_state, waiting_count }, ticket: { id, number, status, position, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
   - Never returns other customers' names, and never the rest of the Queue.
   - `waiting_count` belongs to the Shop rather than to the Ticket, because the join form shows it before there is a Ticket to hang it on.
+  - `shop.id` is the `shop:{id}` topic the page subscribes to ([§6](#6-realtime)); a Customer cannot listen for their own Shop without it. Nothing is authorised by it: the topic is public and carries no data, and every read still comes back through this function with the device cookie.
   - `ticket` is the device's **active** Ticket — Waiting or Called — which the partial unique index makes at most one. A Ticket that has reached a final status is not returned; the page keeps showing that state from `sessionStorage` instead (frontend.md §3.1).
   - Returns SQL `null` for a slug no Shop has, so the page can show a missing Shop and a Deactivated Shop the same way.
-  - Delivered so far (#5): `shop`, and `ticket` as far as `position`. `last_call_choice` and `carried_over` arrive with #11, `can_rejoin` with #7, and `estimate` with #12.
+  - Delivered so far (#6): `shop`, and `ticket` as far as `status` and `position`. `last_call_choice` and `carried_over` arrive with #11, `can_rejoin` with #7, and `estimate` with #12.
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
-- `call_next()`: error `queue_empty`
+- `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once
 - `mark_served(ticket_id)`, `undo_served(ticket_id)` (error `undo_expired`), `mark_no_show(ticket_id)` (error `too_early`), `remove_ticket(ticket_id)`
+- **Every function that names a Ticket raises `ticket_not_found`** when it is not one of the caller's, is not in their current Queue Day, or is no longer in the status the action needs. One token for all three: an Owner learns nothing about another Shop's Queue, and a stale button on their own screen is told the same true thing — that Ticket is not one they can act on now
 - `start_last_call()`
   - Sets `joining_state = last_call` and `queue_days.last_call_at`.
   - Returns a `last_call` alert for every Waiting Ticket.
@@ -176,10 +178,12 @@ Two helpers are not called from outside the database:
   - Moves carry-choice Tickets to the new Queue Day, numbered 1..k in their original order, with `carried_over_at = now()` and `last_call_choice = null`.
   - Removes the remaining Waiting Tickets, each with a `shop_closed` alert.
   - Resets `joining_state = open`.
-- `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at }], called: [{ id, number, name, called_at }] }` for the current Queue Day, plus Tickets Served within the undo window
+- `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at }], called: [{ id, number, name, called_at }], just_served: [{ id, number, name, undo_expires_in_ms }] }` for the current Queue Day
+  - `just_served` is the Tickets Served within the Undo window, most recent first. It is what makes the Undo survive a reload and appear on the Shop's other phone
+  - `undo_expires_in_ms` is measured by the database rather than by the screen, so a tablet with a wrong clock cannot offer an Undo that `undo_served` would then refuse. The screen counts it down on its own clock from the moment it arrives
   - Takes no Shop argument: it finds the Shop from `auth.uid()`, so a request cannot name one.
   - Raises `shop_inactive` when the caller runs no active Shop. The dashboard treats that as a state, not a failure — a layout and its page render at the same time, so the page cannot lean on the layout's redirect having happened first.
-  - Delivered so far (#5): `shop`, `waiting` and `called`. The Served-within-the-undo-window list arrives with #6, which is what creates a Served Ticket in the first place.
+  - Delivered so far (#6): all four keys.
 - `get_owner_history(days int default 30)` → today's Tickets with statuses and timestamps, plus Served counts per day (Malaysia time) and the month-to-date total
 
 ### Estimated Wait (inside `get_customer_view`)
@@ -201,11 +205,12 @@ Two helpers are not called from outside the database:
 
 ## 6. Realtime
 
-- An `AFTER INSERT OR UPDATE` trigger on `tickets` and `shops` calls `realtime.send(jsonb_build_object('at', now()), 'queue_changed', 'shop:' || shop_id, false)`.
-- **Not built yet.** The trigger and the subscription arrive with #6, which is the first slice where one screen changes what another shows. Until then the Customer page keeps its position true with the 30 s poll and the `visibilitychange` refetch below, and the dashboard re-renders per request.
+- An `AFTER INSERT OR UPDATE` trigger on `tickets` and `shops` calls `realtime.send(jsonb_build_object('at', now()), 'queue_changed', 'shop:' || shop_id, false)`. One trigger function serves both tables, taking the column that holds the Shop id from its trigger argument.
 - The payload carries **no ticket data**. A public broadcast is acceptable because it reveals only activity timing.
 - Clients subscribe to `shop:{shop_id}` and refetch their view when a ping arrives, debounced by 300 ms.
 - Clients also poll every 30 s and on `visibilitychange`, because mobile browsers drop sockets in the background.
+- All three live in `lib/queue-changed.ts`, which both the Customer page and the dashboard use, so the two screens cannot fall out of step with each other.
+- `realtime.send` swallows its own failures as a warning, so a Realtime outage can never roll back the mutation that triggered it; the poll covers the gap.
 
 ## 7. Next.js server surface
 
@@ -229,7 +234,7 @@ Device cookie `vq_device`:
 
 ### Route Handlers (reads, `cache: no-store`)
 - `GET /api/s/[slug]/me` → `get_customer_view`. 404 when the slug has no Shop. Reads the device from the raw `Cookie` header rather than `cookies()`, which keeps it testable as Request in, Response out
-- `GET /api/owner/queue` → `get_owner_queue`
+- `GET /api/owner/queue` → `get_owner_queue`. 403 `shop_inactive` when the caller runs no active Shop
 - `GET /api/owner/history` → `get_owner_history`
 
 ### Proxy (`proxy.ts`)

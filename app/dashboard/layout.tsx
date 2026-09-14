@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import { signOut } from "@/app/login/actions";
 
 /**
@@ -28,6 +29,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       </header>
 
       {children}
+      {/* Errors and the Undo window, from anywhere in the dashboard. */}
+      <Toaster position="top-center" />
     </div>
   );
 }

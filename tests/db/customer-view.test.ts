@@ -24,6 +24,7 @@ afterAll(async () => {
 
 interface CustomerView {
   shop: {
+    id: string;
     name: string;
     is_active: boolean;
     joining_state: string;
@@ -70,6 +71,9 @@ describe("get_customer_view", () => {
 
     expect(await view(shop.slug, crypto.randomUUID())).toEqual({
       shop: {
+        // The topic the page subscribes to for queue_changed pings; not a secret,
+        // and the page cannot listen for its own Shop without it.
+        id: shop.id,
         name: shop.name,
         is_active: true,
         joining_state: "open",
@@ -112,6 +116,7 @@ describe("get_customer_view", () => {
 
     expect(await view(shop.slug, mine.deviceId)).toEqual({
       shop: {
+        id: shop.id,
         name: shop.name,
         is_active: true,
         joining_state: "open",
