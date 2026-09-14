@@ -118,7 +118,7 @@ A ticket's subscriptions are deleted when it reaches a final status, except No-s
 | no_show | Rejoin | Customer | new Ticket, waiting, `origin = rejoin` | Source `origin = scan`, source is in the current Queue Day, `joining_state = open`, queue not full. **No location check** |
 | waiting | Call next | Owner | called | Lowest `number` among Waiting in the current Queue Day |
 | called | Done | Owner | served | — |
-| served | Undo | Owner | called | `now() - served_at ≤ 2 min` |
+| served | Undo | Owner | called | `now() - served_at ≤ 2 min`, and the device holds no newer active Ticket |
 | called | No-show | Owner | no_show | `now() - called_at ≥ 5 min` |
 | waiting / called | Leave | Customer | left | Device matches |
 | waiting / called | Remove | Owner | removed (`owner`) | — |
@@ -138,9 +138,14 @@ All functions are `security definer` with `search_path = ''` and lock the Shop r
 
 **Refusals are raised, not returned.** A rule a Customer or Owner has run into is `raise exception '<token>'`, which reaches supabase-js as `{ code: 'P0001', message: '<token>' }`. The tokens are the ones listed per function below, and TypeScript switches on them (`lib/customer/view.ts`); any other message is a bug rather than a situation, and is logged as one. Constraint violations keep their own SQLSTATE, so a name that is too long is a `23514` and not a token.
 
-Two helpers are not called from outside the database:
+Some helpers are never called from outside the database, and are revoked from every role including `service_role`:
 - `haversine_m(lat_a, lng_a, lat_b, lng_b)` — metres between two points on a sphere of radius 6371 km.
 - `customer_view_json(shop, ticket)` — builds the payload below. Shared by `get_customer_view` and `join_queue`, so a join and the refetch that follows it cannot disagree.
+- `lock_owner_shop()` — the caller's Shop, locked, or `shop_inactive`. The first line of every owner mutation.
+- `owner_ticket(shop, ticket_id, status)` — one of the caller's Tickets in the expected status, or `ticket_not_found`.
+- `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
+- `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
+- `broadcast_queue_changed()` — the trigger function behind [§6](#6-realtime).
 
 ### Customer functions (execute granted to `service_role` only)
 - `join_queue(slug, device_id, name, lat, lng, accuracy_m)` → `{ result: <the customer view below>, alerts: [] }`
@@ -166,8 +171,10 @@ Two helpers are not called from outside the database:
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
 - `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once
-- `mark_served(ticket_id)`, `undo_served(ticket_id)` (error `undo_expired`), `mark_no_show(ticket_id)` (error `too_early`), `remove_ticket(ticket_id)`
-- **Every function that names a Ticket raises `ticket_not_found`** when it is not one of the caller's, is not in their current Queue Day, or is no longer in the status the action needs. One token for all three: an Owner learns nothing about another Shop's Queue, and a stale button on their own screen is told the same true thing — that Ticket is not one they can act on now
+- `mark_served(ticket_id)`, `undo_served(ticket_id)` (errors `undo_expired`, `rejoined`), `mark_no_show(ticket_id)` (error `too_early`), `remove_ticket(ticket_id)`
+  - `rejoined`: Done frees the device, so the Customer may already hold a new Ticket. Putting the old one back would give them two active Tickets, which the one-active-Ticket-per-device index refuses — and a raw `23505` is no way to tell an Owner that the person in front of them is queueing again
+- Every owner function raises `shop_inactive` when the caller runs no active Shop, because each one starts by locking their Shop
+- `mark_served` and `undo_served` raise `ticket_not_found` when the Ticket is not one of the caller's, is not in their current Queue Day, or is no longer in the status the action needs. One token for all three: an Owner learns nothing about another Shop's Queue, and a stale button on their own screen is told the same true thing — that Ticket is not one they can act on now. `mark_no_show` and `remove_ticket` join them with #7
 - `start_last_call()`
   - Sets `joining_state = last_call` and `queue_days.last_call_at`.
   - Returns a `last_call` alert for every Waiting Ticket.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { toOwnerQueue } from "./view";
+import { applyMove, toOwnerQueue, UNDO_WINDOW_MS } from "./view";
 
 const json = {
   shop: { id: "s-1", name: "Kedai Ali", joining_state: "open" },
@@ -41,5 +41,49 @@ describe("toOwnerQueue", () => {
     });
 
     expect(queue.waiting[0].name).toBeNull();
+  });
+});
+
+describe("applyMove", () => {
+  const now = new Date("2026-09-14T07:30:00Z");
+  const queue = toOwnerQueue(json);
+
+  test("Call next puts the front of the Queue in a chair", () => {
+    const moved = applyMove(queue, { kind: "call_next" }, now);
+
+    expect(moved.waiting.map((ticket) => ticket.number)).toEqual([2]);
+    expect(moved.called.map((ticket) => ticket.number)).toEqual([9, 1]);
+    expect(moved.called[1].calledAt).toBe(now.toISOString());
+  });
+
+  test("Call next on an empty Queue changes nothing", () => {
+    const empty = { ...queue, waiting: [] };
+
+    expect(applyMove(empty, { kind: "call_next" }, now)).toEqual(empty);
+  });
+
+  test("Done moves a Ticket from the chair into the undo window", () => {
+    const moved = applyMove(queue, { kind: "mark_served", ticketId: "t-0" }, now);
+
+    expect(moved.called).toEqual([]);
+    expect(moved.justServed[0]).toEqual({
+      id: "t-0",
+      number: 9,
+      name: "Zul",
+      undoExpiresInMs: UNDO_WINDOW_MS,
+    });
+  });
+
+  test("Undo puts a Ticket back in the chair", () => {
+    const moved = applyMove(queue, { kind: "undo_served", ticketId: "t-x" }, now);
+
+    expect(moved.justServed).toEqual([]);
+    expect(moved.called.map((ticket) => ticket.number)).toEqual([9, 8]);
+  });
+
+  test("leaves a Ticket the screen no longer has alone", () => {
+    expect(applyMove(queue, { kind: "mark_served", ticketId: "gone" }, now)).toEqual(
+      queue,
+    );
   });
 });

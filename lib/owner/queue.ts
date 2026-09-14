@@ -45,10 +45,7 @@ export async function fetchOwnerQueue(): Promise<OwnerQueue | null> {
 /** Summons the Customer at the front of the Queue. */
 export async function callNextTicket(): Promise<OwnerOutcome<CalledTicket>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("call_next");
-
-  if (error) return refusal("call_next", error);
-  return { ok: true, result: toCalledTicket(resultOf(data)) };
+  return outcome("call_next", await supabase.rpc("call_next"), toCalledTicket);
 }
 
 /** Marks a haircut done — the Shop's one billable event. */
@@ -56,10 +53,11 @@ export async function markTicketServed(
   ticketId: string,
 ): Promise<OwnerOutcome<ServedTicket>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("mark_served", { p_ticket_id: ticketId });
-
-  if (error) return refusal("mark_served", error);
-  return { ok: true, result: toServedTicket(resultOf(data)) };
+  return outcome(
+    "mark_served",
+    await supabase.rpc("mark_served", { p_ticket_id: ticketId }),
+    toServedTicket,
+  );
 }
 
 /** Takes a Done back, while the Undo window is still open. */
@@ -67,24 +65,33 @@ export async function undoTicketServed(
   ticketId: string,
 ): Promise<OwnerOutcome<CalledTicket>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("undo_served", { p_ticket_id: ticketId });
-
-  if (error) return refusal("undo_served", error);
-  return { ok: true, result: toCalledTicket(resultOf(data)) };
+  return outcome(
+    "undo_served",
+    await supabase.rpc("undo_served", { p_ticket_id: ticketId }),
+    toCalledTicket,
+  );
 }
 
 /**
- * The owner functions return `jsonb`, which the generated types can only call
- * `Json`; the `{ result, alerts }` envelope is pinned by backend.md §5. The
- * alerts stay unread until #10 builds the dispatcher that sends them.
+ * What one owner function did, or why it did nothing.
+ *
+ * A message in OWNER_ERRORS is a rule the Owner ran into and worth showing them;
+ * anything else is a bug rather than a situation, and is reported as one.
+ *
+ * The functions return `jsonb`, which the generated types can only call `Json`;
+ * the `{ result, alerts }` envelope is pinned by backend.md §5. The alerts stay
+ * unread until #10 builds the dispatcher that sends them.
  */
-function resultOf(data: unknown): unknown {
-  return (data as { result: unknown }).result;
-}
+function outcome<T>(
+  fn: string,
+  { data, error }: { data: unknown; error: PostgrestError | null },
+  toResult: (json: unknown) => T,
+): OwnerOutcome<T> {
+  if (error) {
+    if (isOwnerError(error.message)) return { ok: false, reason: error.message };
+    console.error(`${fn} failed`, error);
+    return { ok: false, reason: "failed" };
+  }
 
-/** A rule the Owner ran into, or a genuine failure worth reporting. */
-function refusal(fn: string, error: PostgrestError): OwnerOutcome<never> {
-  if (isOwnerError(error.message)) return { ok: false, reason: error.message };
-  console.error(`${fn} failed`, error);
-  return { ok: false, reason: "failed" };
+  return { ok: true, result: toResult((data as { result: unknown }).result) };
 }

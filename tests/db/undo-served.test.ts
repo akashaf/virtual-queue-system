@@ -28,17 +28,18 @@ interface CalledTicket {
   called_at: string;
 }
 
-async function join(slug: string, name = "Ali") {
+async function join(slug: string, deviceId = crypto.randomUUID(), name = "Ali") {
   const { data, error } = await serviceClient().rpc("join_queue", {
     p_slug: slug,
-    p_device_id: crypto.randomUUID(),
+    p_device_id: deviceId,
     p_name: name,
     p_lat: metresNorthOf(0),
     p_lng: SHOP_LNG,
     p_accuracy_m: 0,
   });
   if (error) throw new Error(error.message);
-  return (data as unknown as { result: { ticket: { id: string } } }).result.ticket;
+  const { ticket } = (data as unknown as { result: { ticket: { id: string } } }).result;
+  return { ...ticket, deviceId };
 }
 
 /** A Shop whose one Customer has just been marked Served — where Undo starts. */
@@ -129,6 +130,21 @@ describe("undo_served", () => {
       [ticket.id],
     );
     expect(after[0].called_at).toEqual(before[0].called_at);
+  });
+
+  test("refuses when the Customer has already taken a new place in the Queue", async () => {
+    const { shop, ticket, client } = await shopWithServedTicket();
+    // Done freed the device: the one-active-Ticket-per-device rule no longer
+    // holds it, so the Customer can join again — and often does, for a friend.
+    await join(shop.slug, ticket.deviceId, "Ali");
+
+    const { error } = await undoServed(client, ticket.id);
+
+    expect(error).toBe("rejoined");
+    const { rows } = await db.query("select status from public.tickets where id = $1", [
+      ticket.id,
+    ]);
+    expect(rows[0].status).toBe("served");
   });
 
   test("refuses a Ticket that was never Served", async () => {

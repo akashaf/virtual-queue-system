@@ -106,6 +106,7 @@ export const OWNER_ERRORS = [
   "queue_empty",
   "ticket_not_found",
   "undo_expired",
+  "rejoined",
 ] as const;
 
 export type OwnerError = (typeof OWNER_ERRORS)[number];
@@ -118,3 +119,83 @@ export function isOwnerError(message: string | undefined): message is OwnerError
 export type OwnerOutcome<T> =
   | { ok: true; result: T }
   | { ok: false; reason: OwnerError | "failed" };
+
+/** The Undo window, as `undo_window()` in the database measures it. */
+export const UNDO_WINDOW_MS = 120_000;
+
+/** One press of an owner button, named after the function it calls. */
+export type QueueMove =
+  | { kind: "call_next" }
+  | { kind: "mark_served"; ticketId: string }
+  | { kind: "undo_served"; ticketId: string };
+
+/**
+ * The Queue as it will look once a press lands, so the screen can move before
+ * the round trip does (frontend.md §4.2). The refetch that follows replaces it
+ * with the truth, so this only has to be right about the common case — a move
+ * whose Ticket the screen no longer holds is simply not made.
+ *
+ * `now` is a parameter because the timestamps this invents are the caller's
+ * clock, and because a pure function is one that can be tested.
+ */
+export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQueue {
+  switch (move.kind) {
+    case "call_next": {
+      const [next, ...rest] = queue.waiting;
+      if (!next) return queue;
+
+      return {
+        ...queue,
+        waiting: rest,
+        called: [
+          ...queue.called,
+          { ...withoutJoinedAt(next), calledAt: now.toISOString() },
+        ],
+      };
+    }
+
+    case "mark_served": {
+      const served = queue.called.find((ticket) => ticket.id === move.ticketId);
+      if (!served) return queue;
+
+      return {
+        ...queue,
+        called: queue.called.filter((ticket) => ticket.id !== move.ticketId),
+        justServed: [
+          {
+            id: served.id,
+            number: served.number,
+            name: served.name,
+            undoExpiresInMs: UNDO_WINDOW_MS,
+          },
+          ...queue.justServed,
+        ],
+      };
+    }
+
+    case "undo_served": {
+      const undone = queue.justServed.find((ticket) => ticket.id === move.ticketId);
+      if (!undone) return queue;
+
+      return {
+        ...queue,
+        justServed: queue.justServed.filter((ticket) => ticket.id !== move.ticketId),
+        // The real called_at is the one the Customer was first summoned at, and
+        // the database keeps it; the refetch brings it back a moment later.
+        called: [
+          ...queue.called,
+          {
+            id: undone.id,
+            number: undone.number,
+            name: undone.name,
+            calledAt: now.toISOString(),
+          },
+        ],
+      };
+    }
+  }
+}
+
+function withoutJoinedAt({ id, number, name }: WaitingTicket) {
+  return { id, number, name };
+}

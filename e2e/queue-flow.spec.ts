@@ -11,7 +11,7 @@ async function join(page: Page, slug: string, name: string) {
   await page.goto(`/s/${slug}`);
   await page.getByLabel("Your name").fill(name);
   await page.getByRole("button", { name: "Join queue" }).click();
-  await expect(page.getByText("#001")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
 }
 
 /**
@@ -100,6 +100,62 @@ test("a Done still waiting to be undone survives a reload of the dashboard", asy
   await dashboard.getByRole("button", { name: "Undo" }).click();
 
   await expect(dashboard.getByText("Waiting 0 · In chair 1")).toBeVisible();
+
+  await owner.close();
+});
+
+test("undoing from Just served takes the toast's offer away too", async ({
+  page,
+  browser,
+}) => {
+  const { email, password, shop } = await seedShop();
+  await join(page, shop.slug, "Ali");
+
+  const owner = await browser.newContext();
+  const dashboard = await owner.newPage();
+  await signInAsOwner(dashboard, email, password);
+  await dashboard.getByRole("button", { name: "Call next" }).click();
+  await dashboard.getByRole("button", { name: "Done" }).click();
+  await expect(dashboard.getByText("#001 marked done")).toBeVisible();
+
+  const justServed = dashboard.locator("details");
+  await justServed.getByText("Just served (1)").click();
+  await justServed.getByRole("button", { name: "Undo" }).click();
+
+  // Otherwise the toast would keep counting down and offering an Undo that can
+  // only answer "that ticket is no longer in the queue".
+  await expect(dashboard.getByText("#001 marked done")).toHaveCount(0);
+  await expect(dashboard.getByText("Waiting 0 · In chair 1")).toBeVisible();
+
+  await owner.close();
+});
+
+test("a Customer who rejoins after being served cannot be undone over", async ({
+  page,
+  browser,
+}) => {
+  const { email, password, shop } = await seedShop();
+  await join(page, shop.slug, "Ali");
+
+  const owner = await browser.newContext();
+  const dashboard = await owner.newPage();
+  await signInAsOwner(dashboard, email, password);
+  await dashboard.getByRole("button", { name: "Call next" }).click();
+  await dashboard.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("Thanks! See you next time")).toBeVisible();
+
+  // Done freed the device, so the same phone can take a new place — which is
+  // what puts the old Ticket and the new one in each other's way.
+  await page.evaluate(() => sessionStorage.clear());
+  await join(page, shop.slug, "Ali");
+  await expect(page.getByText("#002")).toBeVisible();
+
+  await dashboard.getByRole("button", { name: "Undo" }).first().click();
+
+  await expect(
+    dashboard.getByText("That customer has already rejoined the queue"),
+  ).toBeVisible();
+  await expect(dashboard.getByText("Waiting 1 · In chair 0")).toBeVisible();
 
   await owner.close();
 });

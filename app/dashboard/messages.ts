@@ -1,6 +1,7 @@
 // Kept out of actions.ts on purpose: a "use server" file may only export async
 // functions, and adding one `const` there breaks every action in the file.
 
+import { SHOP_INACTIVE } from "@/app/login/messages";
 import type { OwnerError } from "@/lib/owner/view";
 
 /**
@@ -17,8 +18,12 @@ export function ownerErrorMessage(reason: OwnerError | "failed"): string {
       return "That ticket is no longer in the queue";
     case "undo_expired":
       return "Too late to undo that";
+    case "rejoined":
+      return "That customer has already rejoined the queue";
     case "shop_inactive":
-      return "This shop account is inactive, contact support";
+      // The same words the login page uses, so an Owner whose Shop was switched
+      // off mid-shift reads one explanation and not two.
+      return SHOP_INACTIVE;
     case "failed":
       return "Something went wrong. Please try again.";
   }

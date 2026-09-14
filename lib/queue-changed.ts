@@ -24,7 +24,7 @@ const POLL_INTERVAL_MS = 30_000;
  * `refetch` is held in a ref, so a caller that rebuilds the callback on every
  * render does not tear the subscription down and put it back up again.
  */
-export function useQueueChanged(shopId: string | null, refetch: () => void): void {
+export function useQueueChanged(shopId: string, refetch: () => void): void {
   const latest = useRef(refetch);
 
   useEffect(() => {
@@ -32,8 +32,6 @@ export function useQueueChanged(shopId: string | null, refetch: () => void): voi
   }, [refetch]);
 
   useEffect(() => {
-    if (!shopId) return;
-
     const run = () => latest.current();
 
     let debounce: ReturnType<typeof setTimeout> | undefined;

@@ -201,7 +201,7 @@ $$;
  * Allowed only while the Undo window is open, because a Served Ticket is what
  * the Shop is billed for and history has to settle at some point.
  *
- * Errors: ticket_not_found, undo_expired.
+ * Errors: ticket_not_found, undo_expired, rejoined.
  */
 create function public.undo_served(p_ticket_id uuid)
 returns jsonb
@@ -218,6 +218,20 @@ begin
 
   if now() - v_ticket.served_at > public.undo_window() then
     raise exception 'undo_expired';
+  end if;
+
+  -- Done freed the device, so the Customer may already have taken a new place
+  -- in the Queue. Putting the old Ticket back would give them two active ones,
+  -- which tickets_one_active_per_device refuses — and a raw 23505 is no way to
+  -- tell an Owner that the person in front of them is queueing again. A null
+  -- device_id, which is what erasure leaves behind, matches nobody.
+  if v_ticket.device_id is not null and exists (
+    select 1 from public.tickets t
+    where t.shop_id = v_shop.id
+      and t.device_id = v_ticket.device_id
+      and t.status in ('waiting', 'called')
+  ) then
+    raise exception 'rejoined';
   end if;
 
   -- called_at is left alone: the Customer really was called then, and the
