@@ -1,14 +1,27 @@
 # Handoff
 
-Repo: `akashaf/virtual-queue-system`, branch `main`, pushed at `314d759`.
+Repo: `akashaf/virtual-queue-system`, branch `main`, committed at `5714137` — **not pushed**.
 
-**The site is live**: https://virtual-queue-system.netlify.app — `/` and `/login` return 200, `/api/health` returns `{"ok":true}`, `/dashboard` 307s to `/login`. But the **cloud database is still empty**, so no Owner can actually sign in yet. See task 2 below.
+**The site is live**: https://virtual-queue-system.netlify.app — `/` and `/login` return 200, `/api/health` returns `{"ok":true}`, `/dashboard` 307s to `/login`. But the **cloud database is still empty**, so no Owner can sign in and no Customer can join. See task 2 below, which is now the only blocker.
 
 ## Done in the last session
 
-- **Supabase API keys** — the leaked `service_role` key is revoked, the project now uses publishable/secret keys, and both environment variables were renamed to match. Commit `314d759`, [ADR 0004](docs/adr/0004-publishable-and-secret-supabase-api-keys.md), task 1 below.
+- **#5 (Customer joins the Queue and sees their position)** — implemented, reviewed on both
+  the Standards and Spec axes, committed as `5714137`. Not yet deployed or closed: it needs
+  task 2 below before it can run anywhere but locally.
+  - `tickets`, `join_queue`, `get_customer_view`, `get_owner_queue` in
+    `supabase/migrations/20260914150714_tickets_and_join_queue.sql`.
+  - `/s/[slug]` (EN/BM), `GET /api/s/[slug]/me`, and the dashboard's Waiting list.
+  - Tests: 214 in `bun run test`, 22 in `bun run e2e`.
+  - Specs updated alongside — `docs/specs/backend.md` §3/§5/§6/§7 and `frontend.md`
+    §1/§3.1/§6. **Don't re-derive any of it from the code.** In particular §5 records where
+    the shipped function contracts stop short of the full MVP shape, per slice.
 
 ## Done in the session before that
+
+- **Supabase API keys** — the leaked `service_role` key is revoked, the project now uses publishable/secret keys, and both environment variables were renamed to match. Commit `314d759`, [ADR 0004](docs/adr/0004-publishable-and-secret-supabase-api-keys.md), task 1 below.
+
+## Done before that
 
 - **#3 (Netlify)** — everything except the Twilio toggle. Findings on the issue: https://github.com/akashaf/virtual-queue-system/issues/3#issuecomment-5660938883
 - **#4 (Operator creates a Shop, Owner logs in)** — implemented, reviewed on both the Standards and Spec axes, committed and deployed. Summary: https://github.com/akashaf/virtual-queue-system/issues/4#issuecomment-5661074145
@@ -53,7 +66,10 @@ Still open from that migration:
 bunx supabase db push
 ```
 
-Needs the **database password**, which only the user has. Until this runs, `supabase/migrations/20260914075646_shops_and_queue_days.sql` exists only locally and the deployed `/login` cannot authenticate anyone.
+Needs the **database password**, which only the user has. Until this runs, **both**
+migrations exist only locally: the deployed `/login` cannot authenticate anyone and
+`/s/[slug]` has no `tickets` table to read. This is now the only thing standing between
+the repo and a working deployment.
 
 ### 3. Turn the Twilio SMS provider off
 
@@ -65,7 +81,13 @@ Its last open acceptance criterion (environment variables, Deploy Previews) is n
 
 ### 5. Then pick up the frontier
 
-**#5** (Customer joins the Queue and sees their position) and **#9** (Sentry) are both `ready-for-agent`. #5 is the natural next step and needs the `tickets` table plus `join_queue`. **#16** (asymmetric JWT signing keys) is also `ready-for-agent` but wants doing before real Shops are onboarded, while signing everyone out costs nothing.
+**#6** (Call next, Done and Served, live on both screens) is the natural next step: #5 left
+the dashboard read-only, and #6 is the first slice where one screen changes what another
+shows, so it brings the `realtime.send('queue_changed')` trigger with it (backend.md §6 says
+so explicitly). It also adds `get_owner_queue`'s Served-within-the-undo-window list.
+
+Also `ready-for-agent`: **#9** (Sentry), and **#16** (asymmetric JWT signing keys), which
+wants doing before real Shops are onboarded, while signing everyone out costs nothing.
 
 Onboarding the first Shop, once the migration is pushed, uses `POST /api/operator/shops` with the `OPERATOR_API_KEY` from `.env.netlify.production` — **that file is the only readable copy**, because Netlify secret values are write-only.
 
@@ -96,9 +118,20 @@ Not in the specs, and each one cost real time:
   avoiding the silent `--scope` failure above. Public values (`NEXT_PUBLIC_*`) are fine by CLI.
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when polling a deploy state.
+- **A layout and its page render at the same time.** `app/dashboard/layout.tsx` redirecting a
+  Deactivated Shop's Owner does not stop `page.tsx` from running and throwing first. Only the
+  e2e run's `[WebServer]` output showed it. Owner reads return null for "no active Shop"
+  rather than throwing.
+- **`db:reset` before the migration edit is not a reset.** A test asserting a new constraint
+  passed against the old function for exactly this reason. Reset after the last SQL edit.
+- Supabase's default privileges grant `service_role` execute on every new function, so
+  `revoke … from public, anon, authenticated` leaves it behind. Name `service_role` too for
+  helpers nothing outside the database calls.
+- `String.length` counts an emoji as 2; Postgres `length()` counts it as 1. Customer names are
+  measured with `[...name].length` so the two agree.
 
 ## Suggested skills
 
-- `mattpocock-skills:implement` with `mattpocock-skills:tdd` — for #5 or #9.
-- `mattpocock-skills:code-review` — after any code or spec change, before committing. It caught three real defects in #4 that the tests did not.
-- `mattpocock-skills:domain-modeling` — if #5's Ticket rules force a decision worth an ADR.
+- `mattpocock-skills:implement` with `mattpocock-skills:tdd` — for #6 or #9.
+- `mattpocock-skills:code-review` — after any code or spec change, before committing. It caught three real defects in #4 and three more in #5 that the tests did not.
+- `mattpocock-skills:domain-modeling` — if #6's Undo window or Realtime rules force a decision worth an ADR.
