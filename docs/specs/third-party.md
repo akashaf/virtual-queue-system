@@ -80,7 +80,8 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
   - The secret key (`sb_secret_…`, `SUPABASE_SECRET_KEY`) stays on the server. It acts as the `service_role` Postgres role and bypasses RLS. It is named `netlify_production` in the dashboard, so it can be revoked on its own.
   - The Postgres role names are unchanged: migrations still grant to `anon`, `authenticated` and `service_role`.
   - Both key types can be live at once, so a future rotation is: create the new key, set it in Netlify, rebuild, verify, then revoke the old one. Reading a secret key back is impossible after creation in Netlify, so verify by exercising a route that uses it.
-  - **User access tokens are still signed by the legacy JWT secret.** Migrating to asymmetric JWT signing keys is a separate migration, deliberately deferred.
+  - **User access tokens are signed by an asymmetric JWT signing key** — ES256, `kid 0b23a31e-9f81-4b48-b429-679fbe2d0abc`. The legacy shared JWT secret is no longer the signing key, so rotating is now zero-downtime: publish the replacement, let the retired key verify until its tokens expire (600 s), then revoke.
+    - **The JWKS endpoint cannot tell you whether this is done.** `GET /auth/v1/.well-known/jwks.json` publishes keys that *verify*, and a shared HS256 secret can never appear there, so a project mid-migration — asymmetric key on standby, legacy secret still signing — looks exactly like a migrated one. Check *Authentication → JWT Keys* for which key is marked **Current key**, or decode an access token and read its `alg` and `kid`; those are the only answers that distinguish the two.
 - **Backups:** the free tier has no downloadable backups. Before charging real money, schedule a weekly `supabase db dump` into a private store, or upgrade to Pro, which has daily backups.
 
 ### Free-tier limits to watch

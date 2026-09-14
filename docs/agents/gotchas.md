@@ -36,6 +36,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **`db:reset` before the migration edit is not a reset.** A test asserting a new constraint
   passed against the old function for exactly this reason. Reset after the *last* SQL edit,
   then run the tests.
+- **The JWKS endpoint does not tell you whether JWT signing keys have been migrated.**
+  `/auth/v1/.well-known/jwks.json` publishes keys that *verify*, and a shared HS256 secret can
+  never appear in a JWKS — so a project with an asymmetric key still on *standby* looks
+  identical to one that has rotated to it. Read *Authentication → JWT Keys* for which key is
+  **Current key**, or decode an access token and read `alg` and `kid`.
 - **`supabase config diff` does not tell you whether phone sign-in is on.** It reports
   `auth.sms.twilio.enabled | remote: true` even after phone auth is switched off, because that
   key means *Twilio is the selected SMS provider*, not *phone sign-in is enabled*. Trusting it
