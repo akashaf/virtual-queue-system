@@ -1,4 +1,5 @@
 import { requireEnv } from "@/lib/env";
+import { noStoreJson as json } from "@/lib/http";
 import { isAuthorizedOperator } from "@/lib/operator/auth";
 import { parseCreateShopInput } from "@/lib/operator/shop-input";
 import { shopUrls, toShopResource } from "@/lib/operator/shop-resource";
@@ -96,11 +97,4 @@ export async function POST(request: Request) {
     },
     201,
   );
-}
-
-function json(body: unknown, status: number) {
-  return Response.json(body, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
 }

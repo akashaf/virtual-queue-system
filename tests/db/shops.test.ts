@@ -4,6 +4,7 @@ import {
   anonClient,
   connectDb,
   createOwner,
+  createShop,
   resetTestData,
   serviceClient,
   signInAs,
@@ -20,21 +21,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.end();
 });
-
-/** Creates a Shop the way the Operator API does, and returns it with its Owner. */
-async function createShop(overrides: Record<string, unknown> = {}) {
-  const owner = await createOwner();
-  const { data, error } = await serviceClient().rpc("create_shop", {
-    p_slug: uniqueSlug(),
-    p_name: "Kedai Gunting Rambut",
-    p_owner_user_id: owner.id,
-    p_lat: 3.1319,
-    p_lng: 101.6841,
-    ...overrides,
-  });
-  if (error) throw error;
-  return { owner, shop: data as Record<string, unknown> };
-}
 
 describe("create_shop", () => {
   test("creates a Shop with the documented defaults and its first Queue Day", async () => {

@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/supabase/database.types";
 import { readLocalSupabase } from "../tests/local-supabase";
+import { SHOP_LAT, SHOP_LNG } from "../tests/shop-location";
+
+export { SHOP_LAT, SHOP_LNG };
 
 const { apiUrl, secretKey } = readLocalSupabase();
 
@@ -9,7 +12,7 @@ const admin = createClient<Database>(apiUrl, secretKey, {
 });
 
 /** Onboards a Shop and its Owner against local Supabase, as the Operator API does. */
-export async function seedShop({ isActive = true } = {}) {
+export async function seedShop({ isActive = true, maxQueueSize = 30 } = {}) {
   const email = `owner-${crypto.randomUUID()}@example.test`;
   const password = "correct-horse-battery";
 
@@ -25,14 +28,28 @@ export async function seedShop({ isActive = true } = {}) {
     p_slug: `shop-${crypto.randomUUID().slice(0, 8)}`,
     p_name: "Kedai Gunting Rambut Ali",
     p_owner_user_id: owner.id,
-    p_lat: 3.1319,
-    p_lng: 101.6841,
+    p_lat: SHOP_LAT,
+    p_lng: SHOP_LNG,
+    p_max_queue_size: maxQueueSize,
   });
   if (shopError) throw shopError;
 
   if (!isActive) await deactivateShop(shop.id);
 
   return { email, password, shop };
+}
+
+/** Puts a Customer in a Shop's Queue without a browser, to stand ahead of the one under test. */
+export async function seedTicket(slug: string, name: string) {
+  const { error } = await admin.rpc("join_queue", {
+    p_slug: slug,
+    p_device_id: crypto.randomUUID(),
+    p_name: name,
+    p_lat: SHOP_LAT,
+    p_lng: SHOP_LNG,
+    p_accuracy_m: 0,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /** Switches a Shop off, the way `PATCH /api/operator/shops/[slug]` will. */

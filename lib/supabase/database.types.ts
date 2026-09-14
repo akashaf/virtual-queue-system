@@ -125,6 +125,94 @@ export type Database = {
           },
         ]
       }
+      tickets: {
+        Row: {
+          called_at: string | null
+          carried_over_at: string | null
+          customer_name: string | null
+          device_id: string | null
+          finished_at: string | null
+          heads_up_sent_at: string | null
+          id: string
+          joined_at: string
+          last_call_choice:
+            | Database["public"]["Enums"]["last_call_choice"]
+            | null
+          number: number
+          origin: Database["public"]["Enums"]["ticket_origin"]
+          parent_ticket_id: string | null
+          queue_day_id: string
+          removed_reason: Database["public"]["Enums"]["removed_reason"] | null
+          served_at: string | null
+          shop_id: string
+          status: Database["public"]["Enums"]["ticket_status"]
+        }
+        Insert: {
+          called_at?: string | null
+          carried_over_at?: string | null
+          customer_name?: string | null
+          device_id?: string | null
+          finished_at?: string | null
+          heads_up_sent_at?: string | null
+          id?: string
+          joined_at?: string
+          last_call_choice?:
+            | Database["public"]["Enums"]["last_call_choice"]
+            | null
+          number: number
+          origin: Database["public"]["Enums"]["ticket_origin"]
+          parent_ticket_id?: string | null
+          queue_day_id: string
+          removed_reason?: Database["public"]["Enums"]["removed_reason"] | null
+          served_at?: string | null
+          shop_id: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+        }
+        Update: {
+          called_at?: string | null
+          carried_over_at?: string | null
+          customer_name?: string | null
+          device_id?: string | null
+          finished_at?: string | null
+          heads_up_sent_at?: string | null
+          id?: string
+          joined_at?: string
+          last_call_choice?:
+            | Database["public"]["Enums"]["last_call_choice"]
+            | null
+          number?: number
+          origin?: Database["public"]["Enums"]["ticket_origin"]
+          parent_ticket_id?: string | null
+          queue_day_id?: string
+          removed_reason?: Database["public"]["Enums"]["removed_reason"] | null
+          served_at?: string | null
+          shop_id?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_parent_ticket_id_fkey"
+            columns: ["parent_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_queue_day_id_fkey"
+            columns: ["queue_day_id"]
+            isOneToOne: false
+            referencedRelation: "queue_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -163,9 +251,51 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      customer_view_json: {
+        Args: {
+          p_shop: Database["public"]["Tables"]["shops"]["Row"]
+          p_ticket: Database["public"]["Tables"]["tickets"]["Row"]
+        }
+        Returns: Json
+      }
+      get_customer_view: {
+        Args: { p_device_id?: string; p_slug: string }
+        Returns: Json
+      }
+      get_owner_queue: { Args: never; Returns: Json }
+      haversine_m: {
+        Args: {
+          p_lat_a: number
+          p_lat_b: number
+          p_lng_a: number
+          p_lng_b: number
+        }
+        Returns: number
+      }
+      join_queue: {
+        Args: {
+          p_accuracy_m?: number
+          p_device_id: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_slug: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       joining_state: "open" | "last_call"
+      last_call_choice: "stay" | "carry"
+      removed_reason: "owner" | "close_shop" | "carry_over_expired"
+      ticket_origin: "scan" | "rejoin"
+      ticket_status:
+        | "waiting"
+        | "called"
+        | "served"
+        | "no_show"
+        | "left"
+        | "removed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -297,6 +427,17 @@ export const Constants = {
   public: {
     Enums: {
       joining_state: ["open", "last_call"],
+      last_call_choice: ["stay", "carry"],
+      removed_reason: ["owner", "close_shop", "carry_over_expired"],
+      ticket_origin: ["scan", "rejoin"],
+      ticket_status: [
+        "waiting",
+        "called",
+        "served",
+        "no_show",
+        "left",
+        "removed",
+      ],
     },
   },
 } as const

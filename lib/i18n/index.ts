@@ -5,11 +5,14 @@ export type { Dictionary };
 
 export const LANG_COOKIE = "vq_lang";
 
+/** The Customer picks a language for good; a year outlives any one visit. */
+export const LANG_COOKIE_MAX_AGE = 31_536_000;
+
 export const dictionaries = { en, ms } satisfies Record<string, Dictionary>;
 
 export type Lang = keyof typeof dictionaries;
 
-function isLang(value: string | undefined): value is Lang {
+export function isLang(value: string | undefined): value is Lang {
   return value !== undefined && Object.hasOwn(dictionaries, value);
 }
 
@@ -37,4 +40,15 @@ export function resolveLang(
     if (isLang(primary)) return primary;
   }
   return "en";
+}
+
+/**
+ * Fills `{name}` placeholders in a translation. Deliberately the whole of our
+ * i18n machinery: the Customer page has one plural to make and no dates to
+ * format, so a library would be more to keep in step than the dictionaries are.
+ */
+export function format(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (placeholder, key: string) =>
+    Object.hasOwn(values, key) ? String(values[key]) : placeholder,
+  );
 }

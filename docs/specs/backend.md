@@ -73,7 +73,7 @@ All timestamps are `timestamptz`, stored in UTC. Business-date logic uses `Asia/
 | shop_id | uuid → shops | Denormalised for billing queries |
 | queue_day_id | uuid → queue_days | Changes when the Ticket is carried over |
 | number | int not null | Unique per `queue_day_id`. Shown to customers as `#017` |
-| customer_name | text null | 1–30 characters. Set to null 30 days after `finished_at` (PDPA) |
+| customer_name | text null | 1–30 characters, counted as Postgres `length()` does — an emoji is one, not the two that `String.length` sees. Set to null 30 days after `finished_at` (PDPA) |
 | device_id | uuid null | From the `vq_device` cookie. Set to null together with the name |
 | status | enum `waiting` `called` `served` `no_show` `left` `removed` | |
 | origin | enum `scan` \| `rejoin` | |
@@ -89,8 +89,10 @@ Indexes and constraints:
 - `shops.name` must not be blank
 - Partial unique index on `queue_days (shop_id) WHERE closed_at IS NULL`: a Shop has exactly one Queue Day open at a time. Close Shop must therefore close the current Queue Day before opening the next one, not after
 - `(queue_day_id, number)` unique
-- Partial unique index `(shop_id, device_id) WHERE status IN ('waiting','called')` enforces one active Ticket per device per Shop
+- Partial unique index `(shop_id, device_id) WHERE status IN ('waiting','called')` enforces one active Ticket per device per Shop. Scoped to the Shop rather than the Queue Day, so a Ticket left open across a Close Shop still blocks a second one. A null `device_id`, which is what erasure leaves behind, never collides
+- Partial index `(queue_day_id, number) WHERE status = 'waiting'` serves both numbers a Customer sees: their position and the waiting count
 - `(shop_id, served_at) WHERE status = 'served'` for billing queries
+- `tickets.customer_name` is null or 1-30 characters; `tickets.number` is at least 1
 
 ### `push_subscriptions`
 | column | type | notes |
@@ -132,21 +134,34 @@ Rules:
 
 ## 5. Postgres functions
 
-All functions are `security definer` with `search_path = ''` and lock the Shop row first. Each returns `{ result, alerts }`. `alerts` is `[{ ticket_id, kind }]`, with `kind ∈ heads_up | called | last_call | shop_closed`, and Next.js dispatches them.
+All functions are `security definer` with `search_path = ''` and lock the Shop row first. Each returns `{ result, alerts }`. `alerts` is `[{ ticket_id, kind }]`, with `kind ∈ heads_up | called | last_call | shop_closed`, and Next.js dispatches them. The read-only `get_*` functions are the exception: they return their view directly, because there is nothing to alert about.
+
+**Refusals are raised, not returned.** A rule a Customer or Owner has run into is `raise exception '<token>'`, which reaches supabase-js as `{ code: 'P0001', message: '<token>' }`. The tokens are the ones listed per function below, and TypeScript switches on them (`lib/customer/view.ts`); any other message is a bug rather than a situation, and is logged as one. Constraint violations keep their own SQLSTATE, so a name that is too long is a `23514` and not a token.
+
+Two helpers are not called from outside the database:
+- `haversine_m(lat_a, lng_a, lat_b, lng_b)` — metres between two points on a sphere of radius 6371 km.
+- `customer_view_json(shop, ticket)` — builds the payload below. Shared by `get_customer_view` and `join_queue`, so a join and the refetch that follows it cannot disagree.
 
 ### Customer functions (execute granted to `service_role` only)
-- `join_queue(slug, device_id, name, lat, lng, accuracy_m)`
+- `join_queue(slug, device_id, name, lat, lng, accuracy_m)` → `{ result: <the customer view below>, alerts: [] }`
   - Distance is the haversine distance in metres.
-  - Accept when `distance ≤ join_radius_m + least(accuracy_m, 100)`.
-  - Errors: `shop_inactive`, `last_call`, `too_far`, `queue_full`, `already_in_queue`.
+  - Accept when `distance ≤ join_radius_m + least(greatest(accuracy_m, 0), 100)`.
+  - Checked in this order: `shop_inactive`, `last_call`, `already_in_queue`, `too_far`, `queue_full`. The Join Radius comes before the queue size deliberately — "check back soon" is the wrong thing to tell someone who is not at the Shop at all.
+  - A slug no Shop has raises `shop_inactive` too. A printed QR code outlives the Shop it was printed for, and a Customer holding an old one needs the same answer either way.
+  - A Ticket that joins already inside the Heads-up Threshold gets `heads_up_sent_at = now()` and no alert, per §4: the Customer is looking at the page that is about to tell them how many are ahead, and marking it is what stops the next mutation alerting them for nothing. The threshold is measured against the Queue only, so Called Tickets do not push a new joiner out of it.
+  - A null or blank name is refused as a `23514`, the same as one over 30 characters. The column itself allows null, because erasure leaves one behind.
 - `rejoin_queue(ticket_id, device_id)`
   - Errors: `not_rejoinable`, `last_call`, `queue_full`.
 - `leave_queue(ticket_id, device_id)`
 - `choose_last_call(ticket_id, device_id, choice)`
   - Only allowed while `joining_state = last_call` and the Ticket is Waiting.
   - Can be changed until Close Shop.
-- `get_customer_view(slug, device_id)` → `{ shop: { name, is_active, joining_state }, ticket: { id, number, status, position, waiting_count, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
-  - Never returns other customers' names.
+- `get_customer_view(slug, device_id)` → `{ shop: { name, is_active, joining_state, waiting_count }, ticket: { id, number, status, position, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
+  - Never returns other customers' names, and never the rest of the Queue.
+  - `waiting_count` belongs to the Shop rather than to the Ticket, because the join form shows it before there is a Ticket to hang it on.
+  - `ticket` is the device's **active** Ticket — Waiting or Called — which the partial unique index makes at most one. A Ticket that has reached a final status is not returned; the page keeps showing that state from `sessionStorage` instead (frontend.md §3.1).
+  - Returns SQL `null` for a slug no Shop has, so the page can show a missing Shop and a Deactivated Shop the same way.
+  - Delivered so far (#5): `shop`, and `ticket` as far as `position`. `last_call_choice` and `carried_over` arrive with #11, `can_rejoin` with #7, and `estimate` with #12.
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
 - `call_next()`: error `queue_empty`
@@ -161,7 +176,10 @@ All functions are `security definer` with `search_path = ''` and lock the Shop r
   - Moves carry-choice Tickets to the new Queue Day, numbered 1..k in their original order, with `carried_over_at = now()` and `last_call_choice = null`.
   - Removes the remaining Waiting Tickets, each with a `shop_closed` alert.
   - Resets `joining_state = open`.
-- `get_owner_queue()` → the current Queue Day's Waiting and Called Tickets with names, plus Tickets Served within the undo window
+- `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at }], called: [{ id, number, name, called_at }] }` for the current Queue Day, plus Tickets Served within the undo window
+  - Takes no Shop argument: it finds the Shop from `auth.uid()`, so a request cannot name one.
+  - Raises `shop_inactive` when the caller runs no active Shop. The dashboard treats that as a state, not a failure — a layout and its page render at the same time, so the page cannot lean on the layout's redirect having happened first.
+  - Delivered so far (#5): `shop`, `waiting` and `called`. The Served-within-the-undo-window list arrives with #6, which is what creates a Served Ticket in the first place.
 - `get_owner_history(days int default 30)` → today's Tickets with statuses and timestamps, plus Served counts per day (Malaysia time) and the month-to-date total
 
 ### Estimated Wait (inside `get_customer_view`)
@@ -184,6 +202,7 @@ All functions are `security definer` with `search_path = ''` and lock the Shop r
 ## 6. Realtime
 
 - An `AFTER INSERT OR UPDATE` trigger on `tickets` and `shops` calls `realtime.send(jsonb_build_object('at', now()), 'queue_changed', 'shop:' || shop_id, false)`.
+- **Not built yet.** The trigger and the subscription arrive with #6, which is the first slice where one screen changes what another shows. Until then the Customer page keeps its position true with the 30 s poll and the `visibilitychange` refetch below, and the dashboard re-renders per request.
 - The payload carries **no ticket data**. A public broadcast is acceptable because it reveals only activity timing.
 - Clients subscribe to `shop:{shop_id}` and refetch their view when a ping arrives, debounced by 300 ms.
 - Clients also poll every 30 s and on `visibilitychange`, because mobile browsers drop sockets in the background.
@@ -204,9 +223,12 @@ After a successful call, each action runs `after(() => dispatchAlerts(alerts))`.
 Device cookie `vq_device`:
 - Random UUID
 - `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=34560000` (400 days, the browser maximum)
+- `Secure` is set in production only. `next dev` on a LAN address is plain HTTP, where the browser would drop the cookie without a word and no Customer could ever hold a Ticket.
+- Minted by the `joinQueue` Server Action, which is the only place it can be: Server Components cannot write cookies, so the first join is what gives a browser its identity.
+- Read back as a UUID or not at all. A forged value would otherwise reach a `uuid` parameter and turn into a 500 instead of a view with no Ticket in it.
 
 ### Route Handlers (reads, `cache: no-store`)
-- `GET /api/s/[slug]/me` → `get_customer_view`
+- `GET /api/s/[slug]/me` → `get_customer_view`. 404 when the slug has no Shop. Reads the device from the raw `Cookie` header rather than `cookies()`, which keeps it testable as Request in, Response out
 - `GET /api/owner/queue` → `get_owner_queue`
 - `GET /api/owner/history` → `get_owner_history`
 

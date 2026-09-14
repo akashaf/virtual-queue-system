@@ -13,7 +13,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
 - **Data:**
   - Server Components render the first view.
   - Client components refetch from Route Handlers when a Realtime ping arrives, every 30 s, and on `visibilitychange`.
-  - Mutations use Server Actions with `useActionState` for pending and error states.
+  - Mutations use Server Actions with `useActionState` for pending and error states. Joining is the exception: the tap has to buy a geolocation fix *before* the action is called (§3.2), so the customer page calls `joinQueue` itself and holds the result in state. Its button stays disabled until the page has hydrated, because a form submitted before then would post with no coordinates at all.
 - **Customer-page languages:** English and Bahasa Malaysia.
   - The language comes from `Accept-Language` and is stored in the `vq_lang` cookie.
   - A small EN | BM toggle overrides it.
@@ -45,6 +45,7 @@ The page is one component that switches on `get_customer_view`. It shows only th
 | Join form | No active Ticket, `joining_state = open` | Shop name, waiting count, name input (1–30 characters), privacy notice | **Join queue** |
 | Last Call, not joined | No Ticket, `last_call` | "Shop is closing soon, not taking new customers" | — |
 | Location denied | Geolocation permission denied | How to enable location in the browser settings | **Try again** |
+| Location unavailable | Geolocation timed out or returned no fix | "We couldn't find your location", and to move somewhere with a clearer signal. Kept apart from denied because only a refusal is the customer's to fix | **Try again** |
 | Too far | `too_far` | "You need to be at the shop to join" | **Try again** |
 | Queue full | `queue_full` | "Queue full, please check back soon" | **Try again** |
 | Waiting | `waiting` | Big ticket number, "N ahead of you", Estimated Wait range if available, the note "Customers waiting in person may be served in between", alert status (push on/off) | **Leave queue** (confirmation) |
@@ -136,7 +137,7 @@ Behaviour:
 ```
 app/
   page.tsx
-  s/[slug]/page.tsx, customer-view.tsx, actions.ts
+  s/[slug]/page.tsx, customer-queue.tsx, language-toggle.tsx, actions.ts
   login/page.tsx, actions.ts
   dashboard/layout.tsx, page.tsx, queue-board.tsx, actions.ts
   dashboard/history/page.tsx
@@ -146,8 +147,10 @@ app/
   api/cron/daily/route.ts
 lib/supabase/{server,client,admin}.ts, lib/supabase/database.types.ts (generated)
 lib/auth/owner.ts             (the Owner's Shop, the authoritative session check)
+lib/customer/{view,queue}.ts  (view.ts is pure and shared with the client component)
+lib/owner/queue.ts
 lib/operator/{auth,shop-input,shop-resource}.ts
-lib/push.ts, lib/device-cookie.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
+lib/push.ts, lib/device-cookie.ts, lib/time.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
 components/ui/…              (shadcn)
 public/sw.js, public/sounds/{chime,called}.mp3
 proxy.ts
