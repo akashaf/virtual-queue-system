@@ -1,80 +1,53 @@
-# Handoff: finish #3 (Netlify dashboard tasks)
+# Handoff: after #3 and #4
 
-Repo: `/Users/akashaf/workspace/virtual-queue-system` (GitHub `akashaf/virtual-queue-system`, branch `main`, pushed at `12605e3`).
+Repo: `/Users/akashaf/workspace/virtual-queue-system` (GitHub `akashaf/virtual-queue-system`, branch `main`).
 
-## Focus for the next session
+## Where things stand
 
-1. **Close out what's still open on #3.** Everything left needs the user's Netlify account.
-2. Then move on to the ticket frontier (§4).
+- **#3 is done apart from two human steps** (below). The Free-plan findings are on the issue: https://github.com/akashaf/virtual-queue-system/issues/3#issuecomment-5660938883 and in `docs/specs/third-party.md` §2.
+- **#4 is implemented**: first migration, `create_shop`, RLS, `POST /api/operator/shops`, `/login`, the real `proxy.ts`, and a dashboard that checks the session and `is_active` on the server.
+- Next frontier: **#5** (Customer joins the Queue) and **#9** (Sentry), both `ready-for-agent`.
 
-The Free-plan decision is **done and recorded**:
-- ADR `docs/adr/0003-netlify-free-plan-until-first-paying-shop.md`
-- specs updated in `12605e3`
-- #1 and #3 issue bodies updated
+## 1. Still needs a human
 
-Don't redo it.
+- [ ] **Two Supabase variables in Netlify.** Reading the project's API keys is blocked in the agent sandbox, so copy them from the `queue-service` dashboard (Project Settings → API keys):
+      ```
+      ~/.bun/bin/netlify env:set NEXT_PUBLIC_SUPABASE_ANON_KEY '<anon key>' --context production
+      ~/.bun/bin/netlify env:set SUPABASE_SERVICE_ROLE_KEY '<service role key>' --context production --secret
+      ```
+      Nothing is deployed that needs them until #4 ships.
+- [ ] **Turn the Twilio SMS provider off** in Supabase → Authentication → Sign In / Providers → Phone. `supabase config push` reports it as *unencodable*: it can switch between SMS providers but cannot turn the active one off. `auth.sms.enable_signup` is already `false`, so nobody can sign up by phone meanwhile.
+- [ ] **Push the first migration to the cloud**: `bunx supabase db push` needs the database password, which only the user has.
+- [ ] Close #3 once the first two are done.
 
-## Read these first (don't duplicate them)
+## 2. Netlify Free plan: what it cannot do
 
-- Spec issue: https://github.com/akashaf/virtual-queue-system/issues/1, with child tickets #2–#15 (native blocked-by links)
-- #3 (acceptance criteria are ticked where done) and its platform-check findings: https://github.com/akashaf/virtual-queue-system/issues/3#issuecomment-5659898761
-- Glossary and ADRs: `CONTEXT.md`, `docs/adr/` (0003 is the Netlify Free plan)
-- Specs: `docs/specs/third-party.md` covers:
-  - Netlify on the Free plan: region, site name, Deploy Previews, Node version
-  - Supabase: project, auth-settings traps, how to push auth settings safely, local-only tests
+Recorded in `docs/specs/third-party.md` §2; repeated here because each one cost a debugging round.
 
-  Also `docs/specs/backend.md` and `docs/specs/frontend.md`.
-- Tracker conventions: `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`
-- Commits: `7f87e08` and `fdf52c3` (#2, closed); `8ac29b0` and `19dc2f5` (#3 check added, then removed); `12605e3` (specs and ADR for the Free plan)
+- **The functions region cannot be changed.** `updateSite` returns 422 for `ap-southeast-1` *and* for another US region. Functions stay in `us-east-2`, so every action is two trans-Pacific hops. Fixing it is part of the paid upgrade (ADR 0003).
+- **Per-scope environment variables are paid-only, and `--scope` fails silently**: no output, exit 0, nothing written. Always confirm with `netlify env:list --context production`. On Free every variable is all-scope, which is what we need.
+- **`--secret` values are write-only** — not readable from the CLI or the dashboard. The generated `OPERATOR_API_KEY`, `CRON_SECRET` and VAPID keys are mirrored to the gitignored `.env.netlify.production`, **the only readable copy**. It is deliberately not named `.env.production.local`, because `next build` loads that name and would pull production secrets into a local build.
 
-## 1. Still open on #3 (label `ready-for-human`)
+## 3. Local environment
 
-- [ ] **Netlify CLI access (blocks everything below).**
-  - It's installed at `~/.bun/bin/netlify` (v27.5.2). That directory **isn't on PATH**, and the CLI is **not logged in**.
-  - The user must run `! ~/.bun/bin/netlify login` and `! ~/.bun/bin/netlify link` (the login needs a browser).
-- [ ] **Functions region.** Check whether the Free plan allows Asia Pacific (Singapore).
-  - Set it if it does.
-  - Record the result in `docs/specs/third-party.md` §2, which currently says "Not yet confirmed". If it's stuck in US East, also update the diagram note in `backend.md` §2.
-- [ ] **Confirm the site name is final** with the user: `virtual-queue-system.netlify.app` (the specs already record it).
-- [ ] **Production environment variables** (names in `.env.example` and `backend.md` §10), scoped per `third-party.md` §2.
-  - The Supabase URL and keys come from the linked project `queue-service`.
-  - **Don't print secret values in the transcript.** List names only, e.g. `netlify env:list --json` filtered to keys.
-  - No deployed code needs them yet; #4 will.
-- [ ] **Disable Deploy Previews and Branch deploys.**
-- [ ] **Pin the Node version** (Netlify runs 22.14.0, local development uses 26; see `third-party.md` §2). This is optional within #3, and can be done in code with `engines` or as the Netlify env var `NODE_VERSION`.
-- [ ] **VAPID keys:** the user should run `bunx web-push generate-vapid-keys` themselves and store the keys in Netlify, so the private key never enters an agent transcript.
-- [ ] **Close #3** once the above is done or explicitly waived.
+- `.env.local` (gitignored) points at local Supabase and holds `OPERATOR_API_KEY=local-operator-key`.
+- Start: `colima start && bun run db:start` · Stop: `bun run db:stop && colima stop`.
+  If `db:start` fails with `LegacyStatusDbNotReadyError`, just run it again; the container was still booting.
+- Colima and the Docker CLI came from Homebrew. `~/.docker/config.json` had a stale `"credsStore": "desktop"` that broke image pulls; it was removed, backup at `~/.docker/config.json.bak-desktop`.
+- `.claude/settings.local.json` allows `~/.bun/bin/netlify` so the agent can run Netlify writes. Reading Supabase API keys and searching for credential files stay blocked.
+- Tests run against local Supabase only, never the cloud project.
 
-## 2. Supabase cloud: state not captured in the specs
+## 4. Gotchas that cost time
 
-- Linked project ref: `beolqxlclwhnvmoglgmo`. The link state is in the gitignored `supabase/.temp/`. Cloud auth already has `jwt_expiry` 600, sign-ups disabled, and `site_url` set; nothing else was changed.
-- Reading the CLI token from the macOS Keychain to call the Management API directly was **blocked by the sandbox**. Don't retry it. Use the CLI's scoped `config diff`/`config push` method described in `third-party.md` §3.
-- The cloud **database is empty** (per the user). `bunx supabase db push` needs the database password, which the user must supply; the first migration arrives with #4.
-- **Flagged, still unanswered:** the cloud shows `auth.sms.twilio.enabled = true`. Ask the user whether that's intended.
+- **`"use server"` files may only export values that are async functions.** Adding `export const MESSAGE = "…"` to `app/login/actions.ts` broke *every* action in the file, and neither `tsc` nor `next build` caught it — only `next dev`. Type-only exports (`export interface`) are fine. Shared strings live in `app/login/messages.ts`.
+- `bun run db:types` regenerates `lib/supabase/database.types.ts`. Run it after every migration and commit the result, or `tsc` silently stops checking queries.
+- Netlify auto-grants new `public` tables to `anon`/`authenticated`, so each migration must `revoke` and then grant back deliberately.
+- A Server Action form clicked before hydration submits as a normal POST, and `page.reload()` in Playwright re-submits it. Poll with `page.goto()` instead.
+- `bun run typecheck` runs `next typegen` first, because `LayoutProps`/`PageProps` are generated. After deleting routes, `rm -rf .next` clears stale `.next/types`.
+- Vitest projects: `unit` (`{app,lib}/**/*.test.ts`) and `db` (`tests/db/**`, needs local Supabase). Plain `bun run test` runs both.
+- `git diff` can hang on a pager here; use `git --no-pager diff`.
 
-## 3. Local environment changes outside the repo
+## 5. Suggested skills
 
-- Colima and the Docker CLI were installed via Homebrew (the user chose this). The VM is 4 CPU / 6 GB / 40 GB, and local Supabase runs on it.
-  - Start: `colima start && bun run db:start`
-  - Stop: `bun run db:stop && colima stop`
-- `~/.docker/config.json` had a stale `"credsStore": "desktop"` left from Docker Desktop, which broke image pulls. That key was removed; the backup is `~/.docker/config.json.bak-desktop`.
-- **Decision: keep local Supabase** even though the cloud project is linked. Tests run locally only (now in the specs).
-
-## Technical gotchas learned (not in the specs)
-
-- `"use server"` files may only export async functions; exporting a `const` breaks every action in the file.
-- A Server Action form clicked before hydration submits as a normal POST, and `page.reload()` in Playwright then re-submits it. Poll with `page.goto()` instead.
-- `bun run typecheck` runs `next typegen` first, because global types like `LayoutProps` are generated. After deleting routes, stale `.next/types` can break `tsc`; `rm -rf .next` fixes it.
-- `next dev` can load a server module separately for a page and an action, so module-level in-memory state isn't shared. Use `globalThis` if it must be.
-- Vitest projects: `unit` (`{app,lib}/**/*.test.ts`) and `db` (`tests/db/**`, needs local Supabase running). Plain `bun run test` runs both.
-- `git diff` can hang waiting on a pager in this environment; use `git --no-pager diff`.
-
-## 4. After #3: the ticket frontier
-
-#4 (Operator creates a Shop, Owner logs in) and #9 (Sentry) are unblocked and labelled `ready-for-agent`. #4 will need the first migration and the real `proxy.ts` (Supabase session refresh), and its schema must then be pushed to the cloud (database password needed).
-
-## Suggested skills
-
-- `mattpocock-skills:implement` (with `mattpocock-skills:tdd`): for #4 or #9 once #3 is closed.
-- `mattpocock-skills:code-review`: after any code or spec change, before committing.
-- `mattpocock-skills:domain-modeling`: if the region check forces a further decision (e.g. accepting US East), to amend ADR 0003 or add a new ADR.
+- `mattpocock-skills:implement` with `mattpocock-skills:tdd`, for #5 or #9.
+- `mattpocock-skills:code-review` after any code or spec change, before committing.

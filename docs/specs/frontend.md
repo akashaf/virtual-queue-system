@@ -144,7 +144,9 @@ app/
   api/owner/queue/route.ts, api/owner/history/route.ts
   api/operator/…            (see backend.md §8)
   api/cron/daily/route.ts
-lib/supabase/{server,client,admin}.ts
+lib/supabase/{server,client,admin}.ts, lib/supabase/database.types.ts (generated)
+lib/auth/owner.ts             (the Owner's Shop, the authoritative session check)
+lib/operator/{auth,shop-input,shop-resource}.ts
 lib/push.ts, lib/device-cookie.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
 components/ui/…              (shadcn)
 public/sw.js, public/sounds/{chime,called}.mp3

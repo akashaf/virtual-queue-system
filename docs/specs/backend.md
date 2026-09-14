@@ -86,6 +86,8 @@ All timestamps are `timestamptz`, stored in UTC. Business-date logic uses `Asia/
 | called_at, served_at, finished_at | timestamptz null | `finished_at` = when the status became final |
 
 Indexes and constraints:
+- `shops.name` must not be blank
+- Partial unique index on `queue_days (shop_id) WHERE closed_at IS NULL`: a Shop has exactly one Queue Day open at a time. Close Shop must therefore close the current Queue Day before opening the next one, not after
 - `(queue_day_id, number)` unique
 - Partial unique index `(shop_id, device_id) WHERE status IN ('waiting','called')` enforces one active Ticket per device per Shop
 - `(shop_id, served_at) WHERE status = 'served'` for billing queries
@@ -169,6 +171,10 @@ All functions are `security definer` with `search_path = ''` and lock the Shop r
 - `estimate = (position + 1) × gap`, returned as a range of −30% to +30%, rounded to 5 minutes.
 
 ### Operator and cron functions (`service_role` only)
+- `create_shop(slug, name, owner_user_id, lat, lng, join_radius_m?, heads_up_threshold?, max_queue_size?)` → the Shop
+  - Inserts the Shop and opens its first Queue Day in one transaction, so a Shop can never exist without a current Queue Day.
+  - Omitted settings take the column defaults, which are written down only in the schema.
+  - The Owner's Auth user has to exist first, and lives outside this transaction: see [§8](#8-operator-admin-api).
 - `billing_summary(month text 'YYYY-MM')` → `[{ slug, name, served_count, amount_sen }]`, where `amount_sen = served_count × 25`
   - Month bounds are computed in `Asia/Kuala_Lumpur`.
 - `expire_carried_over()` → alerts
@@ -223,7 +229,7 @@ Requests need `Authorization: Bearer <OPERATOR_API_KEY>`, compared in constant t
 
 | Method & path | Body | Effect |
 |---|---|---|
-| `POST /api/operator/shops` | `{ slug, name, lat, lng, ownerEmail, ownerPassword, joinRadiusM?, headsUpThreshold?, maxQueueSize? }` | Creates the Auth user with `auth.admin.createUser({ email_confirm: true })`, the Shop and its first Queue Day. If the Shop insert fails, deletes the Auth user. Returns the Shop, `queueUrl`, `qrUrl` |
+| `POST /api/operator/shops` | `{ slug, name, lat, lng, ownerEmail, ownerPassword, joinRadiusM?, headsUpThreshold?, maxQueueSize? }` | Creates the Auth user with `auth.admin.createUser({ email_confirm: true })`, the Shop and its first Queue Day. `ownerPassword` has the same ≥ 10 character minimum as a reset, so a created password is never weaker than a replaced one. If the Shop insert fails, deletes the Auth user. Returns the Shop, `queueUrl`, `qrUrl` |
 | `GET /api/operator/shops` | — | Lists Shops with owner email, `is_active` and month-to-date Served count |
 | `GET /api/operator/shops/[slug]` | — | One Shop |
 | `PATCH /api/operator/shops/[slug]` | Any of `{ name, lat, lng, joinRadiusM, headsUpThreshold, maxQueueSize, isActive }` | Updates the Shop. Setting `isActive: false` also calls `revoke_owner_sessions`. The slug cannot be changed |
@@ -232,6 +238,17 @@ Requests need `Authorization: Bearer <OPERATOR_API_KEY>`, compared in constant t
 | `GET /api/operator/billing?month=YYYY-MM` | — | `billing_summary`. Returns `{ month, shops: [...], totalSen }` |
 
 Shops are never deleted; they are deactivated instead.
+
+Responses use camelCase, so the database's column names are not part of the API. Errors are `{ error, field?, message? }`:
+
+| Status | `error` | When |
+|---|---|---|
+| 400 | `invalid_body` | Malformed JSON, or a field the `field` key names |
+| 401 | `unauthorized` | Missing or wrong bearer key |
+| 409 | `slug_taken`, `email_taken` | The slug or the owner email is already used |
+| 500 | `internal_error` | Anything else; the detail is logged, not returned |
+
+`POST /api/operator/shops` writes to two systems that cannot share a transaction. It creates the Auth user first, because `shops.owner_user_id` references it, then calls `create_shop`. If the Shop is rejected the Auth user is deleted again, so that retrying with a corrected slug doesn't then fail on a duplicate email.
 
 ## 9. Scheduled jobs (Netlify Scheduled Functions)
 
@@ -267,6 +284,7 @@ export const config = { schedule: '0 19 * * *' } // 19:00 UTC = 03:00 Malaysia t
 
 ## 11. Testing
 
+- **Types:** `bun run db:types` regenerates `lib/supabase/database.types.ts` from the local database, and every Supabase client is parameterised with it. Run it after each migration, and commit the result, so `tsc` catches a query that no longer matches the schema.
 - **Queue rules (Vitest against `supabase start`):** these tests always run against the local stack, never the cloud project. One test file per function, covering:
   - Every row of the state machine table, including guards and error codes
   - Concurrent `call_next` from two connections calls two different Tickets

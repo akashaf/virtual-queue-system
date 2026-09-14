@@ -26,3 +26,37 @@ export async function connectDb() {
   await client.connect();
   return client;
 }
+
+/** A slug that won't collide with other tests in the shared local database. */
+export function uniqueSlug(prefix = "shop") {
+  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+/** Creates a pre-confirmed Owner, the way the Operator API does. */
+export async function createOwner(password = "correct-horse-battery") {
+  const email = `owner-${crypto.randomUUID()}@example.test`;
+  const { data, error } = await serviceClient().auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error) throw error;
+  return { id: data.user.id, email, password };
+}
+
+/** Signs in as an Owner, giving a client whose requests carry their JWT. */
+export async function signInAs(email: string, password: string) {
+  const client = anonClient();
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return client;
+}
+
+/**
+ * Clears everything the database tests create. They share one long-lived local
+ * stack, so each file starts from a clean slate rather than relying on `db reset`.
+ */
+export async function resetTestData(db: Client) {
+  await db.query("truncate public.shops, public.queue_days cascade");
+  await db.query("delete from auth.users where email like '%@example.test'");
+}
