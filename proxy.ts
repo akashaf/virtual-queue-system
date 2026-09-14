@@ -58,7 +58,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next's internals and any path with a file extension
-  // (the service worker, sounds, images and the QR route).
-  matcher: ["/((?!_next/static|_next/image|.*\\..*).*)"],
+  // Everything except:
+  //   * Next's internals, and any path with a file extension (the service
+  //     worker, sounds, images and the QR route)
+  //   * the routes that authenticate with a bearer key rather than a session.
+  //     They need no refresh, and the liveness check in particular must not
+  //     depend on Supabase being configured — it exists to verify a deploy.
+  matcher: [
+    "/((?!_next/static|_next/image|api/health|api/cron|api/operator|.*\\..*).*)",
+  ],
 };
