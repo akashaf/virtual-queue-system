@@ -1,10 +1,14 @@
 # Handoff
 
-Repo: `akashaf/virtual-queue-system`, branch `main`, pushed at `716fea6`.
+Repo: `akashaf/virtual-queue-system`, branch `main`, pushed at `314d759`.
 
 **The site is live**: https://virtual-queue-system.netlify.app — `/` and `/login` return 200, `/api/health` returns `{"ok":true}`, `/dashboard` 307s to `/login`. But the **cloud database is still empty**, so no Owner can actually sign in yet. See task 2 below.
 
 ## Done in the last session
+
+- **Supabase API keys** — the leaked `service_role` key is revoked, the project now uses publishable/secret keys, and both environment variables were renamed to match. Commit `314d759`, [ADR 0004](docs/adr/0004-publishable-and-secret-supabase-api-keys.md), task 1 below.
+
+## Done in the session before that
 
 - **#3 (Netlify)** — everything except the Twilio toggle. Findings on the issue: https://github.com/akashaf/virtual-queue-system/issues/3#issuecomment-5660938883
 - **#4 (Operator creates a Shop, Owner logs in)** — implemented, reviewed on both the Standards and Spec axes, committed and deployed. Summary: https://github.com/akashaf/virtual-queue-system/issues/4#issuecomment-5661074145
@@ -17,6 +21,9 @@ Specs were updated alongside the code — `docs/specs/third-party.md` §2 for th
 ### 1. ~~Rotate the Supabase service-role key~~ — done, by migrating instead
 
 The leaked `service_role` key is **revoked**, confirmed by `401` from `/auth/v1/admin/users`.
+Production, local development and the test suites all run on publishable/secret keys, and the
+environment variables are now `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY`
+— the legacy-named pair is deleted from Netlify.
 
 It was not rotated. The legacy `anon`/`service_role` JWT keys are deprecated by Supabase
 (gone by the end of 2026, and never issued to projects created since 1 November 2025), so
@@ -33,6 +40,12 @@ Still open from that migration:
   signed by the legacy shared JWT secret, so rotating it signs everyone out. Cheapest while
   no Owner has a session.
 - Deactivation is **reversible** in the Supabase dashboard, if a forgotten client turns up.
+- **`SUPABASE_SECRET_KEY` in production is not yet proven.** Netlify secret values are write-only
+  and no deployed route builds the admin client until the `shops` table exists, so the first
+  `POST /api/operator/shops` after task 2 is what actually exercises it. If that call fails on
+  auth rather than schema, re-copy the `netlify_production` key from the Supabase dashboard into
+  Netlify. The publishable key *is* proven: `/dashboard` 307s, which needs `requireEnv` in
+  `proxy.ts` to resolve it.
 
 ### 2. Push the first migration to the cloud
 
@@ -52,7 +65,7 @@ Its last open acceptance criterion (environment variables, Deploy Previews) is n
 
 ### 5. Then pick up the frontier
 
-**#5** (Customer joins the Queue and sees their position) and **#9** (Sentry) are both `ready-for-agent`. #5 is the natural next step and needs the `tickets` table plus `join_queue`.
+**#5** (Customer joins the Queue and sees their position) and **#9** (Sentry) are both `ready-for-agent`. #5 is the natural next step and needs the `tickets` table plus `join_queue`. **#16** (asymmetric JWT signing keys) is also `ready-for-agent` but wants doing before real Shops are onboarded, while signing everyone out costs nothing.
 
 Onboarding the first Shop, once the migration is pushed, uses `POST /api/operator/shops` with the `OPERATOR_API_KEY` from `.env.netlify.production` — **that file is the only readable copy**, because Netlify secret values are write-only.
 
@@ -60,8 +73,10 @@ Onboarding the first Shop, once the migration is pushed, uses `POST /api/operato
 
 - Start: `colima start && bun run db:start` · Stop: `bun run db:stop && colima stop`.
   If `db:start` fails with `LegacyStatusDbNotReadyError`, run it again; the container was still booting.
-- `.env.local` (gitignored) points at local Supabase, `OPERATOR_API_KEY=local-operator-key`.
-- `.claude/settings.local.json` allows `~/.bun/bin/netlify` so an agent can make Netlify writes. Reading Supabase API keys and searching for credential files stay blocked by the sandbox — that is why the two Supabase keys had to be supplied by hand.
+- `.env.local` (gitignored) points at local Supabase with the stack's `sb_publishable_…` /
+  `sb_secret_…` keys, `OPERATOR_API_KEY=local-operator-key`. Regenerate it with the `bun run db:env`
+  line quoted at the top of the file.
+- `.claude/settings.local.json` allows `~/.bun/bin/netlify` so an agent can make Netlify writes. Reading Supabase API keys and searching for credential files stay blocked by the sandbox, so key values have to come from the user — and secret ones should go into the Netlify UI by hand, never through an agent (see the gotcha below).
 - Tests run against local Supabase only, never the cloud project. `bun run test` (85 tests) and `bun run e2e` (8 tests).
 
 ## Gotchas worth keeping
