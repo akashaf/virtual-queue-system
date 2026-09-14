@@ -1,63 +1,29 @@
 import "server-only";
+import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import {
+  isOwnerError,
+  toCalledTicket,
+  toOwnerQueue,
+  toServedTicket,
+  type CalledTicket,
+  type OwnerOutcome,
+  type OwnerQueue,
+  type ServedTicket,
+} from "./view";
 
-type JoiningState = Database["public"]["Enums"]["joining_state"];
-
-export interface WaitingTicket {
-  id: string;
-  number: number;
-  /** Null only after personal data has been erased, 30 days on. */
-  name: string | null;
-  joinedAt: string;
-}
-
-export interface CalledTicket {
-  id: string;
-  number: number;
-  name: string | null;
-  calledAt: string;
-}
-
-/** The Owner's live Queue: who is waiting, and who is in a chair. */
-export interface OwnerQueue {
-  shop: { id: string; name: string; joiningState: JoiningState };
-  waiting: WaitingTicket[];
-  called: CalledTicket[];
-}
-
-interface OwnerQueueJson {
-  shop: { id: string; name: string; joining_state: JoiningState };
-  waiting: { id: string; number: number; name: string | null; joined_at: string }[];
-  called: { id: string; number: number; name: string | null; called_at: string }[];
-}
-
-export function toOwnerQueue(json: unknown): OwnerQueue {
-  const { shop, waiting, called } = json as OwnerQueueJson;
-
-  return {
-    shop: { id: shop.id, name: shop.name, joiningState: shop.joining_state },
-    waiting: waiting.map((ticket) => ({
-      id: ticket.id,
-      number: ticket.number,
-      name: ticket.name,
-      joinedAt: ticket.joined_at,
-    })),
-    called: called.map((ticket) => ({
-      id: ticket.id,
-      number: ticket.number,
-      name: ticket.name,
-      calledAt: ticket.called_at,
-    })),
-  };
-}
+/**
+ * Every call here goes through the Owner's own JWT, so each function finds the
+ * Shop from `auth.uid()` rather than from anything the request could claim, and
+ * the Shop lock inside it — not this file — is what keeps two Owner devices
+ * pressing at once from stepping on each other.
+ */
 
 /** What `get_owner_queue` raises when the caller runs no active Shop. */
 const NO_ACTIVE_SHOP = "shop_inactive";
 
 /**
- * Reads the Queue with the Owner's own JWT, so `get_owner_queue` finds the Shop
- * from `auth.uid()` rather than from anything the request could claim.
+ * Reads the Queue.
  *
  * Null means the caller has no active Shop, which is a state rather than a
  * failure: a Shop can be deactivated mid-session, and a layout and its page
@@ -74,4 +40,58 @@ export async function fetchOwnerQueue(): Promise<OwnerQueue | null> {
   }
 
   return toOwnerQueue(data);
+}
+
+/** Summons the Customer at the front of the Queue. */
+export async function callNextTicket(): Promise<OwnerOutcome<CalledTicket>> {
+  const supabase = await createClient();
+  return outcome("call_next", await supabase.rpc("call_next"), toCalledTicket);
+}
+
+/** Marks a haircut done — the Shop's one billable event. */
+export async function markTicketServed(
+  ticketId: string,
+): Promise<OwnerOutcome<ServedTicket>> {
+  const supabase = await createClient();
+  return outcome(
+    "mark_served",
+    await supabase.rpc("mark_served", { p_ticket_id: ticketId }),
+    toServedTicket,
+  );
+}
+
+/** Takes a Done back, while the Undo window is still open. */
+export async function undoTicketServed(
+  ticketId: string,
+): Promise<OwnerOutcome<CalledTicket>> {
+  const supabase = await createClient();
+  return outcome(
+    "undo_served",
+    await supabase.rpc("undo_served", { p_ticket_id: ticketId }),
+    toCalledTicket,
+  );
+}
+
+/**
+ * What one owner function did, or why it did nothing.
+ *
+ * A message in OWNER_ERRORS is a rule the Owner ran into and worth showing them;
+ * anything else is a bug rather than a situation, and is reported as one.
+ *
+ * The functions return `jsonb`, which the generated types can only call `Json`;
+ * the `{ result, alerts }` envelope is pinned by backend.md §5. The alerts stay
+ * unread until #10 builds the dispatcher that sends them.
+ */
+function outcome<T>(
+  fn: string,
+  { data, error }: { data: unknown; error: PostgrestError | null },
+  toResult: (json: unknown) => T,
+): OwnerOutcome<T> {
+  if (error) {
+    if (isOwnerError(error.message)) return { ok: false, reason: error.message };
+    console.error(`${fn} failed`, error);
+    return { ok: false, reason: "failed" };
+  }
+
+  return { ok: true, result: toResult((data as { result: unknown }).result) };
 }

@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { deactivateShop, seedShop, seedTicket, SHOP_LAT, SHOP_LNG } from "./helpers";
+import {
+  deactivateShop,
+  seedShop,
+  seedTicket,
+  signInAsOwner,
+  SHOP_LAT,
+  SHOP_LNG,
+} from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
@@ -59,12 +66,8 @@ test("the Owner sees the Customer in the Waiting list", async ({ page, browser }
 
   const owner = await browser.newContext();
   const dashboard = await owner.newPage();
-  await dashboard.goto("/login");
-  await dashboard.getByLabel("Email").fill(email);
-  await dashboard.getByLabel("Password").fill(password);
-  await dashboard.getByRole("button", { name: "Sign in" }).click();
+  await signInAsOwner(dashboard, email, password);
 
-  await expect(dashboard).toHaveURL("/dashboard");
   await expect(dashboard.getByText("Waiting 1 · In chair 0")).toBeVisible();
   const row = dashboard.getByRole("listitem").filter({ hasText: "Ali" });
   await expect(row).toContainText("#001");

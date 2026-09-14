@@ -52,7 +52,13 @@ function join({
 /** The `{ result, alerts }` envelope, narrowed to what #5 fills in. */
 interface JoinEnvelope {
   result: {
-    shop: { name: string; is_active: boolean; joining_state: string; waiting_count: number };
+    shop: {
+      id: string;
+      name: string;
+      is_active: boolean;
+      joining_state: string;
+      waiting_count: number;
+    };
     ticket: { id: string; number: number; status: string; position: number } | null;
   };
   alerts: unknown[];
@@ -71,6 +77,7 @@ describe("join_queue", () => {
     const { result, alerts } = await joinOrThrow({ slug: shop.slug, name: "Ali" });
 
     expect(result.shop).toEqual({
+      id: shop.id,
       name: shop.name,
       is_active: true,
       joining_state: "open",

@@ -1,3 +1,4 @@
+import { expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/supabase/database.types";
 import { readLocalSupabase } from "../tests/local-supabase";
@@ -50,6 +51,15 @@ export async function seedTicket(slug: string, name: string) {
     p_accuracy_m: 0,
   });
   if (error) throw new Error(error.message);
+}
+
+/** Signs an Owner in on their own page, landing them on the dashboard. */
+export async function signInAsOwner(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL("/dashboard");
 }
 
 /** Switches a Shop off, the way `PATCH /api/operator/shops/[slug]` will. */

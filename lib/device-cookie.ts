@@ -1,3 +1,5 @@
+import { isUuid } from "@/lib/uuid";
+
 /**
  * The `vq_device` cookie is the only thing that identifies a Customer. It is not
  * a login: it says "the browser that holds this Ticket", which is exactly the
@@ -18,16 +20,13 @@ export const deviceCookieOptions = {
   maxAge: DEVICE_COOKIE_MAX_AGE,
 } as const;
 
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 /**
  * A device id has to be a UUID before it reaches Postgres, where the parameter is
  * typed `uuid`: anything else turns a forged cookie into a 500 instead of a view
  * with no Ticket in it.
  */
 export function isDeviceId(value: string | undefined | null): value is string {
-  return typeof value === "string" && UUID.test(value);
+  return isUuid(value);
 }
 
 /**

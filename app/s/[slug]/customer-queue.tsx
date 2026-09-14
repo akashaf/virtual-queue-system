@@ -12,10 +12,15 @@ import {
 } from "@/lib/customer/view";
 import { formatTicketNumber } from "@/lib/ticket";
 import { format, type Dictionary } from "@/lib/i18n";
+import { useQueueChanged } from "@/lib/queue-changed";
 import { joinQueue } from "./actions";
 
-/** How often a waiting page asks where it stands. */
-const REFETCH_INTERVAL_MS = 30_000;
+/**
+ * The Ticket this tab last held. Kept per session rather than per device, so a
+ * final state stays on screen for as long as the Customer is looking at it and
+ * is gone by their next visit (frontend.md §3.1).
+ */
+const LAST_TICKET_KEY = "vq_last_ticket";
 
 const GEOLOCATION_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
@@ -55,7 +60,8 @@ export function CustomerQueue({
   // snapshot is false and the client's is true.
   const hydrated = useSyncExternalStore(subscribeToNothing, onClient, onServer);
 
-  const hasTicket = view.ticket !== null;
+  const storageKey = `${LAST_TICKET_KEY}:${slug}`;
+  const ticketId = view.ticket?.id ?? null;
 
   const refetch = useCallback(async () => {
     try {
@@ -66,22 +72,23 @@ export function CustomerQueue({
     }
   }, [slug]);
 
-  // Realtime arrives with #6; until then a poll and a look on every return to
-  // the tab are what keep "N ahead of you" true.
+  useQueueChanged(view.shop.id, refetch);
+
+  // The server only ever answers with an *active* Ticket, so remembering the id
+  // is the page's only way of knowing that a Ticket it used to hold has since
+  // been finished — including across a reload, which is why it is not just state.
   useEffect(() => {
-    if (!hasTicket) return;
+    if (ticketId !== null) sessionStorage.setItem(storageKey, ticketId);
+  }, [storageKey, ticketId]);
 
-    const interval = setInterval(refetch, REFETCH_INTERVAL_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void refetch();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [hasTicket, refetch]);
+  // sessionStorage is the external store; the server snapshot is "nothing yet",
+  // which is also what a tab that has never held a Ticket reads.
+  const remembered = useSyncExternalStore(
+    subscribeToNothing,
+    () => sessionStorage.getItem(storageKey),
+    () => null,
+  );
+  const lastTicketId = ticketId ?? remembered;
 
   async function handleJoin(event: React.FormEvent) {
     event.preventDefault();
@@ -157,10 +164,20 @@ export function CustomerQueue({
     );
   }
 
-  // get_customer_view only ever returns a Waiting or a Called Ticket, and until
-  // #6 gives the Owner a Call next button, only a Waiting one can exist.
+  // get_customer_view only ever returns a Waiting or a Called Ticket.
   if (view.ticket) {
-    return <Waiting ticket={view.ticket} dict={dict} />;
+    return view.ticket.status === "called" ? (
+      <Called ticket={view.ticket} dict={dict} />
+    ) : (
+      <Waiting ticket={view.ticket} dict={dict} />
+    );
+  }
+
+  // A Ticket this tab held that the server no longer counts as active. The only
+  // way out of the Queue so far is the Owner pressing Done; No-show, Left and
+  // Removed arrive with #7, which is what gives the server a status to send.
+  if (lastTicketId !== null) {
+    return <Served dict={dict} />;
   }
 
   if (view.shop.joiningState === "last_call") {
@@ -277,6 +294,42 @@ function Waiting({
       <p className="text-xl font-medium">{aheadLabel(ticket.position, dict)}</p>
       <p className="text-sm text-muted-foreground">{dict.inPersonNote}</p>
     </div>
+  );
+}
+
+function Called({
+  ticket,
+  dict,
+}: {
+  ticket: NonNullable<CustomerView["ticket"]>;
+  dict: Dictionary;
+}) {
+  return (
+    // Over the whole screen and in the shop's loudest colours: this is the one
+    // state a Customer has to notice from across the room (frontend.md §5).
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-primary p-6 text-center text-primary-foreground"
+    >
+      <p className="text-3xl font-semibold tracking-tight">{dict.yourTurn}</p>
+      <p className="text-8xl font-bold tabular-nums">
+        {formatTicketNumber(ticket.number)}
+      </p>
+      <p className="text-2xl font-medium">{dict.goToCounter}</p>
+    </div>
+  );
+}
+
+function Served({ dict }: { dict: Dictionary }) {
+  return (
+    <p
+      role="status"
+      aria-live="polite"
+      className="my-auto text-center text-2xl font-semibold tracking-tight"
+    >
+      {dict.servedThanks}
+    </p>
   );
 }
 

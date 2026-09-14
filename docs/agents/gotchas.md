@@ -20,6 +20,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **A Server Action form clicked before hydration submits as a normal POST.** The customer
   page's Join button stays disabled until hydrated for this reason: a pre-hydration submit
   would post with no coordinates, and the Join Radius check is the whole point of it.
+- **ESLint here rejects `setState` in an effect body** (`react-hooks/set-state-in-effect`),
+  which rules out the usual "reset derived state when a prop changes" effect. `tsc` is happy
+  with it, so only `bun run lint` catches it. Use React's adjust-while-rendering pattern
+  instead (`if (key !== last) { setLast(key); setCount(0) }`, as `queue-board.tsx` does), and
+  read browser storage through `useSyncExternalStore` rather than an effect — the customer
+  page needs both.
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps` / `PageProps` /
   `RouteContext` are generated. After deleting routes, `rm -rf .next` clears stale
   `.next/types`.
@@ -41,6 +47,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   never appear in a JWKS — so a project with an asymmetric key still on *standby* looks
   identical to one that has rotated to it. Read *Authentication → JWT Keys* for which key is
   **Current key**, or decode an access token and read `alg` and `kid`.
+- **A broadcast is testable without a browser.** `realtime.send` just inserts into
+  `realtime.messages`, so `tests/db/queue-broadcast.test.ts` reads that table over the plain
+  `pg` connection. Two things to know: the rows outlive `resetTestData`, which truncates only
+  the `public` tables, so count the delta rather than the total; and `create_shop` inserts and
+  then updates the Shop, so a new Shop has already pinged its own topic twice before a test
+  does anything.
 - **`supabase config diff` does not tell you whether phone sign-in is on.** It reports
   `auth.sms.twilio.enabled | remote: true` even after phone auth is switched off, because that
   key means *Twilio is the selected SMS provider*, not *phone sign-in is enabled*. Trusting it
