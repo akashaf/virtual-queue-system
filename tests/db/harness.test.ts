@@ -31,3 +31,22 @@ test("public sign-ups are disabled, so the anon key cannot create Owners", async
   });
   expect(error?.code).toBe("signup_disabled");
 });
+
+test("an Owner created by the service role can sign in with a password", async () => {
+  const email = `owner-${Date.now()}@example.com`;
+  const password = "correct-horse-battery";
+  const admin = serviceClient();
+  const { data, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  expect(createError).toBeNull();
+
+  try {
+    const { error } = await anonClient().auth.signInWithPassword({ email, password });
+    expect(error).toBeNull();
+  } finally {
+    await admin.auth.admin.deleteUser(data.user!.id);
+  }
+});
