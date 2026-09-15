@@ -20,6 +20,7 @@ describe("toCustomerView", () => {
           is_active: true,
           joining_state: "open",
           waiting_count: 4,
+          heads_up_threshold: 3,
         },
         ticket: {
           id: "t-1",
@@ -36,6 +37,7 @@ describe("toCustomerView", () => {
         isActive: true,
         joiningState: "open",
         waitingCount: 4,
+        headsUpThreshold: 3,
       },
       ticket: {
         id: "t-1",
@@ -55,6 +57,7 @@ describe("toCustomerView", () => {
         is_active: true,
         joining_state: "open",
         waiting_count: 0,
+        heads_up_threshold: 3,
       },
       ticket: {
         id: "t-1",
@@ -82,6 +85,7 @@ describe("toCustomerView", () => {
         is_active: false,
         joining_state: "last_call",
         waiting_count: 0,
+        heads_up_threshold: 3,
       },
       ticket: null,
     });
@@ -93,6 +97,7 @@ describe("toCustomerView", () => {
       isActive: false,
       joiningState: "last_call",
       waitingCount: 0,
+      headsUpThreshold: 3,
     });
   });
 });

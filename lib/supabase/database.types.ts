@@ -218,6 +218,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_ticket: {
+        Args: {
+          p_device_id: string
+          p_name: string
+          p_origin: Database["public"]["Enums"]["ticket_origin"]
+          p_parent_ticket_id?: string
+          p_shop: Database["public"]["Tables"]["shops"]["Row"]
+        }
+        Returns: {
+          called_at: string | null
+          carried_over_at: string | null
+          customer_name: string | null
+          device_id: string | null
+          finished_at: string | null
+          heads_up_sent_at: string | null
+          id: string
+          joined_at: string
+          last_call_choice:
+            | Database["public"]["Enums"]["last_call_choice"]
+            | null
+          number: number
+          origin: Database["public"]["Enums"]["ticket_origin"]
+          parent_ticket_id: string | null
+          queue_day_id: string
+          removed_reason: Database["public"]["Enums"]["removed_reason"] | null
+          served_at: string | null
+          shop_id: string
+          status: Database["public"]["Enums"]["ticket_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tickets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       call_next: { Args: never; Returns: Json }
       called_ticket_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
@@ -263,41 +299,6 @@ export type Database = {
         }
         Returns: Json
       }
-      device_ticket: {
-        Args: {
-          p_device_id: string
-          p_shop: Database["public"]["Tables"]["shops"]["Row"]
-          p_statuses: Database["public"]["Enums"]["ticket_status"][]
-          p_ticket_id: string
-        }
-        Returns: {
-          called_at: string | null
-          carried_over_at: string | null
-          customer_name: string | null
-          device_id: string | null
-          finished_at: string | null
-          heads_up_sent_at: string | null
-          id: string
-          joined_at: string
-          last_call_choice:
-            | Database["public"]["Enums"]["last_call_choice"]
-            | null
-          number: number
-          origin: Database["public"]["Enums"]["ticket_origin"]
-          parent_ticket_id: string | null
-          queue_day_id: string
-          removed_reason: Database["public"]["Enums"]["removed_reason"] | null
-          served_at: string | null
-          shop_id: string
-          status: Database["public"]["Enums"]["ticket_status"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "tickets"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       get_customer_view: {
         Args: { p_device_id?: string; p_slug: string }
         Returns: Json
@@ -329,6 +330,30 @@ export type Database = {
       }
       lock_owner_shop: {
         Args: never
+        Returns: {
+          created_at: string
+          current_queue_day_id: string | null
+          heads_up_threshold: number
+          id: string
+          is_active: boolean
+          join_radius_m: number
+          joining_state: Database["public"]["Enums"]["joining_state"]
+          lat: number
+          lng: number
+          max_queue_size: number
+          name: string
+          owner_user_id: string
+          slug: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shops"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      lock_ticket_shop: {
+        Args: { p_ticket_id: string }
         Returns: {
           created_at: string
           current_queue_day_id: string | null
@@ -395,6 +420,10 @@ export type Database = {
       remove_ticket: { Args: { p_ticket_id: string }; Returns: Json }
       served_ticket_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
+        Returns: Json
+      }
+      stamp_heads_ups: {
+        Args: { p_shop: Database["public"]["Tables"]["shops"]["Row"] }
         Returns: Json
       }
       ticket_ref_json: {

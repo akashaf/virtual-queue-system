@@ -30,6 +30,7 @@ interface CustomerView {
     is_active: boolean;
     joining_state: string;
     waiting_count: number;
+    heads_up_threshold: number;
   };
   ticket: {
     id: string;
@@ -80,6 +81,8 @@ describe("get_customer_view", () => {
         is_active: true,
         joining_state: "open",
         waiting_count: 0,
+        // The page decides "Head back to the shop now" from it (frontend.md §3.1).
+        heads_up_threshold: 3,
       },
       ticket: null,
     });
@@ -123,6 +126,7 @@ describe("get_customer_view", () => {
         is_active: true,
         joining_state: "open",
         waiting_count: 2,
+        heads_up_threshold: 3,
       },
       ticket: {
         id: mine.ticket.id,

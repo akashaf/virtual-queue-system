@@ -27,6 +27,14 @@ import { cn } from "@/lib/utils";
 import { format, type Dictionary } from "@/lib/i18n";
 import { useQueueChanged } from "@/lib/queue-changed";
 import {
+  acknowledgeCalled,
+  initialPageAlerts,
+  isHeadsUpReached,
+  nextPageAlerts,
+  type PageAlerts,
+} from "@/lib/alerts";
+import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
+import {
   joinQueue,
   leaveQueue,
   rejoinQueue,
@@ -79,7 +87,13 @@ export function CustomerQueue({
   initialView: CustomerView;
   dict: Dictionary;
 }) {
-  const [view, setView] = useState(initialView);
+  // The view and the alerts move together: every alert is decided by comparing
+  // the view the page had with the one that just arrived (lib/alerts.ts).
+  const [page, setPage] = useState<{ view: CustomerView; alerts: PageAlerts }>(() => ({
+    view: initialView,
+    alerts: initialPageAlerts(initialView),
+  }));
+  const { view, alerts } = page;
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const [name, setName] = useState("");
   const [nameProblem, setNameProblem] = useState<NameProblem | null>(null);
@@ -92,16 +106,32 @@ export function CustomerQueue({
 
   const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
 
+  const receive = useCallback((next: CustomerView) => {
+    setPage((current) => ({
+      view: next,
+      alerts: nextPageAlerts(current.alerts, current.view, next),
+    }));
+  }, []);
+
   const refetch = useCallback(async () => {
     try {
       const response = await fetch(`/api/s/${slug}/me`, { cache: "no-store" });
-      if (response.ok) setView((await response.json()) as CustomerView);
+      if (response.ok) receive((await response.json()) as CustomerView);
     } catch {
       // Offline, or the tab was frozen mid-request. The next tick tries again.
     }
-  }, [slug]);
+  }, [slug, receive]);
 
   useQueueChanged(view.shop.id, refetch);
+
+  const active = view.ticket !== null && !isFinalStatus(view.ticket.status);
+  useAlertEffects(alerts, {
+    headsUpTitle: dict.headsUpTitle,
+    calledTitle: dict.calledTitle,
+    // frontend.md §3.3 asks for the wake lock while Waiting. It is held in the
+    // chair too, or the screen could go dark while the Called chime rings.
+    keepAwake: active,
+  });
 
   // sessionStorage is where dismissal lives, so the page reads it from there
   // rather than shadowing it in state. The server snapshot is "nothing
@@ -124,7 +154,7 @@ export function CustomerQueue({
     setStage({ kind: busy });
     const result = await run();
     if (result.status === "done") {
-      setView(result.view);
+      receive(result.view);
       setStage({ kind: "idle" });
     } else {
       setStage({ kind: "rejected", reason: result.reason });
@@ -140,6 +170,10 @@ export function CustomerQueue({
       return;
     }
     setNameProblem(null);
+
+    // Synchronously, while this is still the tap: iOS will not let the page play
+    // a sound later unless one was started inside a user gesture (§3.2 step 2).
+    unlockAudio();
 
     setStage({ kind: "locating" });
     let coords: GeolocationCoordinates;
@@ -158,7 +192,7 @@ export function CustomerQueue({
     });
 
     if (result.status === "joined") {
-      setView(result.view);
+      receive(result.view);
       setStage({ kind: "idle" });
     } else if (result.status === "invalid_name") {
       setNameProblem(result.problem);
@@ -206,20 +240,39 @@ export function CustomerQueue({
       <Ended
         ticket={ended}
         dict={dict}
-        onRejoin={() => void act(() => rejoinQueue(ended.id), "rejoining")}
+        onRejoin={() => {
+          unlockAudio();
+          void act(() => rejoinQueue(ended.id), "rejoining");
+        }}
         onDismiss={() => rememberDismissed(storageKey, ended.id)}
       />
     );
   }
 
-  if (view.ticket && !isFinalStatus(view.ticket.status)) {
+  if (view.ticket && active) {
     const ticket = view.ticket;
     const leave = () => void act(() => leaveQueue(ticket.id), "leaving");
 
     return ticket.status === "called" ? (
-      <Called ticket={ticket} dict={dict} onLeave={leave} />
+      <Called
+        ticket={ticket}
+        dict={dict}
+        ringing={alerts.ringingTicketId === ticket.id}
+        onAcknowledge={() =>
+          setPage((current) => ({
+            ...current,
+            alerts: acknowledgeCalled(current.alerts),
+          }))
+        }
+        onLeave={leave}
+      />
     ) : (
-      <Waiting ticket={ticket} dict={dict} onLeave={leave} />
+      <Waiting
+        ticket={ticket}
+        dict={dict}
+        headsUp={isHeadsUpReached(view)}
+        onLeave={leave}
+      />
     );
   }
 
@@ -318,10 +371,13 @@ function JoinForm({
 function Waiting({
   ticket,
   dict,
+  headsUp,
   onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
+  /** Inside the Heads-up Threshold: time to walk back. */
+  headsUp: boolean;
   onLeave: () => void;
 }) {
   return (
@@ -337,6 +393,11 @@ function Waiting({
         {formatTicketNumber(ticket.number)}
       </p>
       <p className="text-xl font-medium">{aheadLabel(ticket.position, dict)}</p>
+      {headsUp ? (
+        <p className="rounded-lg bg-primary px-4 py-3 text-lg font-semibold text-primary-foreground">
+          {dict.headBackNow}
+        </p>
+      ) : null}
       <p className="text-sm text-muted-foreground">{dict.inPersonNote}</p>
       <LeaveButton dict={dict} onLeave={onLeave} className="mt-4" />
     </div>
@@ -346,10 +407,15 @@ function Waiting({
 function Called({
   ticket,
   dict,
+  ringing,
+  onAcknowledge,
   onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
+  /** The chime is repeating; "I'm coming" is what stops it. */
+  ringing: boolean;
+  onAcknowledge: () => void;
   onLeave: () => void;
 }) {
   return (
@@ -365,6 +431,17 @@ function Called({
         {formatTicketNumber(ticket.number)}
       </p>
       <p className="text-2xl font-medium">{dict.goToCounter}</p>
+      {ringing ? (
+        <Button
+          type="button"
+          size="lg"
+          variant="secondary"
+          className="mt-6 h-14 px-10 text-lg"
+          onClick={onAcknowledge}
+        >
+          {dict.imComing}
+        </Button>
+      ) : null}
       <LeaveButton
         dict={dict}
         onLeave={onLeave}

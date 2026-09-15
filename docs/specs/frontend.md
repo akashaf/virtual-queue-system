@@ -76,16 +76,17 @@ Every final state therefore has a way on, Served included — otherwise a Custom
 6. Switch to the Waiting state.
 
 ### 3.3 Alerts on the open page
-The page compares the previous view with the new one after each refetch.
-- **Heads-up** (position drops to ≤ threshold for the first time on this page):
-  - Plays a chime once
+The page compares the previous view with the new one after each refetch, in `lib/alerts.ts`, which is pure; `lib/alert-effects.ts` makes the noise. A Heads-up fires only on a change the page *saw happen*, never on a state it merely found: a Customer who has just joined is looking at it, which is the same reason the database stamps a Ticket that joins inside the threshold without alerting it (backend.md §4). Called is the exception: a page that loads already Called rings too. iPhone Safari discards background tabs and this page is its only alert, so a Customer coming back to a reloaded page must not find it silent; the page cannot tell that from a fresh visit, and one chime too many is the cheaper mistake.
+- **Heads-up** (the same Ticket goes from Waiting outside the threshold to Waiting inside it):
+  - Plays a chime once, and never again for that Ticket on this page, however the position moves afterwards
   - Vibrates `[200,100,200]` where supported
-  - Flashes the tab title "⏰ Almost your turn"
-- **Called:**
-  - Plays a louder repeating chime every 5 s until the customer taps "I'm coming"
-  - Vibrates `[500,200,500]`
-  - Flashes the title "🔔 Your turn!"
-- **Screen Wake Lock:** request `navigator.wakeLock` while Waiting and re-acquire it on `visibilitychange`. Treat it as a best-effort extra, not a guarantee.
+  - Flashes the tab title "⏰ Almost your turn" for 10 s
+- **Called** (the same Ticket goes from Waiting to Called, or the page loads already Called; not Served back to Called while the page watches, which is an Owner undoing a mis-tap on a Customer already in the chair):
+  - Plays a louder chime every 5 s until the customer taps "I'm coming", which only shows while it rings
+  - Vibrates `[500,200,500]` with each chime
+  - Flashes the title "🔔 Your turn!" until acknowledged
+- **Sounds** are synthesised in the browser as WAV clips and played through one `<audio>` element, rather than shipped as files. `<audio>`, not Web Audio, because iOS mutes Web Audio on the silent switch. iOS only plays from an element that has played inside a tap: the Join (and Rejoin) tap plays a silent clip on it, and so does the first tap anywhere on the page, so a Customer who reloads while waiting is not left silent.
+- **Screen Wake Lock:** request `navigator.wakeLock` while the Ticket is Waiting or Called — Called too, or the screen could go dark while the chime rings — and re-acquire it on `visibilitychange`. Treat it as a best-effort extra, not a guarantee.
 - **Push already shown:** if a push notification arrives while the page is focused, the service worker skips it (it checks `clients.matchAll`) so the alert isn't shown twice.
 
 ### 3.4 Service worker `public/sw.js`
@@ -155,9 +156,11 @@ lib/customer/{view,queue}.ts  (view.ts is pure and shared with the client compon
 lib/owner/{view,queue}.ts     (same split: view.ts is pure, queue.ts calls the database)
 lib/operator/{auth,shop-input,shop-resource}.ts
 lib/queue-changed.ts          (the ping, the poll and the visibilitychange refetch, shared by both screens)
-lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts, lib/alerts.ts
+lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts
+lib/alerts.ts                 (pure: which alert a view change calls for)
+lib/alert-effects.ts          (sound, vibration, title flash and wake lock, acting on it)
 components/ui/…              (shadcn)
-public/sw.js, public/sounds/{chime,called}.mp3
+public/sw.js
 proxy.ts
 netlify/functions/daily.mts  (schedule only; calls api/cron/daily)
 netlify.toml

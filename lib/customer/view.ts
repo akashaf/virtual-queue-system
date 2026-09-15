@@ -17,6 +17,11 @@ export interface CustomerView {
     joiningState: JoiningState;
     /** Waiting Tickets in the current Queue Day, shown before joining too. */
     waitingCount: number;
+    /**
+     * How few Waiting Tickets ahead count as "almost your turn". A Shop setting,
+     * so it tells the browser nothing about anyone else.
+     */
+    headsUpThreshold: number;
   };
   /**
    * The last Ticket this device took in the Shop's current Queue Day, whatever
@@ -44,6 +49,7 @@ interface CustomerViewJson {
     is_active: boolean;
     joining_state: JoiningState;
     waiting_count: number;
+    heads_up_threshold: number;
   };
   ticket: {
     id: string;
@@ -65,6 +71,7 @@ export function toCustomerView(json: unknown): CustomerView {
       isActive: shop.is_active,
       joiningState: shop.joining_state,
       waitingCount: shop.waiting_count,
+      headsUpThreshold: shop.heads_up_threshold,
     },
     ticket: ticket && {
       id: ticket.id,

@@ -41,10 +41,14 @@ export const ms: Dictionary = {
   aheadOfYouOne: "1 orang di hadapan anda",
   aheadOfYou: "{count} orang di hadapan anda",
   inPersonNote: "Pelanggan yang menunggu di kedai mungkin dilayan di antaranya",
+  headBackNow: "Kembali ke kedai sekarang",
+  headsUpTitle: "⏰ Hampir giliran anda",
 
   // Dipanggil, dan selesai
   yourTurn: "Giliran anda",
   goToCounter: "Sila ke kaunter",
+  imComing: "Saya datang",
+  calledTitle: "🔔 Giliran anda!",
   servedThanks: "Terima kasih! Jumpa lagi",
 
   // Keluar

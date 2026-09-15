@@ -58,6 +58,7 @@ interface JoinEnvelope {
       is_active: boolean;
       joining_state: string;
       waiting_count: number;
+      heads_up_threshold: number;
     };
     ticket: {
       id: string;
@@ -88,6 +89,7 @@ describe("join_queue", () => {
       is_active: true,
       joining_state: "open",
       waiting_count: 1,
+      heads_up_threshold: 3,
     });
     expect(result.ticket).toEqual({
       id: expect.any(String),

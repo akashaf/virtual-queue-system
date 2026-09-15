@@ -150,9 +150,10 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
 - `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
 - `broadcast_queue_changed()` — the trigger function behind [§6](#6-realtime).
+- `stamp_heads_ups(shop)` — the §4 Heads-up rule in one place: stamps every Waiting Ticket inside the threshold that has not been told, and returns them as `heads_up` alerts. The last thing every mutation does, including the ones that move nobody up, so a Ticket owed a Heads-up for any reason — a threshold raised under it — is told by the very next press. A joining Ticket is never among them, because `add_ticket` has already stamped it.
 
 ### Customer functions (execute granted to `service_role` only)
-- `join_queue(slug, device_id, name, lat, lng, accuracy_m)` → `{ result: <the customer view below>, alerts: [] }`
+- `join_queue(slug, device_id, name, lat, lng, accuracy_m)` → `{ result: <the customer view below>, alerts }`. A join moves nobody up, so its alerts are only ever Heads-ups an earlier change left owed — never the joining Ticket
   - Distance is the haversine distance in metres.
   - Accept when `distance ≤ join_radius_m + least(greatest(accuracy_m, 0), 100)`.
   - Checked in this order: `shop_inactive`, `last_call`, `already_in_queue`, `too_far`, `queue_full`. The Join Radius comes before the queue size deliberately — "check back soon" is the wrong thing to tell someone who is not at the Shop at all.
@@ -169,19 +170,21 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `choose_last_call(ticket_id, device_id, choice)`
   - Only allowed while `joining_state = last_call` and the Ticket is Waiting.
   - Can be changed until Close Shop.
-- `get_customer_view(slug, device_id)` → `{ shop: { id, name, is_active, joining_state, waiting_count }, ticket: { id, number, status, position, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
+- `get_customer_view(slug, device_id)` → `{ shop: { id, name, is_active, joining_state, waiting_count, heads_up_threshold }, ticket: { id, number, status, position, last_call_choice, carried_over, can_rejoin } | null, estimate: { min_minutes, max_minutes } | null }`
   - Never returns other customers' names, and never the rest of the Queue.
   - `waiting_count` belongs to the Shop rather than to the Ticket, because the join form shows it before there is a Ticket to hang it on.
+  - `heads_up_threshold` is what the page shows "Head back to the shop now" against, and what it watches a Ticket cross to decide when to chime (frontend.md §3.3). A Shop setting, so it tells the browser nothing about anyone else.
   - `shop.id` is the `shop:{id}` topic the page subscribes to ([§6](#6-realtime)); a Customer cannot listen for their own Shop without it. Nothing is authorised by it: the topic is public and carries no data, and every read still comes back through this function with the device cookie.
   - `position` is the number of Waiting Tickets with a lower number, and is `0` for any other status: a Called Ticket is in a chair and a finished one is out of the Queue altogether, so counting past them would report somebody else's wait
   - `ticket` is the last Ticket this device took in the Shop's **current Queue Day**, whatever became of it — not only an active one. #7 changed this: No-show, Removed and Served are three different screens, and a page that only ever sees a Ticket disappear cannot tell them apart. `can_rejoin` needs it too, being a property of a No-show.
   - Scoped to the current Queue Day, so a Customer returning tomorrow meets the join form. Which ending has already been *read* is the browser's business, and stays in `sessionStorage` (frontend.md §3.1).
   - `can_rejoin` is the whole of the Rejoin offer: a No-show, from a scan, in today's Queue Day, not already rejoined from. The Shop-level reasons a Rejoin can still fail — Last Call, a full Queue — are deliberately left out, because they change from moment to moment and `rejoin_queue` answers them with a token the page can put into words.
   - Returns SQL `null` for a slug no Shop has, so the page can show a missing Shop and a Deactivated Shop the same way.
-  - Delivered so far (#7): `shop`, and `ticket` as far as `status`, `position` and `can_rejoin`. `last_call_choice` and `carried_over` arrive with #11, and `estimate` with #12.
+  - Delivered so far (#8): `shop`, and `ticket` as far as `status`, `position` and `can_rejoin`. `last_call_choice` and `carried_over` arrive with #11, and `estimate` with #12.
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
-- `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once
+- `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once. Its alerts are a `called` alert for that Ticket, then the Heads-ups the Tickets behind are now owed
+  - `undo_served` sends no second `called` alert: the Customer was told once, and is in the chair
 - `mark_served(ticket_id)`, `undo_served(ticket_id)` (errors `undo_expired`, `rejoined`), `mark_no_show(ticket_id)` (error `too_early`), `remove_ticket(ticket_id)`
   - `mark_no_show` waits the full five minutes from `called_at`; the Customer may be walking over, and a No-show is final. It frees the device, which is what makes a Rejoin possible
   - `remove_ticket` takes a Ticket from the Queue or the chair alike, with `removed_reason = owner`

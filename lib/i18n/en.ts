@@ -40,10 +40,14 @@ export const en = {
   aheadOfYouOne: "1 person ahead of you",
   aheadOfYou: "{count} people ahead of you",
   inPersonNote: "Customers waiting in person may be served in between",
+  headBackNow: "Head back to the shop now",
+  headsUpTitle: "⏰ Almost your turn",
 
   // Called, and done
   yourTurn: "It's your turn",
   goToCounter: "Go to the counter",
+  imComing: "I'm coming",
+  calledTitle: "🔔 Your turn!",
   servedThanks: "Thanks! See you next time",
 
   // Leaving

@@ -63,6 +63,7 @@ describe("GET /api/s/[slug]/me", () => {
         isActive: true,
         joiningState: "open",
         waitingCount: 0,
+        headsUpThreshold: 3,
       },
       ticket: null,
     });
