@@ -1,4 +1,5 @@
 import { requireEnv } from "@/lib/env";
+import { reportUnexpected } from "@/lib/error-reporting";
 import { noStoreJson as json } from "@/lib/http";
 import { isAuthorizedOperator } from "@/lib/operator/auth";
 import { parseCreateShopInput } from "@/lib/operator/shop-input";
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
         409,
       );
     }
-    console.error("Could not create the Owner", ownerError);
+    reportUnexpected("Could not create the Owner", ownerError);
     return json({ error: "internal_error" }, 500);
   }
 
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
         409,
       );
     }
-    console.error("Could not create the Shop", shopError);
+    reportUnexpected("Could not create the Shop", shopError);
     return json({ error: "internal_error" }, 500);
   }
 

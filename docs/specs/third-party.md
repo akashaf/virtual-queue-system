@@ -116,15 +116,15 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 
 ## 5. Sentry
 
-- **SDK:** `@sentry/nextjs`, set up through `instrumentation.ts` and `instrumentation-client.ts`. Upload source maps at build time with `SENTRY_AUTH_TOKEN`.
+- **SDK:** `@sentry/nextjs`, set up through `instrumentation.ts` and `instrumentation-client.ts`, with `app/global-error.tsx` reporting render errors the SDK's global handlers never see. Every `Sentry.init` takes its options from `lib/error-reporting.ts`. Upload source maps at build time with `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT`; a build without the token skips the upload, and a runtime without `NEXT_PUBLIC_SENTRY_DSN` sends nothing.
 - **Capture:**
   - Unhandled errors
   - Push send failures other than 404 and 410
-  - Unexpected function errors (anything not in the known error-code list)
+  - Unexpected function errors (anything not in the known error-code list), through `functionErrorReason`, which passes known codes through unreported. It leaves out the error's `details`, which Postgres fills with the failing row
   - Geolocation timeouts, as breadcrumbs only
 - **Privacy:**
   - `sendDefaultPii: false`
-  - Scrub `customer_name` and any `lat`/`lng`
+  - Scrub `customer_name` and any `lat`/`lng`, and their `p_`-prefixed function arguments, from events and breadcrumbs by key
   - No session replay in the MVP
 - **Alert rule:** email the Operator on any new issue in production.
 

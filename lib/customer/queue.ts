@@ -1,7 +1,8 @@
 import "server-only";
+import { functionErrorReason } from "@/lib/error-reporting";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  isCustomerError,
+  CUSTOMER_ERRORS,
   toCustomerView,
   type CustomerView,
   type CustomerError,
@@ -61,9 +62,7 @@ export async function createTicket(
   });
 
   if (error) {
-    if (isCustomerError(error.message)) return { ok: false, reason: error.message };
-    console.error("join_queue failed", error);
-    return { ok: false, reason: "failed" };
+    return { ok: false, reason: functionErrorReason("join_queue", error, CUSTOMER_ERRORS) };
   }
 
   // `join_queue` returns jsonb, which the generated types can only call `Json`;
@@ -110,9 +109,7 @@ async function customerCall(
   const { data, error } = await createAdminClient().rpc(fn, args);
 
   if (error) {
-    if (isCustomerError(error.message)) return { ok: false, reason: error.message };
-    console.error(`${fn} failed`, error);
-    return { ok: false, reason: "failed" };
+    return { ok: false, reason: functionErrorReason(fn, error, CUSTOMER_ERRORS) };
   }
 
   const { result } = data as unknown as { result: unknown };

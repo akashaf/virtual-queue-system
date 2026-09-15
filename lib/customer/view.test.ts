@@ -3,7 +3,6 @@ import type { Database } from "@/lib/supabase/database.types";
 import {
   checkCustomerName,
   isFinalStatus,
-  isCustomerError,
   MAX_CUSTOMER_NAME_LENGTH,
   toCustomerView,
 } from "./view";
@@ -99,31 +98,6 @@ describe("toCustomerView", () => {
       waitingCount: 0,
       headsUpThreshold: 3,
     });
-  });
-});
-
-describe("isCustomerError", () => {
-  test.each([
-    "shop_inactive",
-    "last_call",
-    "already_in_queue",
-    "too_far",
-    "queue_full",
-    "not_rejoinable",
-    "ticket_not_found",
-  ])(
-    "recognises %s as something to explain to the Customer",
-    (message) => {
-      expect(isCustomerError(message)).toBe(true);
-    },
-  );
-
-  test.each([
-    ["a constraint violation", 'new row violates check constraint "x"'],
-    ["a connection failure", "fetch failed"],
-    ["nothing", undefined],
-  ])("treats %s as a bug, not a situation", (_label, message) => {
-    expect(isCustomerError(message)).toBe(false);
   });
 });
 

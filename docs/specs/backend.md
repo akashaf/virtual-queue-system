@@ -332,7 +332,8 @@ export const config = { schedule: '0 19 * * *' } // 19:00 UTC = 03:00 Malaysia t
 | `OPERATOR_API_KEY` | server | Admin API |
 | `CRON_SECRET` | server | Cron route |
 | `APP_BASE_URL` | server | QR target: `https://virtual-queue-system.netlify.app` in production |
-| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | client / build | Error tracking |
+| `NEXT_PUBLIC_SENTRY_DSN` | client + server | Error tracking. Absent: nothing is sent |
+| `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | build | Source-map upload. Without the token the build skips it |
 
 ## 11. Testing
 

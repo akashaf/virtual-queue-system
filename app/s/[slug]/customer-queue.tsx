@@ -34,6 +34,7 @@ import {
   type PageAlerts,
 } from "@/lib/alerts";
 import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
+import { recordLocationFailure } from "@/lib/error-reporting";
 import {
   joinQueue,
   leaveQueue,
@@ -180,6 +181,7 @@ export function CustomerQueue({
     try {
       coords = (await currentPosition()).coords;
     } catch (error) {
+      recordLocationFailure(error);
       setStage({ kind: locationFailure(error) });
       return;
     }

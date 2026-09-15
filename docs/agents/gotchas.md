@@ -73,6 +73,32 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   proceeds without confirmation. `docs/specs/third-party.md` §3 has the safe scratch-workdir
   recipe. `supabase config diff` is read-only and safe.
 
+- **A Postgres error's `details` is the failing row.** For a constraint violation it reads
+  `Failing row contains (…)`, Customer name and coordinates included, and Supabase passes it
+  through on the error object. Sentry's scrubber in `lib/error-reporting.ts` filters by key, so
+  it cannot see into that string; the reporting helpers send only `message` and `code` for this
+  reason. Do not hand a Supabase error to `Sentry.captureException` directly.
+
+## Sentry
+
+- **`@sentry/nextjs` warns on every build** unless `instrumentation-client.ts` exports
+  `onRouterTransitionStart`, even with tracing off, and `withSentryConfig` must come from
+  `@sentry/nextjs/config` (the root export is deprecated for v11). `next typegen` prints both.
+- **The client only sees `NEXT_PUBLIC_` variables**, so the DSN is `NEXT_PUBLIC_SENTRY_DSN`
+  (it is public by design). Source-map upload also needs `SENTRY_ORG` and `SENTRY_PROJECT` at
+  build time beside `SENTRY_AUTH_TOKEN`.
+- **An organization auth token carries one scope, `org:ci`**, which uploads source maps and
+  nothing else. `sentry-cli projects list` and `organizations list` both 403 on it, so neither
+  is a way to check a token: use `sentry-cli info`, which prints the scopes. A 403 means the
+  token is good and refusing the action; only a 401 means the token itself is wrong.
+- **The org slug is embedded in the token.** Pass a different `--org` and `sentry-cli` warns
+  *Using organization `X` (embedded in token) rather than manually-configured organization `Y`*
+  and carries on. That warning is the only cheap check on a mistyped `SENTRY_ORG`; nothing
+  validates `SENTRY_PROJECT` until a build actually uploads.
+- **Sentry shows an organization token once, at creation.** The Organization Tokens page lists
+  each token's name and last use, never its value, so a token that is not saved on the way past
+  can only be replaced, not recovered.
+
 ## Netlify and secrets
 
 - **Never let a production secret pass through an agent.** A command containing the value puts

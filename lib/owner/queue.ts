@@ -1,8 +1,9 @@
 import "server-only";
 import type { PostgrestError } from "@supabase/supabase-js";
+import { functionErrorReason } from "@/lib/error-reporting";
 import { createClient } from "@/lib/supabase/server";
 import {
-  isOwnerError,
+  OWNER_ERRORS,
   toCalledTicket,
   toOwnerQueue,
   toServedTicket,
@@ -114,9 +115,7 @@ function outcome<T>(
   toResult: (json: unknown) => T,
 ): OwnerOutcome<T> {
   if (error) {
-    if (isOwnerError(error.message)) return { ok: false, reason: error.message };
-    console.error(`${fn} failed`, error);
-    return { ok: false, reason: "failed" };
+    return { ok: false, reason: functionErrorReason(fn, error, OWNER_ERRORS) };
   }
 
   return { ok: true, result: toResult((data as { result: unknown }).result) };

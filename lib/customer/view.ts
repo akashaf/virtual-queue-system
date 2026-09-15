@@ -104,12 +104,6 @@ export const CUSTOMER_ERRORS = [
 
 export type CustomerError = (typeof CUSTOMER_ERRORS)[number];
 
-export function isCustomerError(
-  message: string | undefined,
-): message is CustomerError {
-  return CUSTOMER_ERRORS.includes(message as CustomerError);
-}
-
 /**
  * The statuses a Ticket never comes back from. The page shows one of these until
  * the Customer taps past it, rather than dropping them straight back on the join

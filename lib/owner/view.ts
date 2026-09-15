@@ -155,10 +155,6 @@ export const OWNER_ERRORS = [
 
 export type OwnerError = (typeof OWNER_ERRORS)[number];
 
-export function isOwnerError(message: string | undefined): message is OwnerError {
-  return OWNER_ERRORS.includes(message as OwnerError);
-}
-
 /** What one press of an owner button did, or why it did nothing. */
 export type OwnerOutcome<T> =
   | { ok: true; result: T }
