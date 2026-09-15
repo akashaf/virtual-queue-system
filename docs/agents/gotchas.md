@@ -29,6 +29,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps` / `PageProps` /
   `RouteContext` are generated. After deleting routes, `rm -rf .next` clears stale
   `.next/types`.
+- **Error boundaries take a `retry` prop here, not `reset`.** Next 16.3.5 renamed it, and
+  neither `reset` nor `unstable_retry` exists any more, so a boundary copied from older docs
+  or from training data renders a dead button. `app/global-error.tsx` uses `retry`. Read
+  `node_modules/next/dist/docs/` before assuming any API in this version.
 
 ## Supabase and migrations
 
@@ -98,6 +102,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **Sentry shows an organization token once, at creation.** The Organization Tokens page lists
   each token's name and last use, never its value, so a token that is not saved on the way past
   can only be replaced, not recovered.
+- **A capturing transport proves scrubbing end to end.** Pass `createTransport` from
+  `@sentry/core` to a real `Sentry.init` and read what it was handed: it exercises the actual
+  `beforeSend` chain rather than a mock of it. Sentry attaches context lines that quote the
+  surrounding source, though, so never assert on a literal that also appears in the test file —
+  it will be in the payload either way and the test will pass for the wrong reason.
 
 ## Netlify and secrets
 
@@ -108,7 +117,19 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **`netlify env:set --scope` fails silently on the Free plan**: no output, exit 0, nothing
   written. Always confirm with `netlify env:list --context production`.
 - **Netlify secret values are write-only.** You cannot read one back to check it, so a key is
-  only ever proven by a request that uses it.
+  only ever proven by a request that uses it. `env:list` prints a short placeholder for one, so
+  compare the length rather than the value when checking the secret flag took.
+- **The Free plan cannot narrow a secret's contexts or scopes.** A variable added as secret
+  lands in every context (`dev`, `branch-deploy`, `deploy-preview`, `production`, `dev-server`)
+  with `builds, functions, runtime`, and the UI will not restrict it. So choose secrets that are
+  safe everywhere: `SENTRY_AUTH_TOKEN` is acceptable only because an organization token carries
+  `org:ci` alone. A token that could *read* anything would need a different plan, or no Netlify.
+
+## Testing
+
+- **Vitest only collects `{app,lib}/**/*.test.ts` (unit) and `tests/db/**` (db).** A scratch
+  test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
+  green while proving nothing. Check the file is under one of those roots before trusting a pass.
 
 ## JavaScript and Postgres disagreeing
 
