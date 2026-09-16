@@ -31,6 +31,7 @@ describe("toCustomerView", () => {
           removed_reason: null,
           can_rejoin: false,
         },
+        estimate: { min_minutes: 15, max_minutes: 25 },
       }),
     ).toEqual({
       shop: {
@@ -51,6 +52,7 @@ describe("toCustomerView", () => {
         removedReason: null,
         canRejoin: false,
       },
+      estimate: { minMinutes: 15, maxMinutes: 25 },
     });
   });
 
@@ -74,6 +76,7 @@ describe("toCustomerView", () => {
         removed_reason: "close_shop",
         can_rejoin: false,
       },
+      estimate: null,
     });
 
     expect(view.ticket?.removedReason).toBe("close_shop");
@@ -99,6 +102,7 @@ describe("toCustomerView", () => {
         removed_reason: null,
         can_rejoin: true,
       },
+      estimate: null,
     });
 
     expect(view.ticket).toEqual({
@@ -124,9 +128,11 @@ describe("toCustomerView", () => {
         heads_up_threshold: 3,
       },
       ticket: null,
+      estimate: null,
     });
 
     expect(view.ticket).toBeNull();
+    expect(view.estimate).toBeNull();
     expect(view.shop).toEqual({
       id: "s-1",
       name: "Kedai Ali",

@@ -85,6 +85,8 @@ describe("get_customer_view", () => {
         heads_up_threshold: 3,
       },
       ticket: null,
+      // Estimated Wait waits for 5 Served Tickets, and this Queue has none.
+      estimate: null,
     });
   });
 
@@ -138,6 +140,7 @@ describe("get_customer_view", () => {
         removed_reason: null,
         can_rejoin: false,
       },
+      estimate: null,
     });
   });
 

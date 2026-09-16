@@ -40,6 +40,8 @@ export const ms: Dictionary = {
   youAreNext: "Anda seterusnya",
   aheadOfYouOne: "1 orang di hadapan anda",
   aheadOfYou: "{count} orang di hadapan anda",
+  estimatedWait: "Anggaran menunggu: {min}–{max} minit",
+  estimatedWaitAbout: "Anggaran menunggu: kira-kira {minutes} minit",
   inPersonNote: "Pelanggan yang menunggu di kedai mungkin dilayan di antaranya",
   headBackNow: "Kembali ke kedai sekarang",
   headsUpTitle: "⏰ Hampir giliran anda",

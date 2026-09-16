@@ -150,6 +150,7 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
 - `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
 - `broadcast_queue_changed()` — the trigger function behind [§6](#6-realtime).
+- `estimated_wait(shop, ticket)` — the Estimated Wait range below, or null. Lives beside `customer_view_json`, which is its only caller, so every path that returns the customer view carries the same estimate.
 - `stamp_heads_ups(shop)` — the §4 Heads-up rule in one place: stamps every Waiting Ticket inside the threshold that has not been told, and returns them as `heads_up` alerts. The last thing every mutation does, including the ones that move nobody up, so a Ticket owed a Heads-up for any reason — a threshold raised under it — is told by the very next press. A joining Ticket is never among them, because `add_ticket` has already stamped it. `close_shop` is the one exception (#11): the carried Tickets sit at the front of the new day, and stamping at closing time would push "almost your turn" to people who just chose to come back tomorrow — the new day's first mutation tells whoever is owed one. A carried Ticket keeps its `heads_up_sent_at` for the same reason the Heads-up is one-time per Ticket (CONTEXT.md): one already told is not told again tomorrow.
 
 ### Customer functions (execute granted to `service_role` only)
@@ -182,7 +183,8 @@ Some helpers are never called from outside the database, and are revoked from ev
   - One exception to that scope: when the current day holds nothing for the device, a Ticket that Close Shop removed is looked for in a day closed within the last 6 hours. Close Shop moves the whole day into the past at once, so without this the one ending a Customer is owed *tonight* — "shop closed, come back tomorrow" — would vanish with it. Time-boxed because a Customer who does come back tomorrow must meet the join form, not last night's goodbye. `removed_reason` is what lets the page tell that goodbye apart from the Owner's Remove.
   - `can_rejoin` is the whole of the Rejoin offer: a No-show, from a scan, in today's Queue Day, not already rejoined from. The Shop-level reasons a Rejoin can still fail — Last Call, a full Queue — are deliberately left out, because they change from moment to moment and `rejoin_queue` answers them with a token the page can put into words.
   - Returns SQL `null` for a slug no Shop has, so the page can show a missing Shop and a Deactivated Shop the same way.
-  - Delivered so far (#11): everything above but `estimate`, which arrives with #12.
+  - `estimate` (#12) is the Estimated Wait range below, and is null until the Shop has Served enough today — and for any Ticket not Waiting: a Called Ticket is in a chair, so the wait it estimates is over.
+  - Delivered so far (#12): everything above.
 
 ### Owner functions (execute granted to `authenticated`, check that `auth.uid()` owns the Shop)
 - `call_next()`: error `queue_empty`. Moves the lowest-numbered Waiting Ticket in the current Queue Day to Called. Separate from marking one Served, so several may be Called at once. Its alerts are a `called` alert for that Ticket, then the Heads-ups the Tickets behind are now owed

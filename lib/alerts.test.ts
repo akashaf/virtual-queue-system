@@ -33,6 +33,7 @@ function view(ticket: Partial<Ticket> | null): CustomerView {
       canRejoin: false,
       ...ticket,
     },
+    estimate: null,
   };
 }
 

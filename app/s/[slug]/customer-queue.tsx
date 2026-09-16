@@ -297,6 +297,7 @@ export function CustomerQueue({
         ) : (
           <Waiting
             ticket={ticket}
+            estimate={view.estimate}
             dict={dict}
             headsUp={isHeadsUpReached(view)}
             lastCall={view.shop.joiningState === "last_call"}
@@ -405,6 +406,7 @@ function JoinForm({
 
 function Waiting({
   ticket,
+  estimate,
   dict,
   headsUp,
   lastCall,
@@ -413,6 +415,8 @@ function Waiting({
   onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
+  /** The Estimated Wait range, or null while the Shop hasn't served enough today. */
+  estimate: CustomerView["estimate"];
   dict: Dictionary;
   /** Inside the Heads-up Threshold: time to walk back. */
   headsUp: boolean;
@@ -439,6 +443,9 @@ function Waiting({
         <Badge variant="secondary">{dict.carriedOverBadge}</Badge>
       ) : null}
       <p className="text-xl font-medium">{aheadLabel(ticket.position, dict)}</p>
+      {estimate ? (
+        <p className="text-muted-foreground">{estimateLabel(estimate, dict)}</p>
+      ) : null}
       {headsUp ? (
         <p className="rounded-lg bg-primary px-4 py-3 text-lg font-semibold text-primary-foreground">
           {dict.headBackNow}
@@ -783,6 +790,20 @@ function waitingCountLabel(count: number, dict: Dictionary): string {
   if (count === 0) return dict.waitingNowNone;
   if (count === 1) return dict.waitingNowOne;
   return format(dict.waitingNow, { count });
+}
+
+function estimateLabel(
+  estimate: NonNullable<CustomerView["estimate"]>,
+  dict: Dictionary,
+): string {
+  // Rounding to 5 minutes can land both ends on the same mark, and a range of
+  // "15–15 min" reads like a bug rather than an estimate.
+  return estimate.minMinutes === estimate.maxMinutes
+    ? format(dict.estimatedWaitAbout, { minutes: estimate.minMinutes })
+    : format(dict.estimatedWait, {
+        min: estimate.minMinutes,
+        max: estimate.maxMinutes,
+      });
 }
 
 function aheadLabel(position: number, dict: Dictionary): string {

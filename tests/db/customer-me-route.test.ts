@@ -66,6 +66,7 @@ describe("GET /api/s/[slug]/me", () => {
         headsUpThreshold: 3,
       },
       ticket: null,
+      estimate: null,
     });
   });
 

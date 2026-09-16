@@ -66,7 +66,7 @@ The one-time alert sent the first time a Waiting Ticket has the Shop's Heads-up 
 _Avoid_: Reminder, warning
 
 **Estimated Wait**:
-A rough range shown to a Waiting Customer, derived from recent Called-to-Served durations in the current Queue Day. Hidden until enough Tickets have been Served.
+A rough range shown to a Waiting Customer, derived from the pace of recent Served Tickets in the current Queue Day — the gaps between serves, so several chairs working at once read as a faster queue. Hidden until enough Tickets have been Served.
 
 ### The queue day
 

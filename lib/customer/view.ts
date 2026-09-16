@@ -50,6 +50,14 @@ export interface CustomerView {
     /** Whether this Ticket is a No-show the Customer may still come back from. */
     canRejoin: boolean;
   } | null;
+  /**
+   * The Estimated Wait range, held only by a Waiting Ticket once the Shop has
+   * Served enough Tickets today (backend.md §5) — null hides it entirely.
+   */
+  estimate: {
+    minMinutes: number;
+    maxMinutes: number;
+  } | null;
 }
 
 /** The JSON `get_customer_view` and `join_queue` return, in the database's own names. */
@@ -72,11 +80,15 @@ interface CustomerViewJson {
     removed_reason: RemovedReason | null;
     can_rejoin: boolean;
   } | null;
+  estimate: {
+    min_minutes: number;
+    max_minutes: number;
+  } | null;
 }
 
 /** Turns one of those payloads into the camelCase shape the app and its pages use. */
 export function toCustomerView(json: unknown): CustomerView {
-  const { shop, ticket } = json as CustomerViewJson;
+  const { shop, ticket, estimate } = json as CustomerViewJson;
 
   return {
     shop: {
@@ -96,6 +108,10 @@ export function toCustomerView(json: unknown): CustomerView {
       carriedOver: ticket.carried_over,
       removedReason: ticket.removed_reason,
       canRejoin: ticket.can_rejoin,
+    },
+    estimate: estimate && {
+      minMinutes: estimate.min_minutes,
+      maxMinutes: estimate.max_minutes,
     },
   };
 }

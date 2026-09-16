@@ -351,6 +351,13 @@ export type Database = {
         Args: { p_ticket_id: string }
         Returns: undefined
       }
+      estimated_wait: {
+        Args: {
+          p_shop: Database["public"]["Tables"]["shops"]["Row"]
+          p_ticket: Database["public"]["Tables"]["tickets"]["Row"]
+        }
+        Returns: Json
+      }
       get_customer_view: {
         Args: { p_device_id?: string; p_slug: string }
         Returns: Json

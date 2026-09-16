@@ -39,6 +39,8 @@ export const en = {
   youAreNext: "You're next",
   aheadOfYouOne: "1 person ahead of you",
   aheadOfYou: "{count} people ahead of you",
+  estimatedWait: "Estimated wait: {min}–{max} min",
+  estimatedWaitAbout: "Estimated wait: about {minutes} min",
   inPersonNote: "Customers waiting in person may be served in between",
   headBackNow: "Head back to the shop now",
   headsUpTitle: "⏰ Almost your turn",
