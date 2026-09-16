@@ -77,6 +77,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   proceeds without confirmation. `docs/specs/third-party.md` §3 has the safe scratch-workdir
   recipe. `supabase config diff` is read-only and safe.
 
+- **A supabase-js `.select()` string must be one literal.** The client parses the
+  column string *at the type level*, and TypeScript only gives it a literal type when it is a
+  single literal: split a long select across two strings with `+` and every row property
+  becomes `GenericStringError`. `lib/push.ts` keeps its embedded-join select on one long line
+  for this reason.
+
 - **A Postgres error's `details` is the failing row.** For a constraint violation it reads
   `Failing row contains (…)`, Customer name and coordinates included, and Supabase passes it
   through on the error object. Sentry's scrubber in `lib/error-reporting.ts` filters by key, so
@@ -127,6 +133,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Testing
 
+- **An e2e context that joins the Queue must grant `"notifications"`.** With the permission
+  at its default, the push explanation sheet (#10) opens as a modal right after a successful
+  join and blocks every later click in the test. Granted, the page subscribes silently and no
+  sheet appears. `test.use({ permissions: ["geolocation", "notifications"] })` is the pattern.
 - **Vitest only collects `{app,lib}/**/*.test.ts` (unit) and `tests/db/**` (db).** A scratch
   test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
   green while proving nothing. Check the file is under one of those roots before trusting a pass.

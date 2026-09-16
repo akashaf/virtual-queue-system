@@ -11,7 +11,7 @@ import {
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
-  permissions: ["geolocation"],
+  permissions: ["geolocation", "notifications"],
 });
 
 async function join(page: Page, slug: string, name: string) {

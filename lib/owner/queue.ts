@@ -1,6 +1,7 @@
 import "server-only";
 import type { PostgrestError } from "@supabase/supabase-js";
 import { functionErrorReason } from "@/lib/error-reporting";
+import { toQueueAlerts, type Mutated } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import {
   OWNER_ERRORS,
@@ -46,7 +47,7 @@ export async function fetchOwnerQueue(): Promise<OwnerQueue | null> {
 }
 
 /** Summons the Customer at the front of the Queue. */
-export async function callNextTicket(): Promise<OwnerOutcome<CalledTicket>> {
+export async function callNextTicket(): Promise<Mutated<OwnerOutcome<CalledTicket>>> {
   const supabase = await createClient();
   return outcome("call_next", await supabase.rpc("call_next"), toCalledTicket);
 }
@@ -54,7 +55,7 @@ export async function callNextTicket(): Promise<OwnerOutcome<CalledTicket>> {
 /** Marks a haircut done — the Shop's one billable event. */
 export async function markTicketServed(
   ticketId: string,
-): Promise<OwnerOutcome<ServedTicket>> {
+): Promise<Mutated<OwnerOutcome<ServedTicket>>> {
   const supabase = await createClient();
   return outcome(
     "mark_served",
@@ -66,7 +67,7 @@ export async function markTicketServed(
 /** Takes a Done back, while the Undo window is still open. */
 export async function undoTicketServed(
   ticketId: string,
-): Promise<OwnerOutcome<CalledTicket>> {
+): Promise<Mutated<OwnerOutcome<CalledTicket>>> {
   const supabase = await createClient();
   return outcome(
     "undo_served",
@@ -78,7 +79,7 @@ export async function undoTicketServed(
 /** The Customer never came to the chair. */
 export async function markTicketNoShow(
   ticketId: string,
-): Promise<OwnerOutcome<TicketRef>> {
+): Promise<Mutated<OwnerOutcome<TicketRef>>> {
   const supabase = await createClient();
   return outcome(
     "mark_no_show",
@@ -90,7 +91,7 @@ export async function markTicketNoShow(
 /** The Owner takes a Ticket out, from the Queue or from the chair. */
 export async function removeQueueTicket(
   ticketId: string,
-): Promise<OwnerOutcome<TicketRef>> {
+): Promise<Mutated<OwnerOutcome<TicketRef>>> {
   const supabase = await createClient();
   return outcome(
     "remove_ticket",
@@ -100,23 +101,30 @@ export async function removeQueueTicket(
 }
 
 /**
- * What one owner function did, or why it did nothing.
+ * What one owner function did, or why it did nothing — plus the alerts it
+ * returned, which the Server Action dispatches after its response is sent.
  *
  * A message in OWNER_ERRORS is a rule the Owner ran into and worth showing them;
  * anything else is a bug rather than a situation, and is reported as one.
  *
  * The functions return `jsonb`, which the generated types can only call `Json`;
- * the `{ result, alerts }` envelope is pinned by backend.md §5. The alerts stay
- * unread until #10 builds the dispatcher that sends them.
+ * the `{ result, alerts }` envelope is pinned by backend.md §5.
  */
 function outcome<T>(
   fn: string,
   { data, error }: { data: unknown; error: PostgrestError | null },
   toResult: (json: unknown) => T,
-): OwnerOutcome<T> {
+): Mutated<OwnerOutcome<T>> {
   if (error) {
-    return { ok: false, reason: functionErrorReason(fn, error, OWNER_ERRORS) };
+    return {
+      outcome: { ok: false, reason: functionErrorReason(fn, error, OWNER_ERRORS) },
+      alerts: [],
+    };
   }
 
-  return { ok: true, result: toResult((data as { result: unknown }).result) };
+  const envelope = data as { result: unknown; alerts: unknown };
+  return {
+    outcome: { ok: true, result: toResult(envelope.result) },
+    alerts: toQueueAlerts(envelope.alerts),
+  };
 }

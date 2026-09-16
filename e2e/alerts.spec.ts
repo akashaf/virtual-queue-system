@@ -3,7 +3,7 @@ import { seedShop, seedTicket, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpe
 
 test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
-  permissions: ["geolocation"],
+  permissions: ["geolocation", "notifications"],
 });
 
 // Counts every sound the page starts. Headless Chromium has nothing to play it

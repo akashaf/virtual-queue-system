@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { fetchCustomerView } from "@/lib/customer/queue";
 import { DEVICE_COOKIE, isDeviceId } from "@/lib/device-cookie";
 import { dictionaries, LANG_COOKIE, resolveLang } from "@/lib/i18n";
+import { isInAppBrowser } from "@/lib/in-app-browser";
 import { CustomerQueue } from "./customer-queue";
 import { LanguageToggle } from "./language-toggle";
 
@@ -38,6 +39,14 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
       className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-6 px-6 py-8"
     >
       <LanguageToggle slug={slug} lang={lang} label={dict.langToggleLabel} />
+
+      {/* Above any state (frontend.md §3.1): these webviews get no Web Push,
+          and some of them drop the page as soon as the Customer switches away. */}
+      {isInAppBrowser(headerList.get("user-agent")) ? (
+        <p role="alert" className="rounded-lg bg-muted px-4 py-3 text-sm font-medium">
+          {dict.inAppBrowserWarning}
+        </p>
+      ) : null}
 
       {view?.shop.isActive ? (
         <CustomerQueue slug={slug} initialView={view} dict={dict} />

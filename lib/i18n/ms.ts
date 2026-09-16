@@ -59,6 +59,16 @@ export const ms: Dictionary = {
   leaveConfirmStay: "Kekal dalam giliran",
   leaveConfirmLeave: "Keluar",
 
+  // Makluman tolak
+  inAppBrowserWarning: "Buka dalam Chrome/Safari untuk menerima makluman",
+  pushExplainTitle: "Terima makluman apabila tiba giliran anda",
+  pushExplainBody:
+    "Benarkan notifikasi dan kami akan maklumkan anda apabila giliran anda hampir tiba — walaupun skrin dikunci atau halaman ini ditutup.",
+  pushExplainAllow: "Hidupkan makluman",
+  pushExplainNotNow: "Bukan sekarang",
+  pushOn: "Makluman dihidupkan — kami akan maklumkan anda",
+  keepPageOpen: "Biarkan halaman ini terbuka, kami akan maklumkan anda dengan bunyi",
+
   // Cara lain giliran boleh berakhir
   noShowTitle: "Anda terlepas giliran anda",
   joinAgain: "Sertai semula",

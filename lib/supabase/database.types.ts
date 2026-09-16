@@ -34,6 +34,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          lang: string
+          p256dh: string
+          ticket_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          lang?: string
+          p256dh: string
+          ticket_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          lang?: string
+          p256dh?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       queue_days: {
         Row: {
           closed_at: string | null
@@ -299,6 +337,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_push_subscriptions: {
+        Args: { p_ticket_id: string }
+        Returns: undefined
+      }
       get_customer_view: {
         Args: { p_device_id?: string; p_slug: string }
         Returns: Json
@@ -418,6 +460,17 @@ export type Database = {
         Returns: Json
       }
       remove_ticket: { Args: { p_ticket_id: string }; Returns: Json }
+      save_push_subscription: {
+        Args: {
+          p_auth: string
+          p_device_id: string
+          p_endpoint: string
+          p_lang: string
+          p_p256dh: string
+          p_ticket_id: string
+        }
+        Returns: undefined
+      }
       served_ticket_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
         Returns: Json

@@ -41,6 +41,12 @@ import {
   rejoinQueue,
   type TicketActionResult,
 } from "./actions";
+import {
+  PushExplanationSheet,
+  PushStatusNote,
+  usePushAlerts,
+  type PushStatus,
+} from "./push-alerts";
 
 /**
  * The Ticket whose ending this tab has already been shown and tapped past.
@@ -126,6 +132,7 @@ export function CustomerQueue({
   useQueueChanged(view.shop.id, refetch);
 
   const active = view.ticket !== null && !isFinalStatus(view.ticket.status);
+  const push = usePushAlerts(active && view.ticket ? view.ticket.id : null);
   useAlertEffects(alerts, {
     headsUpTitle: dict.headsUpTitle,
     calledTitle: dict.calledTitle,
@@ -151,7 +158,7 @@ export function CustomerQueue({
   async function act(
     run: () => Promise<TicketActionResult>,
     busy: BusyStage,
-  ) {
+  ): Promise<TicketActionResult> {
     setStage({ kind: busy });
     const result = await run();
     if (result.status === "done") {
@@ -160,6 +167,7 @@ export function CustomerQueue({
     } else {
       setStage({ kind: "rejected", reason: result.reason });
     }
+    return result;
   }
 
   async function handleJoin(event: React.FormEvent) {
@@ -196,6 +204,8 @@ export function CustomerQueue({
     if (result.status === "joined") {
       receive(result.view);
       setStage({ kind: "idle" });
+      // Step 5 of the join flow: the explanation sheet, if there is one to show.
+      push.offerPush();
     } else if (result.status === "invalid_name") {
       setNameProblem(result.problem);
       setStage({ kind: "idle" });
@@ -244,7 +254,11 @@ export function CustomerQueue({
         dict={dict}
         onRejoin={() => {
           unlockAudio();
-          void act(() => rejoinQueue(ended.id), "rejoining");
+          void act(() => rejoinQueue(ended.id), "rejoining").then((result) => {
+            // The new Ticket needs its own subscription; a Customer never yet
+            // asked is asked now, and a granted browser re-saves silently.
+            if (result.status === "done") push.offerPush();
+          });
         }}
         onDismiss={() => rememberDismissed(storageKey, ended.id)}
       />
@@ -255,26 +269,37 @@ export function CustomerQueue({
     const ticket = view.ticket;
     const leave = () => void act(() => leaveQueue(ticket.id), "leaving");
 
-    return ticket.status === "called" ? (
-      <Called
-        ticket={ticket}
-        dict={dict}
-        ringing={alerts.ringingTicketId === ticket.id}
-        onAcknowledge={() =>
-          setPage((current) => ({
-            ...current,
-            alerts: acknowledgeCalled(current.alerts),
-          }))
-        }
-        onLeave={leave}
-      />
-    ) : (
-      <Waiting
-        ticket={ticket}
-        dict={dict}
-        headsUp={isHeadsUpReached(view)}
-        onLeave={leave}
-      />
+    return (
+      <>
+        <PushExplanationSheet
+          open={push.status === "ask"}
+          dict={dict}
+          onAllow={() => void push.allowPush(ticket.id)}
+          onDecline={push.declinePush}
+        />
+        {ticket.status === "called" ? (
+          <Called
+            ticket={ticket}
+            dict={dict}
+            ringing={alerts.ringingTicketId === ticket.id}
+            onAcknowledge={() =>
+              setPage((current) => ({
+                ...current,
+                alerts: acknowledgeCalled(current.alerts),
+              }))
+            }
+            onLeave={leave}
+          />
+        ) : (
+          <Waiting
+            ticket={ticket}
+            dict={dict}
+            headsUp={isHeadsUpReached(view)}
+            pushStatus={push.status}
+            onLeave={leave}
+          />
+        )}
+      </>
     );
   }
 
@@ -374,12 +399,15 @@ function Waiting({
   ticket,
   dict,
   headsUp,
+  pushStatus,
   onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
   /** Inside the Heads-up Threshold: time to walk back. */
   headsUp: boolean;
+  /** Whether push alerts are on, or the page's sound is all there is. */
+  pushStatus: PushStatus;
   onLeave: () => void;
 }) {
   return (
@@ -401,6 +429,7 @@ function Waiting({
         </p>
       ) : null}
       <p className="text-sm text-muted-foreground">{dict.inPersonNote}</p>
+      <PushStatusNote status={pushStatus} dict={dict} />
       <LeaveButton dict={dict} onLeave={onLeave} className="mt-4" />
     </div>
   );

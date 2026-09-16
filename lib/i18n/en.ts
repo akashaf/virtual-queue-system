@@ -58,6 +58,16 @@ export const en = {
   leaveConfirmStay: "Stay in the queue",
   leaveConfirmLeave: "Leave",
 
+  // Push alerts
+  inAppBrowserWarning: "Open in Chrome/Safari to get alerts",
+  pushExplainTitle: "Get an alert when it's your turn",
+  pushExplainBody:
+    "Allow notifications and we'll alert you when it's almost your turn — even if your screen is locked or this page is closed.",
+  pushExplainAllow: "Turn on alerts",
+  pushExplainNotNow: "Not now",
+  pushOn: "Alerts are on — we'll notify you",
+  keepPageOpen: "Keep this page open, we'll alert you with sound",
+
   // How else a Ticket can end
   noShowTitle: "You missed your turn",
   joinAgain: "Join again",

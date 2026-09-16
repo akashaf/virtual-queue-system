@@ -4,7 +4,7 @@ import { backdateCalls, seedShop, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./he
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
-  permissions: ["geolocation"],
+  permissions: ["geolocation", "notifications"],
 });
 
 /**

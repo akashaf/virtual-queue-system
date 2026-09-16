@@ -13,6 +13,7 @@ import type {
   ServedTicket,
   TicketRef,
 } from "@/lib/owner/view";
+import { dispatched } from "@/lib/push";
 import { isUuid } from "@/lib/uuid";
 
 /**
@@ -30,7 +31,7 @@ export async function callNext(
   _previous: OwnerOutcome<CalledTicket> | null,
   _formData: FormData,
 ): Promise<OwnerOutcome<CalledTicket>> {
-  return callNextTicket();
+  return dispatched(await callNextTicket());
 }
 
 export async function markServed(
@@ -39,7 +40,7 @@ export async function markServed(
 ): Promise<OwnerOutcome<ServedTicket>> {
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
-  return markTicketServed(ticketId);
+  return dispatched(await markTicketServed(ticketId));
 }
 
 export async function undoServed(
@@ -48,7 +49,7 @@ export async function undoServed(
 ): Promise<OwnerOutcome<CalledTicket>> {
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
-  return undoTicketServed(ticketId);
+  return dispatched(await undoTicketServed(ticketId));
 }
 
 export async function markNoShow(
@@ -57,7 +58,7 @@ export async function markNoShow(
 ): Promise<OwnerOutcome<TicketRef>> {
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
-  return markTicketNoShow(ticketId);
+  return dispatched(await markTicketNoShow(ticketId));
 }
 
 export async function removeTicket(
@@ -66,5 +67,5 @@ export async function removeTicket(
 ): Promise<OwnerOutcome<TicketRef>> {
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
-  return removeQueueTicket(ticketId);
+  return dispatched(await removeQueueTicket(ticketId));
 }

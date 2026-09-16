@@ -1,13 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
   createTicket,
   leaveTicket,
   rejoinTicket,
+  savePushSubscriptionForTicket,
   type TicketOutcome,
 } from "@/lib/customer/queue";
+import { dispatched, type Mutated } from "@/lib/push";
+import type { PushSubscriptionInput } from "@/lib/push-client";
 import {
   checkCustomerName,
   type CustomerView,
@@ -16,7 +19,7 @@ import {
 } from "@/lib/customer/view";
 import { DEVICE_COOKIE, deviceCookieOptions, isDeviceId } from "@/lib/device-cookie";
 import { isUuid } from "@/lib/uuid";
-import { isLang, LANG_COOKIE, LANG_COOKIE_MAX_AGE } from "@/lib/i18n";
+import { isLang, LANG_COOKIE, LANG_COOKIE_MAX_AGE, resolveLang } from "@/lib/i18n";
 
 export interface Coords {
   lat: number;
@@ -47,14 +50,16 @@ export async function joinQueue(
 
   if (!isCoords(coords)) return { status: "rejected", reason: "failed" };
 
-  const outcome = await createTicket({
-    slug,
-    deviceId: await requireDeviceId(),
-    name: checked.name,
-    lat: coords.lat,
-    lng: coords.lng,
-    accuracyM: coords.accuracyM,
-  });
+  const outcome = dispatched(
+    await createTicket({
+      slug,
+      deviceId: await requireDeviceId(),
+      name: checked.name,
+      lat: coords.lat,
+      lng: coords.lng,
+      accuracyM: coords.accuracyM,
+    }),
+  );
 
   return outcome.ok
     ? { status: "joined", view: outcome.view }
@@ -137,7 +142,7 @@ export async function rejoinQueue(ticketId: unknown): Promise<TicketActionResult
 
 async function deviceAction(
   ticketId: unknown,
-  act: (ticketId: string, deviceId: string) => Promise<TicketOutcome>,
+  act: (ticketId: string, deviceId: string) => Promise<Mutated<TicketOutcome>>,
 ): Promise<TicketActionResult> {
   if (!isUuid(ticketId)) return { status: "rejected", reason: "failed" };
 
@@ -147,8 +152,62 @@ async function deviceAction(
   // Ticket to act on — the same answer as naming someone else's.
   if (!isDeviceId(deviceId)) return { status: "rejected", reason: "ticket_not_found" };
 
-  const outcome = await act(ticketId, deviceId);
+  const outcome = dispatched(await act(ticketId, deviceId));
   return outcome.ok
     ? { status: "done", view: outcome.view }
     : { status: "rejected", reason: outcome.reason };
+}
+
+/**
+ * Stores the browser's push subscription against the Customer's Ticket, with
+ * the page's language, so a closed tab can still be told in the right words.
+ *
+ * `ok: false` is not worth a message: the page falls back to the keep-open
+ * banner, which is also the answer for a browser with no push at all.
+ */
+export async function savePushSubscription(
+  ticketId: unknown,
+  subscription: unknown,
+): Promise<{ ok: boolean }> {
+  if (!isUuid(ticketId) || !isPushSubscription(subscription)) return { ok: false };
+
+  const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
+  const deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
+  if (!isDeviceId(deviceId)) return { ok: false };
+
+  return savePushSubscriptionForTicket({
+    ticketId,
+    deviceId,
+    endpoint: subscription.endpoint,
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    lang: resolveLang(
+      cookieStore.get(LANG_COOKIE)?.value,
+      headerList.get("accept-language"),
+    ),
+  });
+}
+
+/**
+ * Takes `unknown` for the same reason `isCoords` does: a Server Action is a
+ * public endpoint. The length caps keep a forged request from storing an
+ * essay; real endpoints and keys are comfortably inside them.
+ */
+function isPushSubscription(value: unknown): value is PushSubscriptionInput {
+  if (typeof value !== "object" || value === null) return false;
+  const { endpoint, keys } = value as { endpoint?: unknown; keys?: unknown };
+
+  return (
+    typeof endpoint === "string" &&
+    endpoint.startsWith("https://") &&
+    endpoint.length <= 2_048 &&
+    typeof keys === "object" &&
+    keys !== null &&
+    isKey((keys as { p256dh?: unknown }).p256dh) &&
+    isKey((keys as { auth?: unknown }).auth)
+  );
+}
+
+function isKey(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256;
 }
