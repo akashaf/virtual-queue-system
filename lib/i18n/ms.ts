@@ -69,6 +69,18 @@ export const ms: Dictionary = {
   pushOn: "Makluman dihidupkan — kami akan maklumkan anda",
   keepPageOpen: "Biarkan halaman ini terbuka, kami akan maklumkan anda dengan bunyi",
 
+  // Panggilan terakhir dan kedai tutup
+  lastCallChoiceTitle: "Kedai akan tutup sebentar lagi",
+  lastCallChoiceBody:
+    "Pindah ke giliran hari esok, atau kekal hari ini? Jika anda kekal, anda mungkin tidak sempat dilayan.",
+  choiceCarry: "Pindah ke hari esok",
+  choiceStay: "Kekal hari ini",
+  choiceChangeNote: "Anda boleh mengubahnya sehingga kedai tutup.",
+  savingChoice: "Menyimpan pilihan anda…",
+  choiceUnavailable: "Pilihan itu tidak lagi tersedia",
+  carriedOverBadge: "Dipindah dari hari sebelumnya",
+  shopClosedTitle: "Kedai telah tutup, maaf, sila datang semula esok",
+
   // Cara lain giliran boleh berakhir
   noShowTitle: "Anda terlepas giliran anda",
   joinAgain: "Sertai semula",

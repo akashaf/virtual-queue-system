@@ -80,6 +80,7 @@ describe("functionErrorReason", () => {
 const SHIPPED_CUSTOMER_REASONS = [
   "shop_inactive",
   "last_call",
+  "not_last_call",
   "already_in_queue",
   "too_far",
   "queue_full",
@@ -94,6 +95,7 @@ const SHIPPED_OWNER_REASONS = [
   "undo_expired",
   "rejoined",
   "too_early",
+  "tickets_still_called",
 ] as const;
 
 describe("the shipped reason lists", () => {

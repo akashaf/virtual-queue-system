@@ -14,12 +14,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import {
   checkCustomerName,
   isFinalStatus,
   MAX_CUSTOMER_NAME_LENGTH,
   type CustomerView,
   type CustomerError,
+  type LastCallChoice,
   type NameProblem,
 } from "@/lib/customer/view";
 import { formatTicketNumber } from "@/lib/ticket";
@@ -36,6 +38,7 @@ import {
 import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
 import { recordLocationFailure } from "@/lib/error-reporting";
 import {
+  chooseLastCall,
   joinQueue,
   leaveQueue,
   rejoinQueue,
@@ -75,6 +78,7 @@ type Stage =
   | { kind: "joining" }
   | { kind: "leaving" }
   | { kind: "rejoining" }
+  | { kind: "choosing" }
   | { kind: "location_denied" }
   | { kind: "location_unavailable" }
   | { kind: "rejected"; reason: CustomerError | "failed" };
@@ -82,7 +86,7 @@ type Stage =
 /** The stages that are just a wait, each with something to say while it lasts. */
 type BusyStage = Extract<
   Stage,
-  { kind: "locating" | "joining" | "leaving" | "rejoining" }
+  { kind: "locating" | "joining" | "leaving" | "rejoining" | "choosing" }
 >["kind"];
 
 export function CustomerQueue({
@@ -295,7 +299,11 @@ export function CustomerQueue({
             ticket={ticket}
             dict={dict}
             headsUp={isHeadsUpReached(view)}
+            lastCall={view.shop.joiningState === "last_call"}
             pushStatus={push.status}
+            onChoose={(choice) =>
+              void act(() => chooseLastCall(ticket.id, choice), "choosing")
+            }
             onLeave={leave}
           />
         )}
@@ -399,15 +407,20 @@ function Waiting({
   ticket,
   dict,
   headsUp,
+  lastCall,
   pushStatus,
+  onChoose,
   onLeave,
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
   /** Inside the Heads-up Threshold: time to walk back. */
   headsUp: boolean;
+  /** Last Call is on: the shop is closing soon, and this Ticket must choose. */
+  lastCall: boolean;
   /** Whether push alerts are on, or the page's sound is all there is. */
   pushStatus: PushStatus;
+  onChoose: (choice: LastCallChoice) => void;
   onLeave: () => void;
 }) {
   return (
@@ -422,16 +435,88 @@ function Waiting({
       <p className="text-7xl font-bold tabular-nums">
         {formatTicketNumber(ticket.number)}
       </p>
+      {ticket.carriedOver ? (
+        <Badge variant="secondary">{dict.carriedOverBadge}</Badge>
+      ) : null}
       <p className="text-xl font-medium">{aheadLabel(ticket.position, dict)}</p>
       {headsUp ? (
         <p className="rounded-lg bg-primary px-4 py-3 text-lg font-semibold text-primary-foreground">
           {dict.headBackNow}
         </p>
       ) : null}
+      {lastCall ? (
+        <LastCallChoiceCard
+          choice={ticket.lastCallChoice}
+          dict={dict}
+          onChoose={onChoose}
+        />
+      ) : null}
       <p className="text-sm text-muted-foreground">{dict.inPersonNote}</p>
       <PushStatusNote status={pushStatus} dict={dict} />
       <LeaveButton dict={dict} onLeave={onLeave} className="mt-4" />
     </div>
+  );
+}
+
+/**
+ * The Last Call question, on screen for as long as it is open: stay today, or
+ * move to the next Queue Day. The current answer is marked, and stays
+ * changeable until Close Shop acts on it — which is also why there is no
+ * "confirm": the card itself shows what is currently chosen.
+ */
+function LastCallChoiceCard({
+  choice,
+  dict,
+  onChoose,
+}: {
+  choice: LastCallChoice | null;
+  dict: Dictionary;
+  onChoose: (choice: LastCallChoice) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={dict.lastCallChoiceTitle}
+      className="flex w-full flex-col gap-3 rounded-lg border-2 border-primary p-4 text-left"
+    >
+      <p className="font-semibold">{dict.lastCallChoiceTitle}</p>
+      <p className="text-sm text-muted-foreground">{dict.lastCallChoiceBody}</p>
+      <ChoiceButton
+        label={dict.choiceCarry}
+        chosen={choice === "carry"}
+        onSelect={() => onChoose("carry")}
+      />
+      <ChoiceButton
+        label={dict.choiceStay}
+        chosen={choice === "stay"}
+        onSelect={() => onChoose("stay")}
+      />
+      {choice !== null ? (
+        <p className="text-sm text-muted-foreground">{dict.choiceChangeNote}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ChoiceButton({
+  label,
+  chosen,
+  onSelect,
+}: {
+  label: string;
+  chosen: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={chosen ? "default" : "outline"}
+      aria-pressed={chosen}
+      className="h-12 text-base"
+      onClick={onSelect}
+    >
+      {chosen ? `✓ ${label}` : label}
+    </Button>
   );
 }
 
@@ -543,7 +628,13 @@ function Ended({
     case "removed":
       return (
         <Ending
-          title={dict.removedTitle}
+          // The shop closing for the day is not the Owner turning someone away,
+          // and reads differently: come back tomorrow, not "you were removed".
+          title={
+            ticket.removedReason === "close_shop"
+              ? dict.shopClosedTitle
+              : dict.removedTitle
+          }
           action={dict.joinButton}
           onAction={onDismiss}
         />
@@ -622,7 +713,8 @@ function isBusy(stage: Stage): stage is Stage & { kind: BusyStage } {
     stage.kind === "locating" ||
     stage.kind === "joining" ||
     stage.kind === "leaving" ||
-    stage.kind === "rejoining"
+    stage.kind === "rejoining" ||
+    stage.kind === "choosing"
   );
 }
 
@@ -632,6 +724,8 @@ function busyMessage(stage: BusyStage, dict: Dictionary): string {
       return dict.checkingLocation;
     case "leaving":
       return dict.leaving;
+    case "choosing":
+      return dict.savingChoice;
     case "rejoining":
     case "joining":
       return dict.joining;
@@ -705,6 +799,8 @@ function rejectionMessage(reason: CustomerError | "failed", dict: Dictionary): s
       return dict.queueFull;
     case "last_call":
       return dict.lastCallClosed;
+    case "not_last_call":
+      return dict.choiceUnavailable;
     case "already_in_queue":
       return dict.alreadyInQueue;
     case "shop_inactive":

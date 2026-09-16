@@ -198,6 +198,22 @@ describe("dispatchAlerts", () => {
     expect(reported).toHaveBeenCalled();
   });
 
+  test("shop_closed is a goodbye: the Ticket's subscriptions go once it is sent", async () => {
+    const { shop } = await createShop();
+    const removed = await join(shop.slug);
+    const staying = await join(shop.slug);
+    await subscribe(removed, "https://push.test/removed");
+    await subscribe(staying, "https://push.test/staying");
+
+    const send = recordingSender();
+    await dispatchAlerts([{ ticketId: removed.id, kind: "shop_closed" }], send);
+
+    // Told first, deleted after: close_shop leaves the subscriptions in place
+    // precisely so this send can happen.
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await endpoints(shop.id)).toEqual(["https://push.test/staying"]);
+  });
+
   test("an alerted Ticket with no subscriptions sends nothing", async () => {
     const { shop } = await createShop();
     const ticket = await join(shop.slug);

@@ -19,6 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,9 @@ import {
 import { useQueueChanged } from "@/lib/queue-changed";
 import {
   applyMove,
+  closeShopPlan,
   type CalledTicket,
+  type CloseShopResult,
   type OwnerOutcome,
   type OwnerQueue,
   type QueueMove,
@@ -39,8 +42,17 @@ import {
 } from "@/lib/owner/view";
 import { formatCountdown, formatMalaysiaTime, formatMinutesAgo } from "@/lib/time";
 import { formatTicketNumber } from "@/lib/ticket";
-import { callNext, markNoShow, markServed, removeTicket, undoServed } from "./actions";
-import { ownerErrorMessage } from "./messages";
+import {
+  callNext,
+  cancelLastCall,
+  closeShop,
+  markNoShow,
+  markServed,
+  removeTicket,
+  startLastCall,
+  undoServed,
+} from "./actions";
+import { CHAIRS_STILL_BUSY, ownerErrorMessage } from "./messages";
 
 /**
  * The Owner's live Queue and the buttons that move it.
@@ -86,6 +98,23 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   const undo = useOwnerAction(undoServed, settle);
   const noShow = useOwnerAction(markNoShow, settle);
   const remove = useOwnerAction(removeTicket, settle);
+  const lastCall = useOwnerAction(startLastCall, settle);
+  const reopen = useOwnerAction(cancelLastCall, settle);
+
+  /** Closing the day is worth a receipt: who moved to the new day, who did not. */
+  const settleClose = useCallback(
+    (outcome: OwnerOutcome<CloseShopResult>) => {
+      if (outcome.ok) {
+        const { carriedOver, removed } = outcome.result;
+        toast.success(
+          `Day closed — ${carriedOver} moved to the next day, ${removed} removed`,
+        );
+      }
+      settle(outcome);
+    },
+    [settle],
+  );
+  const close = useOwnerAction(closeShop, settleClose);
 
   /** Done is undoable for two minutes, so it says so until the window shuts. */
   const offerUndo = useCallback(
@@ -110,11 +139,19 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
     (ticket) => ticket.undoExpiresInMs - elapsedMs > 0,
   );
 
+  const lastCallOn = queue.shop.joiningState === "last_call";
+
   return (
     <main className="flex flex-1 flex-col gap-4 px-4 py-4">
-      <p className="text-sm font-medium text-muted-foreground" aria-live="polite">
-        Waiting {waiting.length} · In chair {called.length}
-      </p>
+      <div className="flex items-center gap-2">
+        {/* Which door the shop is showing the street: open, or closing soon. */}
+        <Badge variant={lastCallOn ? "destructive" : "secondary"}>
+          {lastCallOn ? "Last Call" : "Open"}
+        </Badge>
+        <p className="text-sm font-medium text-muted-foreground" aria-live="polite">
+          Waiting {waiting.length} · In chair {called.length}
+        </p>
+      </div>
 
       {called.length > 0 ? (
         <ul className="flex flex-col gap-2">
@@ -149,12 +186,24 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
               <span className="text-lg font-semibold tabular-nums">
                 {formatTicketNumber(ticket.number)}
               </span>
-              <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                 <span className="truncate font-medium">{ticket.name}</span>
                 {/* They are at the back with a high number, but they have been
                     in the shop a while. */}
                 {ticket.origin === "rejoin" ? (
                   <Badge variant="secondary">Rejoined</Badge>
+                ) : null}
+                {ticket.carriedOver ? (
+                  <Badge variant="secondary">Moved from previous day</Badge>
+                ) : null}
+                {/* Only while the question is open: yesterday's answer means
+                    nothing once joining reopens. */}
+                {lastCallOn && ticket.lastCallChoice ? (
+                  <Badge variant="outline">
+                    {ticket.lastCallChoice === "carry"
+                      ? "Chose: next day"
+                      : "Chose: stay"}
+                  </Badge>
                 ) : null}
               </span>
               <span className="text-sm text-muted-foreground tabular-nums">
@@ -190,7 +239,19 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
         </details>
       ) : null}
 
-      <div className="sticky bottom-0 mt-auto -mx-4 border-t bg-background px-4 py-3">
+      {/* Ending the day, kept at the far end of the screen from Call next. */}
+      <div className="mt-auto flex flex-col gap-2">
+        {lastCallOn ? (
+          <>
+            <ReopenJoiningButton move={move} reopen={reopen} />
+            <CloseShopButton queue={queue} move={move} close={close} />
+          </>
+        ) : (
+          <StartLastCallButton move={move} lastCall={lastCall} />
+        )}
+      </div>
+
+      <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3">
         <CallNextButton
           nobodyWaiting={waiting.length === 0}
           move={move}
@@ -198,6 +259,123 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
         />
       </div>
     </main>
+  );
+}
+
+/**
+ * Last Call is confirmed: it pushes an alert to every Waiting Customer and
+ * turns joiners away, which is not something to do with an elbow.
+ */
+function StartLastCallButton({
+  move,
+  lastCall,
+}: {
+  move: (intent: QueueMove) => void;
+  lastCall: OwnerAction;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="outline" className="h-11 w-full">
+          Last Call
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Start last call?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Stop new customers joining and ask waiting customers to choose?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Not yet</AlertDialogCancel>
+          <MoveForm
+            move={move}
+            intent={{ kind: "start_last_call" }}
+            action={lastCall}
+          >
+            <AlertDialogAction type="submit" disabled={lastCall.pending}>
+              Start last call
+            </AlertDialogAction>
+          </MoveForm>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * Reopening needs no confirmation: it takes nothing from anybody, and the
+ * choices already made are kept for the next Last Call (§12 rule 2).
+ */
+function ReopenJoiningButton({
+  move,
+  reopen,
+}: {
+  move: (intent: QueueMove) => void;
+  reopen: OwnerAction;
+}) {
+  return (
+    <MoveForm move={move} intent={{ kind: "cancel_last_call" }} action={reopen}>
+      <Button
+        type="submit"
+        variant="outline"
+        className="h-11 w-full"
+        disabled={reopen.pending}
+      >
+        Reopen joining
+      </Button>
+    </MoveForm>
+  );
+}
+
+/**
+ * The confirmation counts what `close_shop` will actually do — or, while
+ * anyone is still in a chair, says why it will refuse: those Tickets must be
+ * finished first, because closing can neither bill them nor drop them.
+ */
+function CloseShopButton({
+  queue,
+  move,
+  close,
+}: {
+  queue: OwnerQueue;
+  move: (intent: QueueMove) => void;
+  close: OwnerAction;
+}) {
+  const chairsBusy = queue.called.length > 0;
+  const plan = closeShopPlan(queue.waiting);
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="destructive" className="h-11 w-full">
+          Close Shop
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {chairsBusy ? "Customers still in the chair" : "Close the shop?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {chairsBusy
+              ? CHAIRS_STILL_BUSY
+              : `${plan.moving} moving to next day, ${plan.removing} will be removed.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{chairsBusy ? "OK" : "Stay open"}</AlertDialogCancel>
+          {chairsBusy ? null : (
+            <MoveForm move={move} intent={{ kind: "close_shop" }} action={close}>
+              <AlertDialogAction type="submit" disabled={close.pending}>
+                Close Shop
+              </AlertDialogAction>
+            </MoveForm>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

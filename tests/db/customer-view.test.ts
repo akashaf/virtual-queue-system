@@ -133,6 +133,9 @@ describe("get_customer_view", () => {
         number: 2,
         status: "waiting",
         position: 1,
+        last_call_choice: null,
+        carried_over: false,
+        removed_reason: null,
         can_rejoin: false,
       },
     });

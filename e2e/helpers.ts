@@ -76,6 +76,21 @@ export async function backdateCalls(shopId: string, minutes: number) {
   if (error) throw error;
 }
 
+/**
+ * Reads a Shop's joining state straight from the database. The dashboard shows
+ * a press optimistically, so a test that must not outrun the server — opening
+ * another page that depends on Last Call being on — polls this instead.
+ */
+export async function shopJoiningState(id: string) {
+  const { data, error } = await admin
+    .from("shops")
+    .select("joining_state")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data.joining_state;
+}
+
 /** Switches a Shop off, the way `PATCH /api/operator/shops/[slug]` will. */
 export async function deactivateShop(id: string) {
   const { error } = await admin.from("shops").update({ is_active: false }).eq("id", id);

@@ -68,6 +68,18 @@ export const en = {
   pushOn: "Alerts are on — we'll notify you",
   keepPageOpen: "Keep this page open, we'll alert you with sound",
 
+  // Last Call and Close Shop
+  lastCallChoiceTitle: "Shop is closing soon",
+  lastCallChoiceBody:
+    "Move to the next day's queue, or stay today? If you stay, you may not be served.",
+  choiceCarry: "Move to next day",
+  choiceStay: "Stay today",
+  choiceChangeNote: "You can change this until the shop closes.",
+  savingChoice: "Saving your choice…",
+  choiceUnavailable: "That choice isn't available any more",
+  carriedOverBadge: "Moved from previous day",
+  shopClosedTitle: "Shop closed, sorry, come back tomorrow",
+
   // How else a Ticket can end
   noShowTitle: "You missed your turn",
   joinAgain: "Join again",

@@ -2,6 +2,8 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type JoiningState = Database["public"]["Enums"]["joining_state"];
 type TicketStatus = Database["public"]["Enums"]["ticket_status"];
+export type LastCallChoice = Database["public"]["Enums"]["last_call_choice"];
+type RemovedReason = Database["public"]["Enums"]["removed_reason"];
 
 /**
  * Everything a Customer is allowed to know: their Shop, and their own Ticket.
@@ -36,6 +38,15 @@ export interface CustomerView {
     status: TicketStatus;
     /** Waiting Tickets with a lower number. Called Tickets are ahead of nobody. */
     position: number;
+    /** The Customer's Last Call answer so far, changeable until Close Shop. */
+    lastCallChoice: LastCallChoice | null;
+    /** A Carried-over Ticket: moved from the previous Queue Day, once only. */
+    carriedOver: boolean;
+    /**
+     * Why a Removed Ticket was removed: the Owner's doing reads differently
+     * from the shop closing for the day.
+     */
+    removedReason: RemovedReason | null;
     /** Whether this Ticket is a No-show the Customer may still come back from. */
     canRejoin: boolean;
   } | null;
@@ -56,6 +67,9 @@ interface CustomerViewJson {
     number: number;
     status: TicketStatus;
     position: number;
+    last_call_choice: LastCallChoice | null;
+    carried_over: boolean;
+    removed_reason: RemovedReason | null;
     can_rejoin: boolean;
   } | null;
 }
@@ -78,6 +92,9 @@ export function toCustomerView(json: unknown): CustomerView {
       number: ticket.number,
       status: ticket.status,
       position: ticket.position,
+      lastCallChoice: ticket.last_call_choice,
+      carriedOver: ticket.carried_over,
+      removedReason: ticket.removed_reason,
       canRejoin: ticket.can_rejoin,
     },
   };
@@ -95,6 +112,7 @@ export function toCustomerView(json: unknown): CustomerView {
 export const CUSTOMER_ERRORS = [
   "shop_inactive",
   "last_call",
+  "not_last_call",
   "already_in_queue",
   "too_far",
   "queue_full",

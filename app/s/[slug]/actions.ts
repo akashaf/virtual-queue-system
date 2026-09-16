@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
+  chooseTicketLastCall,
   createTicket,
   leaveTicket,
   rejoinTicket,
@@ -138,6 +139,23 @@ export async function leaveQueue(ticketId: unknown): Promise<TicketActionResult>
 
 export async function rejoinQueue(ticketId: unknown): Promise<TicketActionResult> {
   return deviceAction(ticketId, rejoinTicket);
+}
+
+/**
+ * The Customer's answer to Last Call. The choice is checked here the way every
+ * browser-supplied value is — a Server Action is a public endpoint, and only
+ * the two real answers may reach an enum parameter.
+ */
+export async function chooseLastCall(
+  ticketId: unknown,
+  choice: unknown,
+): Promise<TicketActionResult> {
+  if (choice !== "stay" && choice !== "carry") {
+    return { status: "rejected", reason: "failed" };
+  }
+  return deviceAction(ticketId, (id, deviceId) =>
+    chooseTicketLastCall(id, deviceId, choice),
+  );
 }
 
 async function deviceAction(

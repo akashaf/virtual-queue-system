@@ -100,6 +100,13 @@ export async function dispatchAlerts(
     return;
   }
 
+  // A shop_closed alert is the last thing its Ticket can ever be told, so its
+  // subscriptions are deleted here once it has been sent — close_shop cannot do
+  // it, because this very dispatch still needs them (backend.md §3).
+  const closedTicketIds = alerts
+    .filter((alert) => alert.kind === "shop_closed")
+    .map((alert) => alert.ticketId);
+
   const gone: string[] = [];
   await Promise.all(
     alerts.flatMap((alert) =>
@@ -140,6 +147,16 @@ export async function dispatchAlerts(
     const deleted = await supabase.from("push_subscriptions").delete().in("id", gone);
     if (deleted.error) {
       reportUnexpected("deleting gone push subscriptions", deleted.error);
+    }
+  }
+
+  if (closedTicketIds.length > 0) {
+    const deleted = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .in("ticket_id", closedTicketIds);
+    if (deleted.error) {
+      reportUnexpected("deleting closed tickets' push subscriptions", deleted.error);
     }
   }
 }

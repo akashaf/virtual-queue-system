@@ -95,6 +95,8 @@ describe("get_owner_queue", () => {
         name: "Ali",
         joined_at: expect.any(String),
         origin: "scan",
+        last_call_choice: null,
+        carried_over: false,
       },
       {
         id: second.id,
@@ -102,6 +104,8 @@ describe("get_owner_queue", () => {
         name: "Siti",
         joined_at: expect.any(String),
         origin: "scan",
+        last_call_choice: null,
+        carried_over: false,
       },
     ]);
     expect(queue.called).toEqual([]);

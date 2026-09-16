@@ -2,13 +2,18 @@
 
 import {
   callNextTicket,
+  cancelShopLastCall,
+  closeShopDay,
   markTicketNoShow,
   markTicketServed,
   removeQueueTicket,
+  startShopLastCall,
   undoTicketServed,
 } from "@/lib/owner/queue";
 import type {
   CalledTicket,
+  CloseShopResult,
+  JoiningStateResult,
   OwnerOutcome,
   ServedTicket,
   TicketRef,
@@ -68,4 +73,25 @@ export async function removeTicket(
   const ticketId = formData.get("ticketId");
   if (!isUuid(ticketId)) return { ok: false, reason: "failed" };
   return dispatched(await removeQueueTicket(ticketId));
+}
+
+export async function startLastCall(
+  _previous: OwnerOutcome<JoiningStateResult> | null,
+  _formData: FormData,
+): Promise<OwnerOutcome<JoiningStateResult>> {
+  return dispatched(await startShopLastCall());
+}
+
+export async function cancelLastCall(
+  _previous: OwnerOutcome<JoiningStateResult> | null,
+  _formData: FormData,
+): Promise<OwnerOutcome<JoiningStateResult>> {
+  return dispatched(await cancelShopLastCall());
+}
+
+export async function closeShop(
+  _previous: OwnerOutcome<CloseShopResult> | null,
+  _formData: FormData,
+): Promise<OwnerOutcome<CloseShopResult>> {
+  return dispatched(await closeShopDay());
 }

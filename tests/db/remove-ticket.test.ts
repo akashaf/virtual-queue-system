@@ -101,6 +101,8 @@ describe("remove_ticket", () => {
         name: "Siti",
         joined_at: expect.any(String),
         origin: "scan",
+        last_call_choice: null,
+        carried_over: false,
       },
     ]);
   });

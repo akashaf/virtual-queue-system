@@ -26,6 +26,9 @@ describe("toCustomerView", () => {
           number: 17,
           status: "waiting",
           position: 3,
+          last_call_choice: "carry",
+          carried_over: true,
+          removed_reason: null,
           can_rejoin: false,
         },
       }),
@@ -43,9 +46,37 @@ describe("toCustomerView", () => {
         number: 17,
         status: "waiting",
         position: 3,
+        lastCallChoice: "carry",
+        carriedOver: true,
+        removedReason: null,
         canRejoin: false,
       },
     });
+  });
+
+  test("says why a Removed Ticket was removed, which decides the goodbye", () => {
+    const view = toCustomerView({
+      shop: {
+        id: "s-1",
+        name: "Kedai Ali",
+        is_active: true,
+        joining_state: "open",
+        waiting_count: 0,
+        heads_up_threshold: 3,
+      },
+      ticket: {
+        id: "t-1",
+        number: 17,
+        status: "removed",
+        position: 0,
+        last_call_choice: null,
+        carried_over: false,
+        removed_reason: "close_shop",
+        can_rejoin: false,
+      },
+    });
+
+    expect(view.ticket?.removedReason).toBe("close_shop");
   });
 
   test("carries the Rejoin offer through, which only a No-show ever has", () => {
@@ -63,6 +94,9 @@ describe("toCustomerView", () => {
         number: 17,
         status: "no_show",
         position: 0,
+        last_call_choice: null,
+        carried_over: false,
+        removed_reason: null,
         can_rejoin: true,
       },
     });
@@ -72,6 +106,9 @@ describe("toCustomerView", () => {
       number: 17,
       status: "no_show",
       position: 0,
+      lastCallChoice: null,
+      carriedOver: false,
+      removedReason: null,
       canRejoin: true,
     });
   });

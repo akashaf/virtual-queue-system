@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { applyMove, toOwnerQueue, UNDO_WINDOW_MS } from "./view";
+import {
+  applyMove,
+  closeShopPlan,
+  toOwnerQueue,
+  UNDO_WINDOW_MS,
+  type WaitingTicket,
+} from "./view";
 
 const json = {
   shop: { id: "s-1", name: "Kedai Ali", joining_state: "open" },
@@ -10,6 +16,8 @@ const json = {
       name: "Ali",
       joined_at: "2026-09-14T07:05:00Z",
       origin: "scan",
+      last_call_choice: null,
+      carried_over: true,
     },
     {
       id: "t-2",
@@ -17,6 +25,8 @@ const json = {
       name: "Siti",
       joined_at: "2026-09-14T07:09:00Z",
       origin: "rejoin",
+      last_call_choice: "stay",
+      carried_over: false,
     },
   ],
   called: [
@@ -51,6 +61,8 @@ describe("toOwnerQueue", () => {
           name: "Ali",
           joinedAt: "2026-09-14T07:05:00Z",
           origin: "scan",
+          lastCallChoice: null,
+          carriedOver: true,
         },
         {
           id: "t-2",
@@ -58,6 +70,8 @@ describe("toOwnerQueue", () => {
           name: "Siti",
           joinedAt: "2026-09-14T07:09:00Z",
           origin: "rejoin",
+          lastCallChoice: "stay",
+          carriedOver: false,
         },
       ],
       called: [
@@ -100,6 +114,8 @@ describe("toOwnerQueue", () => {
           name: null,
           joined_at: "2026-09-14T07:05:00Z",
           origin: "scan",
+          last_call_choice: null,
+          carried_over: false,
         },
       ],
     });
@@ -179,4 +195,65 @@ describe("applyMove", () => {
       queue,
     );
   });
+
+  test("Last Call and Reopen only swing the door", () => {
+    const closing = applyMove(queue, { kind: "start_last_call" }, now);
+    expect(closing.shop.joiningState).toBe("last_call");
+    expect(closing.waiting).toEqual(queue.waiting);
+
+    const reopened = applyMove(closing, { kind: "cancel_last_call" }, now);
+    expect(reopened.shop.joiningState).toBe("open");
+    // Choices survive a reopen (§12 rule 2); only Close Shop spends them.
+    expect(reopened.waiting).toEqual(queue.waiting);
+  });
+
+  test("Close Shop keeps only the unspent carry choices, renumbered from 1", () => {
+    const waiting = [
+      waitingTicket({ id: "w-1", number: 4, lastCallChoice: "stay" }),
+      waitingTicket({ id: "w-2", number: 7, lastCallChoice: "carry" }),
+      // Already carried once: tonight's carry choice no longer moves it.
+      waitingTicket({ id: "w-3", number: 9, lastCallChoice: "carry", carriedOver: true }),
+      waitingTicket({ id: "w-4", number: 11, lastCallChoice: "carry" }),
+    ];
+    const closing = { ...queue, shop: { ...queue.shop, joiningState: "last_call" as const }, waiting };
+
+    const closed = applyMove(closing, { kind: "close_shop" }, now);
+
+    expect(closed.shop.joiningState).toBe("open");
+    expect(closed.waiting).toEqual([
+      { ...waiting[1], number: 1, lastCallChoice: null, carriedOver: true },
+      { ...waiting[3], number: 2, lastCallChoice: null, carriedOver: true },
+    ]);
+    // The old day's undo window closed with the old day.
+    expect(closed.justServed).toEqual([]);
+  });
 });
+
+describe("closeShopPlan", () => {
+  test("counts the way close_shop will act, not the way the badges read", () => {
+    const plan = closeShopPlan([
+      waitingTicket({ id: "w-1", lastCallChoice: "carry" }),
+      waitingTicket({ id: "w-2", lastCallChoice: "carry", carriedOver: true }),
+      waitingTicket({ id: "w-3", lastCallChoice: "stay" }),
+      waitingTicket({ id: "w-4" }),
+    ]);
+
+    expect(plan).toEqual({ moving: 1, removing: 3 });
+  });
+
+  test("an empty Queue moves and removes nobody", () => {
+    expect(closeShopPlan([])).toEqual({ moving: 0, removing: 0 });
+  });
+});
+
+function waitingTicket(overrides: Partial<WaitingTicket> & { id: string }): WaitingTicket {
+  return {
+    number: 1,
+    name: "Ali",
+    joinedAt: "2026-09-14T07:05:00Z",
+    origin: "scan",
+    lastCallChoice: null,
+    carriedOver: false,
+    ...overrides,
+  };
+}

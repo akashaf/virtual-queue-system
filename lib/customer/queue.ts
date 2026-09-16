@@ -8,6 +8,7 @@ import {
   toCustomerView,
   type CustomerView,
   type CustomerError,
+  type LastCallChoice,
 } from "./view";
 
 /**
@@ -111,6 +112,23 @@ export async function rejoinTicket(
 }
 
 /**
+ * The Customer's answer to Last Call: stay today, or move to the next Queue
+ * Day. Recorded only while the question is open, and changeable until Close
+ * Shop — `choose_last_call` holds both rules.
+ */
+export async function chooseTicketLastCall(
+  ticketId: string,
+  deviceId: string,
+  choice: LastCallChoice,
+): Promise<Mutated<TicketOutcome>> {
+  return customerCall("choose_last_call", {
+    p_ticket_id: ticketId,
+    p_device_id: deviceId,
+    p_choice: choice,
+  });
+}
+
+/**
  * Stores the browser's push subscription against the Customer's Ticket. The
  * device id is the whole of their claim, checked inside the function as ever:
  * a Ticket another device holds gets the same answer as one that has ended.
@@ -144,8 +162,8 @@ export async function savePushSubscriptionForTicket(subscription: {
 }
 
 async function customerCall(
-  fn: "leave_queue" | "rejoin_queue",
-  args: { p_ticket_id: string; p_device_id: string },
+  fn: "leave_queue" | "rejoin_queue" | "choose_last_call",
+  args: { p_ticket_id: string; p_device_id: string; p_choice?: LastCallChoice },
 ): Promise<Mutated<TicketOutcome>> {
   const { data, error } = await createAdminClient().rpc(fn, args);
 

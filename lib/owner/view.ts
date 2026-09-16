@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type JoiningState = Database["public"]["Enums"]["joining_state"];
 type TicketOrigin = Database["public"]["Enums"]["ticket_origin"];
+type LastCallChoice = Database["public"]["Enums"]["last_call_choice"];
 
 export interface WaitingTicket {
   id: string;
@@ -14,6 +15,10 @@ export interface WaitingTicket {
    * its Customer has been in the shop a while — worth saying on the screen.
    */
   origin: TicketOrigin;
+  /** What this Customer answered during Last Call, if anything yet. */
+  lastCallChoice: LastCallChoice | null;
+  /** Moved from the previous Queue Day; one carry is all a Ticket gets. */
+  carriedOver: boolean;
 }
 
 export interface CalledTicket {
@@ -83,6 +88,8 @@ interface OwnerQueueJson {
     name: string | null;
     joined_at: string;
     origin: TicketOrigin;
+    last_call_choice: LastCallChoice | null;
+    carried_over: boolean;
   }[];
   called: CalledTicketJson[];
   just_served: ServedTicketJson[];
@@ -122,6 +129,46 @@ export function toTicketRef(json: unknown): TicketRef {
   return { id: ticket.id, number: ticket.number };
 }
 
+/** Where a Last Call press left the door: the least its screen needs back. */
+export interface JoiningStateResult {
+  joiningState: JoiningState;
+}
+
+export function toJoiningStateResult(json: unknown): JoiningStateResult {
+  const result = json as { joining_state: JoiningState };
+  return { joiningState: result.joining_state };
+}
+
+/** What Close Shop did: who moved to the new Queue Day, and who was removed. */
+export interface CloseShopResult {
+  carriedOver: number;
+  removed: number;
+}
+
+export function toCloseShopResult(json: unknown): CloseShopResult {
+  const result = json as { carried_over: number; removed: number };
+  return { carriedOver: result.carried_over, removed: result.removed };
+}
+
+/**
+ * Whether `close_shop` will move this Ticket to the new Queue Day: only a
+ * carry choice that has not already been honoured — a Carried-over Ticket used
+ * its one carry, whatever it answers tonight. The confirmation's counts and
+ * the optimistic close both read this, so neither can drift from the rule.
+ */
+function willCarry(ticket: WaitingTicket): boolean {
+  return ticket.lastCallChoice === "carry" && !ticket.carriedOver;
+}
+
+/** What Close Shop is about to do, for the confirmation dialog. */
+export function closeShopPlan(waiting: WaitingTicket[]): {
+  moving: number;
+  removing: number;
+} {
+  const moving = waiting.filter(willCarry).length;
+  return { moving, removing: waiting.length - moving };
+}
+
 export function toOwnerQueue(json: unknown): OwnerQueue {
   const { shop, waiting, called, just_served: justServed } = json as OwnerQueueJson;
 
@@ -133,6 +180,8 @@ export function toOwnerQueue(json: unknown): OwnerQueue {
       name: ticket.name,
       joinedAt: ticket.joined_at,
       origin: ticket.origin,
+      lastCallChoice: ticket.last_call_choice,
+      carriedOver: ticket.carried_over,
     })),
     called: called.map(toCalledTicket),
     justServed: justServed.map(toServedTicket),
@@ -151,6 +200,7 @@ export const OWNER_ERRORS = [
   "undo_expired",
   "rejoined",
   "too_early",
+  "tickets_still_called",
 ] as const;
 
 export type OwnerError = (typeof OWNER_ERRORS)[number];
@@ -172,7 +222,10 @@ export type QueueMove =
   | { kind: "mark_served"; ticketId: string }
   | { kind: "undo_served"; ticketId: string }
   | { kind: "mark_no_show"; ticketId: string }
-  | { kind: "remove_ticket"; ticketId: string };
+  | { kind: "remove_ticket"; ticketId: string }
+  | { kind: "start_last_call" }
+  | { kind: "cancel_last_call" }
+  | { kind: "close_shop" };
 
 /**
  * The Queue as it will look once a press lands, so the screen can move before
@@ -260,6 +313,31 @@ export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQ
         ],
       };
     }
+
+    case "start_last_call":
+      return { ...queue, shop: { ...queue.shop, joiningState: "last_call" } };
+
+    case "cancel_last_call":
+      return { ...queue, shop: { ...queue.shop, joiningState: "open" } };
+
+    case "close_shop":
+      return {
+        ...queue,
+        shop: { ...queue.shop, joiningState: "open" },
+        // The same rule close_shop applies: unspent carry choices move to the
+        // front of the new day, renumbered 1..k in original order with the
+        // choice honoured and cleared; everyone else's day is over — as is the
+        // old day's undo window, which belonged to the Queue Day that closed.
+        waiting: queue.waiting
+          .filter(willCarry)
+          .map((ticket, index) => ({
+            ...ticket,
+            number: index + 1,
+            lastCallChoice: null,
+            carriedOver: true,
+          })),
+        justServed: [],
+      };
   }
 }
 

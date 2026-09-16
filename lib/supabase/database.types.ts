@@ -297,6 +297,16 @@ export type Database = {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
         Returns: Json
       }
+      cancel_last_call: { Args: never; Returns: Json }
+      choose_last_call: {
+        Args: {
+          p_choice: Database["public"]["Enums"]["last_call_choice"]
+          p_device_id: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      close_shop: { Args: never; Returns: Json }
       create_shop: {
         Args: {
           p_heads_up_threshold?: number
@@ -479,6 +489,7 @@ export type Database = {
         Args: { p_shop: Database["public"]["Tables"]["shops"]["Row"] }
         Returns: Json
       }
+      start_last_call: { Args: never; Returns: Json }
       ticket_ref_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
         Returns: Json

@@ -6,10 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import {
   OWNER_ERRORS,
   toCalledTicket,
+  toCloseShopResult,
+  toJoiningStateResult,
   toOwnerQueue,
   toServedTicket,
   toTicketRef,
   type CalledTicket,
+  type CloseShopResult,
+  type JoiningStateResult,
   type OwnerOutcome,
   type OwnerQueue,
   type ServedTicket,
@@ -98,6 +102,36 @@ export async function removeQueueTicket(
     await supabase.rpc("remove_ticket", { p_ticket_id: ticketId }),
     toTicketRef,
   );
+}
+
+/** Stops new joins and asks every Waiting Customer to choose (Last Call). */
+export async function startShopLastCall(): Promise<
+  Mutated<OwnerOutcome<JoiningStateResult>>
+> {
+  const supabase = await createClient();
+  return outcome(
+    "start_last_call",
+    await supabase.rpc("start_last_call"),
+    toJoiningStateResult,
+  );
+}
+
+/** Reopens joining before Close Shop; choices already made are kept. */
+export async function cancelShopLastCall(): Promise<
+  Mutated<OwnerOutcome<JoiningStateResult>>
+> {
+  const supabase = await createClient();
+  return outcome(
+    "cancel_last_call",
+    await supabase.rpc("cancel_last_call"),
+    toJoiningStateResult,
+  );
+}
+
+/** Ends the Queue Day: carries the carry-choosers, removes the rest. */
+export async function closeShopDay(): Promise<Mutated<OwnerOutcome<CloseShopResult>>> {
+  const supabase = await createClient();
+  return outcome("close_shop", await supabase.rpc("close_shop"), toCloseShopResult);
 }
 
 /**

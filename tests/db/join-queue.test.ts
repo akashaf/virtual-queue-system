@@ -96,6 +96,9 @@ describe("join_queue", () => {
       number: 1,
       status: "waiting",
       position: 0,
+      last_call_choice: null,
+      carried_over: false,
+      removed_reason: null,
       can_rejoin: false,
     });
     // Joining raises none: the Customer is looking at the page already.
