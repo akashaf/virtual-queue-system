@@ -44,3 +44,16 @@ export function formatCountdown(remainingMs: number): string {
   const seconds = Math.ceil(Math.max(0, remainingMs) / 1000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
+
+const calendarDay = new Intl.DateTimeFormat("en-MY", {
+  // The date is already Malaysian: read and print it in UTC so no zone moves it.
+  timeZone: "UTC",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
+/** A Malaysian calendar date from the database (`YYYY-MM-DD`), e.g. `Thu, 17 Sept`. */
+export function formatMalaysiaDay(day: string): string {
+  return calendarDay.format(new Date(`${day}T00:00:00Z`));
+}

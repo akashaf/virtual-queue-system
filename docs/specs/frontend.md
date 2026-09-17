@@ -109,14 +109,14 @@ The page compares the previous view with the new one after each refetch, in `lib
 The layout checks the session and `is_active` on the server, and redirects to `/login` otherwise.
 
 Layout, from top to bottom:
-1. **Header:** shop name, joining state badge (Open / Last Call), counts "Waiting N · In chair N", menu (History, Sign out).
+1. **Header:** shop name, joining state badge (Open / Last Call), counts "Waiting N · In chair N", menu (Queue, History, Sign out) behind one 44 px button.
 2. **Primary button:** **Call next** (large, sticky at the bottom on phones). Disabled when nobody is Waiting.
 3. **Called list:** one card per Called Ticket showing number, name and "called 3 min ago", with these actions:
    - **Done**
    - **No-show:** disabled until 5 minutes after the call, with a countdown shown
    - **Remove** in an overflow menu, with confirmation
 4. **Waiting list:** ordered rows showing number, name, time joined, and badges for "Moved from previous day", "Rejoined" and "Chose: next day / stay" during Last Call. **Remove** is in an overflow menu with confirmation.
-5. **Undo toast:** after Done, a Sonner toast "#017 marked done · Undo" stays for the remaining undo window (2 min) with a visible countdown. Recently Served Tickets still in the window are also listed in a collapsed "Just served" section with Undo, so the undo survives a page reload.
+5. **Undo toast:** after Done, a Sonner toast, shown at the bottom just above Call next so it never covers the header's menu, "#017 marked done · Undo" stays for the remaining undo window (2 min) with a visible countdown. Recently Served Tickets still in the window are also listed in a collapsed "Just served" section with Undo, so the undo survives a page reload.
 6. **Footer actions:**
    - **Last Call** (confirmation: "Stop new customers joining and ask waiting customers to choose?"). While Last Call is active this becomes **Reopen joining** and **Close Shop**.
    - **Close Shop:** the confirmation summarises "N moving to next day, N will be removed". If any Ticket is Called, it shows "Finish or mark no-show for customers in chair first".
@@ -154,6 +154,7 @@ lib/supabase/{server,client,admin}.ts, lib/supabase/database.types.ts (generated
 lib/auth/owner.ts             (the Owner's Shop, the authoritative session check)
 lib/customer/{view,queue}.ts  (view.ts is pure and shared with the client component)
 lib/owner/{view,queue}.ts     (same split: view.ts is pure, queue.ts calls the database)
+lib/owner/{history-view,history}.ts (the same split for the history page)
 lib/operator/{auth,shop-input,shop-resource}.ts
 lib/queue-changed.ts          (the ping, the poll and the visibilitychange refetch, shared by both screens)
 lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts

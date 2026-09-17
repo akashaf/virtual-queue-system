@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { formatCountdown, formatMalaysiaTime, formatMinutesAgo } from "./time";
+import {
+  formatCountdown,
+  formatMalaysiaDay,
+  formatMalaysiaTime,
+  formatMinutesAgo,
+} from "./time";
 
 describe("formatMalaysiaTime", () => {
   test("shows a UTC timestamp on a Malaysian clock, eight hours ahead", () => {
@@ -57,5 +62,16 @@ describe("formatCountdown", () => {
   test("stops at zero rather than going negative", () => {
     expect(formatCountdown(0)).toBe("0:00");
     expect(formatCountdown(-5_000)).toBe("0:00");
+  });
+});
+
+describe("formatMalaysiaDay", () => {
+  test("names a Malaysian calendar date by weekday, day and month", () => {
+    expect(formatMalaysiaDay("2026-09-17")).toBe("Thu, 17 Sept");
+  });
+
+  test("keeps the date the database gave, whatever the machine's time zone", () => {
+    // A date read as local midnight would slip to the day before west of UTC.
+    expect(formatMalaysiaDay("2026-09-01")).toBe("Tue, 1 Sept");
   });
 });

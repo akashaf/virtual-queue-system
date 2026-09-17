@@ -16,7 +16,8 @@ test("an Owner signs in, sees their Shop, and signs out again", async ({ page })
   await expect(page).toHaveURL("/dashboard");
   await expect(page.getByRole("heading", { name: shop.name })).toBeVisible();
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
 
   await expect(page).toHaveURL("/login");
 });

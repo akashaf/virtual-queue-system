@@ -150,6 +150,9 @@ Some helpers are never called from outside the database, and are revoked from ev
 - `called_ticket_json(ticket)`, `served_ticket_json(ticket)` — one Ticket as the Owner's screen shows it, shared by the mutations and `get_owner_queue` so a press and the refetch after it cannot disagree.
 - `undo_window()` — the 2 minutes, in one place, so `undo_served` and `get_owner_queue` cannot drift apart.
 - `broadcast_queue_changed()` — the trigger function behind [§6](#6-realtime).
+- `served_ticket_price_sen()` — the 25 sen a Served Ticket costs, in one place, so the Owner's month-to-date amount and the Operator's invoice cannot price it differently (#13).
+- `malaysia_day(date)`, `billing_month(date)`, `current_billing_month()` — a Malaysian calendar day, the Billing Month holding a date, and the Billing Month now, each as a `tstzrange` of the instants it spans in `Asia/Kuala_Lumpur`. The one definition of those bounds: `get_owner_history`, `billing_summary` and `operator_shops` all read them.
+- `served_count(shop_id, span)` — a Shop's Served Tickets in a span, `status = 'served'` only, compared with the span's bounds rather than `<@` so the `(shop_id, served_at)` index serves it. Every Served count in the app goes through it, so the Owner's month so far, the Operator's `servedThisMonth` and the invoice cannot disagree.
 - `estimated_wait(shop, ticket)` — the Estimated Wait range below, or null. Lives beside `customer_view_json`, which is its only caller, so every path that returns the customer view carries the same estimate.
 - `stamp_heads_ups(shop)` — the §4 Heads-up rule in one place: stamps every Waiting Ticket inside the threshold that has not been told, and returns them as `heads_up` alerts. The last thing every mutation does, including the ones that move nobody up, so a Ticket owed a Heads-up for any reason — a threshold raised under it — is told by the very next press. A joining Ticket is never among them, because `add_ticket` has already stamped it. `close_shop` is the one exception (#11): the carried Tickets sit at the front of the new day, and stamping at closing time would push "almost your turn" to people who just chose to come back tomorrow — the new day's first mutation tells whoever is owed one. A carried Ticket keeps its `heads_up_sent_at` for the same reason the Heads-up is one-time per Ticket (CONTEXT.md): one already told is not told again tomorrow.
 
@@ -214,7 +217,13 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Takes no Shop argument: it finds the Shop from `auth.uid()`, so a request cannot name one.
   - Raises `shop_inactive` when the caller runs no active Shop. The dashboard treats that as a state, not a failure — a layout and its page render at the same time, so the page cannot lean on the layout's redirect having happened first.
   - Delivered so far (#7): all four keys.
-- `get_owner_history(days int default 30)` → today's Tickets with statuses and timestamps, plus Served counts per day (Malaysia time) and the month-to-date total
+- `get_owner_history(days int default 30)` → `{ today: [{ id, number, name, status, joined_at, called_at, served_at }], served_by_day: [{ day, served_count }], this_month: { served_count, amount_sen } }`
+  - `today` is every Ticket in the current Queue Day, whatever became of it, in number order — a Queue Day rather than a calendar date, because that is what the numbers restart with.
+  - `served_by_day` is one entry per Malaysian calendar date (`YYYY-MM-DD`) over the last `days` days including today, newest first, a quiet day included at `0`.
+  - `this_month` is the Billing Month so far, counted and priced as `billing_summary` will invoice it. Only `status = 'served'` counts anywhere, so an undone Done is not billed.
+  - `days` outside 1–366 is a `22023`, not a token: nothing an Owner does can send one.
+  - Finds the Shop from `auth.uid()` and raises `shop_inactive` like `get_owner_queue`.
+  - Delivered so far (#13): all three keys.
 
 ### Estimated Wait (inside `get_customer_view`)
 - Take Served Tickets in the current Queue Day ordered by `served_at`.
@@ -229,6 +238,9 @@ Some helpers are never called from outside the database, and are revoked from ev
   - The Owner's Auth user has to exist first, and lives outside this transaction: see [§8](#8-operator-admin-api).
 - `billing_summary(month text 'YYYY-MM')` → `[{ slug, name, served_count, amount_sen }]`, where `amount_sen = served_count × 25`
   - Month bounds are computed in `Asia/Kuala_Lumpur`.
+  - Every Shop is listed, oldest first, Deactivated ones included and a Shop that Served nobody at `0`, so "nothing to invoice" is never confused with "not counted".
+  - A month that is not `YYYY-MM` is a `22023`; the admin API checks first.
+  - Delivered so far (#13): all of it.
 - `expire_carried_over()` → alerts
 - `erase_expired_personal_data()` sets `customer_name` and `device_id` to null, and deletes push subscriptions, where `finished_at < now() - 30 days`
 - `revoke_owner_sessions(user_id)` deletes the user's rows from `auth.sessions`, and the refresh tokens cascade with them. An access JWT already issued is still accepted by the Data API until it expires, so the JWT expiry is 10 minutes; the Auth server itself refuses a `getUser()` for a deleted session at once, which is what the dashboard layout asks on every render.
@@ -267,7 +279,7 @@ Device cookie `vq_device`:
 ### Route Handlers (reads, `cache: no-store`)
 - `GET /api/s/[slug]/me` → `get_customer_view`. 404 when the slug has no Shop. Reads the device from the raw `Cookie` header rather than `cookies()`, which keeps it testable as Request in, Response out
 - `GET /api/owner/queue` → `get_owner_queue`. 403 `shop_inactive` when the caller runs no active Shop
-- `GET /api/owner/history` → `get_owner_history`
+- `GET /api/owner/history` → `get_owner_history`, with the default 30 days. 403 `shop_inactive` like the Queue
 
 ### Proxy (`proxy.ts`)
 - Refreshes the Supabase session cookie using the `@supabase/ssr` pattern.
@@ -294,7 +306,7 @@ Requests need `Authorization: Bearer <OPERATOR_API_KEY>`, compared in constant t
 | `PATCH /api/operator/shops/[slug]` | Any of `{ name, lat, lng, joinRadiusM, headsUpThreshold, maxQueueSize, isActive }` | Updates the Shop and returns it as `GET` does. Setting `isActive: false` also calls `revoke_owner_sessions`. A body naming `slug` is a 400 that says the slug cannot be changed; any other unknown field is a 400 too, so a typo cannot pass as a no-op |
 | `POST /api/operator/shops/[slug]/owner-password` | `{ password }` (≥ 10 characters) | `auth.admin.updateUserById`, then `revoke_owner_sessions`. 204 |
 | `GET /api/operator/shops/[slug]/qr.png` | — | 1024×1024 PNG with error correction level M and a 4-module quiet zone, encoding `${APP_BASE_URL}/s/${slug}`. `Content-Disposition: inline; filename="<slug>-qr.png"` |
-| `GET /api/operator/billing?month=YYYY-MM` | — | `billing_summary`. Returns `{ month, shops: [...], totalSen }` |
+| `GET /api/operator/billing?month=YYYY-MM` | — | `billing_summary`. Returns `{ month, shops: [{ slug, name, servedCount, amountSen }], totalSen }`. The month is required: the run is normally for the month just ended, and a default would guess |
 
 Shops are never deleted; they are deactivated instead. Every Shop response carries `servedThisMonth`, the Served count in the current Billing Month — `0` on the create response, since a Shop that has just opened has Served nobody.
 
@@ -303,6 +315,7 @@ Responses use camelCase, so the database's column names are not part of the API.
 | Status | `error` | When |
 |---|---|---|
 | 400 | `invalid_body` | Malformed JSON, or a field the `field` key names |
+| 400 | `invalid_query` | A query parameter the `field` key names is missing or malformed |
 | 401 | `unauthorized` | Missing or wrong bearer key |
 | 404 | `not_found` | No Shop has the slug |
 | 409 | `slug_taken`, `email_taken` | The slug or the owner email is already used |

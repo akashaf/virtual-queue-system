@@ -4,11 +4,11 @@ import {
   anonClient,
   connectDb,
   createShop,
-  metresNorthOf,
+  MONTH_START_SQL,
   resetTestData,
+  serveOne,
   serviceClient,
   sessionCount,
-  SHOP_LNG,
   signInAs,
 } from "./helpers";
 
@@ -23,29 +23,6 @@ afterAll(async () => {
   await db.end();
 });
 
-async function join(slug: string, name = "Ali") {
-  const { data, error } = await serviceClient().rpc("join_queue", {
-    p_slug: slug,
-    p_device_id: crypto.randomUUID(),
-    p_name: name,
-    p_lat: metresNorthOf(0),
-    p_lng: SHOP_LNG,
-    p_accuracy_m: 0,
-  });
-  if (error) throw new Error(error.message);
-  return (data as unknown as { result: { ticket: { id: string } } }).result.ticket;
-}
-
-/** Puts one Customer through the whole Queue, the only way a Ticket becomes Served. */
-async function serveOne(client: Awaited<ReturnType<typeof signInAs>>, slug: string) {
-  const ticket = await join(slug);
-  const called = await client.rpc("call_next");
-  if (called.error) throw new Error(called.error.message);
-  const served = await client.rpc("mark_served", { p_ticket_id: ticket.id });
-  if (served.error) throw new Error(served.error.message);
-  return ticket;
-}
-
 async function operatorShops(slug?: string) {
   const { data, error } = await serviceClient().rpc(
     "operator_shops",
@@ -54,11 +31,6 @@ async function operatorShops(slug?: string) {
   if (error) throw new Error(error.message);
   return data;
 }
-
-/** The instant the current Billing Month began, as Postgres computes it. */
-const MONTH_START = `
-  date_trunc('month', now() at time zone 'Asia/Kuala_Lumpur')
-    at time zone 'Asia/Kuala_Lumpur'`;
 
 describe("operator_shops", () => {
   test("lists every Shop with its Owner's email, oldest first", async () => {
@@ -106,10 +78,10 @@ describe("operator_shops", () => {
     const onTheStroke = await serveOne(client, shop.slug);
     await serveOne(client, shop.slug);
     await db.query(
-      `update public.tickets set served_at = ${MONTH_START} - interval '1 minute' where id = $1`,
+      `update public.tickets set served_at = ${MONTH_START_SQL} - interval '1 minute' where id = $1`,
       [lastMonth.id],
     );
-    await db.query(`update public.tickets set served_at = ${MONTH_START} where id = $1`, [
+    await db.query(`update public.tickets set served_at = ${MONTH_START_SQL} where id = $1`, [
       onTheStroke.id,
     ]);
 

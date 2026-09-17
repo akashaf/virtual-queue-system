@@ -28,7 +28,7 @@ import {
  */
 
 /** What `get_owner_queue` raises when the caller runs no active Shop. */
-const NO_ACTIVE_SHOP = "shop_inactive";
+export const NO_ACTIVE_SHOP = "shop_inactive";
 
 /**
  * Reads the Queue.

@@ -292,6 +292,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      billing_month: { Args: { p_day: string }; Returns: unknown }
+      billing_summary: {
+        Args: { p_month: string }
+        Returns: {
+          amount_sen: number
+          name: string
+          served_count: number
+          slug: string
+        }[]
+      }
       call_next: { Args: never; Returns: Json }
       called_ticket_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
@@ -340,6 +350,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      current_billing_month: { Args: never; Returns: unknown }
       customer_view_json: {
         Args: {
           p_shop: Database["public"]["Tables"]["shops"]["Row"]
@@ -362,6 +373,7 @@ export type Database = {
         Args: { p_device_id?: string; p_slug: string }
         Returns: Json
       }
+      get_owner_history: { Args: { p_days?: number }; Returns: Json }
       get_owner_queue: { Args: never; Returns: Json }
       haversine_m: {
         Args: {
@@ -435,6 +447,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      malaysia_day: { Args: { p_day: string }; Returns: unknown }
       mark_no_show: { Args: { p_ticket_id: string }; Returns: Json }
       mark_served: { Args: { p_ticket_id: string }; Returns: Json }
       no_show_window: { Args: never; Returns: string }
@@ -508,10 +521,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      served_count: {
+        Args: { p_shop_id: string; p_span: unknown }
+        Returns: number
+      }
       served_ticket_json: {
         Args: { p_ticket: Database["public"]["Tables"]["tickets"]["Row"] }
         Returns: Json
       }
+      served_ticket_price_sen: { Args: never; Returns: number }
       stamp_heads_ups: {
         Args: { p_shop: Database["public"]["Tables"]["shops"]["Row"] }
         Returns: Json

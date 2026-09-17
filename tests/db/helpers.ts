@@ -56,6 +56,50 @@ export async function signInAs(email: string, password: string) {
   return client;
 }
 
+/** A client carrying an Owner's JWT, as `signInAs` returns it. */
+export type OwnerClient = Awaited<ReturnType<typeof signInAs>>;
+
+/** Puts a Customer in a Shop's Queue from a fresh device, standing at the door. */
+export async function joinQueue(slug: string, name = "Ali") {
+  const { data, error } = await serviceClient().rpc("join_queue", {
+    p_slug: slug,
+    p_device_id: crypto.randomUUID(),
+    p_name: name,
+    p_lat: metresNorthOf(0),
+    p_lng: SHOP_LNG,
+    p_accuracy_m: 0,
+  });
+  if (error) throw new Error(error.message);
+  return (data as unknown as { result: { ticket: { id: string } } }).result.ticket;
+}
+
+export async function callNext(owner: OwnerClient) {
+  const { error } = await owner.rpc("call_next");
+  if (error) throw new Error(error.message);
+}
+
+/** Puts one Customer through the whole Queue, the only way a Ticket becomes Served. */
+export async function serveOne(owner: OwnerClient, slug: string, name = "Ali") {
+  const ticket = await joinQueue(slug, name);
+  await callNext(owner);
+  const { error } = await owner.rpc("mark_served", { p_ticket_id: ticket.id });
+  if (error) throw new Error(error.message);
+  return ticket;
+}
+
+/**
+ * Moves a serve to another instant, so a test can place it either side of a
+ * day or month boundary. `servedAt` is anything Postgres reads as a timestamptz.
+ */
+export async function setServedAt(db: Client, ticketId: string, servedAt: string) {
+  await db.query("update public.tickets set served_at = $1 where id = $2", [servedAt, ticketId]);
+}
+
+/** SQL for the instant the current Billing Month began, in Malaysia time. */
+export const MONTH_START_SQL = `
+  date_trunc('month', now() at time zone 'Asia/Kuala_Lumpur')
+    at time zone 'Asia/Kuala_Lumpur'`;
+
 type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
 
 /** Creates a Shop the way the Operator API does, and returns it with its Owner. */
