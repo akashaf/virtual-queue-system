@@ -71,6 +71,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   `curl -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" https://<ref>.supabase.co/auth/v1/settings`
   and read `external.phone`. More generally, `config diff` compares against the CLI's config
   model, which is not always shaped like the thing the dashboard toggles.
+- **A push to `main` does not migrate production.** Netlify deploys the code; nothing applies
+  `supabase/migrations/` to the cloud project. #11, #12 and #14 all shipped code to production
+  while its database stayed three migrations behind, and nobody noticed until #13 checked. After
+  a ticket with a migration lands, run `bunx supabase db push --dry-run` (read-only; the linked
+  CLI needs no password for it) and, if it lists anything, have the user run `bunx supabase db push`.
+  A dry run afterwards should say *Remote database is up to date*.
 - **Never run `supabase config push` from the repo.** `supabase/config.toml` is the local
   development config and much of it is wrong for production — `site_url`, redirect URLs,
   pooler sizes, OTP and email limits. It has no per-key flag, and a non-interactive run
