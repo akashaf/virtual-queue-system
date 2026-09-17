@@ -141,6 +141,13 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
   green while proving nothing. Check the file is under one of those roots before trusting a pass.
 
+## QR codes
+
+- **`qrcode`'s `width` option does not guarantee the width.** It divides the requested width
+  by the module count and *floors* the product, so `width: 1024` came out 1023×1023 for a
+  version-6 symbol (a 42-character slug) while shorter slugs were fine. `lib/operator/qr.ts`
+  maps pixels onto modules itself for this reason; the unit test renders several slug lengths.
+
 ## JavaScript and Postgres disagreeing
 
 - `String.length` counts an emoji as 2; Postgres `length()` counts it as 1. Customer names are

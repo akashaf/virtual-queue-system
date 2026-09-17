@@ -231,7 +231,9 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Month bounds are computed in `Asia/Kuala_Lumpur`.
 - `expire_carried_over()` → alerts
 - `erase_expired_personal_data()` sets `customer_name` and `device_id` to null, and deletes push subscriptions, where `finished_at < now() - 30 days`
-- `revoke_owner_sessions(user_id)` deletes the user's rows from `auth.sessions`. The access JWT stays valid until it expires, so set the JWT expiry to 10 minutes.
+- `revoke_owner_sessions(user_id)` deletes the user's rows from `auth.sessions`, and the refresh tokens cascade with them. An access JWT already issued is still accepted by the Data API until it expires, so the JWT expiry is 10 minutes; the Auth server itself refuses a `getUser()` for a deleted session at once, which is what the dashboard layout asks on every render.
+- `operator_shops(slug?)` → rows of every Shop column but `owner_user_id`, plus `owner_email` (joined from `auth.users`, so the API makes no Auth round trip per Shop) and `served_this_month`, the Served Tickets in the current Billing Month (Malaysia time; `status = 'served'` only, so an undone Done is not counted). With a slug, that one Shop or no rows. Both the list and the single-Shop reads go through it, so they cannot disagree.
+  - Delivered so far (#14): both functions.
 
 ## 6. Realtime
 
@@ -287,14 +289,14 @@ Requests need `Authorization: Bearer <OPERATOR_API_KEY>`, compared in constant t
 | Method & path | Body | Effect |
 |---|---|---|
 | `POST /api/operator/shops` | `{ slug, name, lat, lng, ownerEmail, ownerPassword, joinRadiusM?, headsUpThreshold?, maxQueueSize? }` | Creates the Auth user with `auth.admin.createUser({ email_confirm: true })`, the Shop and its first Queue Day. `ownerPassword` has the same ≥ 10 character minimum as a reset, so a created password is never weaker than a replaced one. If the Shop insert fails, deletes the Auth user. Returns the Shop, `queueUrl`, `qrUrl` |
-| `GET /api/operator/shops` | — | Lists Shops with owner email, `is_active` and month-to-date Served count |
-| `GET /api/operator/shops/[slug]` | — | One Shop |
-| `PATCH /api/operator/shops/[slug]` | Any of `{ name, lat, lng, joinRadiusM, headsUpThreshold, maxQueueSize, isActive }` | Updates the Shop. Setting `isActive: false` also calls `revoke_owner_sessions`. The slug cannot be changed |
-| `POST /api/operator/shops/[slug]/owner-password` | `{ password }` (≥ 10 characters) | `auth.admin.updateUserById`, then `revoke_owner_sessions` |
-| `GET /api/operator/shops/[slug]/qr.png` | — | 1024×1024 PNG with error correction level M, encoding `${APP_BASE_URL}/s/${slug}` |
+| `GET /api/operator/shops` | — | `{ shops: [...] }`: every Shop with `ownerEmail`, `isActive` and `servedThisMonth`, oldest first |
+| `GET /api/operator/shops/[slug]` | — | One Shop, with `queueUrl` and `qrUrl` as the create returned them |
+| `PATCH /api/operator/shops/[slug]` | Any of `{ name, lat, lng, joinRadiusM, headsUpThreshold, maxQueueSize, isActive }` | Updates the Shop and returns it as `GET` does. Setting `isActive: false` also calls `revoke_owner_sessions`. A body naming `slug` is a 400 that says the slug cannot be changed; any other unknown field is a 400 too, so a typo cannot pass as a no-op |
+| `POST /api/operator/shops/[slug]/owner-password` | `{ password }` (≥ 10 characters) | `auth.admin.updateUserById`, then `revoke_owner_sessions`. 204 |
+| `GET /api/operator/shops/[slug]/qr.png` | — | 1024×1024 PNG with error correction level M and a 4-module quiet zone, encoding `${APP_BASE_URL}/s/${slug}`. `Content-Disposition: inline; filename="<slug>-qr.png"` |
 | `GET /api/operator/billing?month=YYYY-MM` | — | `billing_summary`. Returns `{ month, shops: [...], totalSen }` |
 
-Shops are never deleted; they are deactivated instead.
+Shops are never deleted; they are deactivated instead. Every Shop response carries `servedThisMonth`, the Served count in the current Billing Month — `0` on the create response, since a Shop that has just opened has Served nobody.
 
 Responses use camelCase, so the database's column names are not part of the API. Errors are `{ error, field?, message? }`:
 
@@ -302,6 +304,7 @@ Responses use camelCase, so the database's column names are not part of the API.
 |---|---|---|
 | 400 | `invalid_body` | Malformed JSON, or a field the `field` key names |
 | 401 | `unauthorized` | Missing or wrong bearer key |
+| 404 | `not_found` | No Shop has the slug |
 | 409 | `slug_taken`, `email_taken` | The slug or the owner email is already used |
 | 500 | `internal_error` | Anything else; the detail is logged, not returned |
 

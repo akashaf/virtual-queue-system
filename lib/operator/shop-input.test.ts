@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { parseCreateShopInput } from "./shop-input";
+import {
+  parseCreateShopInput,
+  parseOwnerPasswordInput,
+  parseUpdateShopInput,
+} from "./shop-input";
 
 const valid = {
   slug: "kedai-ali",
@@ -131,5 +135,95 @@ describe("parseCreateShopInput", () => {
     const result = parseCreateShopInput({ ...valid, joinRadiusM: null });
 
     expect(result).toEqual({ ok: true, value: valid });
+  });
+});
+
+/** The field a rejected PATCH body blames, or "(accepted)" when it wasn't rejected. */
+function rejectedUpdateField(body: unknown) {
+  const result = parseUpdateShopInput(body);
+  return result.ok ? "(accepted)" : result.field;
+}
+
+describe("parseUpdateShopInput", () => {
+  test("accepts any subset of the settings, trimming the name", () => {
+    expect(parseUpdateShopInput({ name: "  Kedai Ali  ", isActive: false })).toEqual({
+      ok: true,
+      value: { name: "Kedai Ali", isActive: false },
+    });
+    expect(
+      parseUpdateShopInput({
+        lat: 3.14,
+        lng: 101.7,
+        joinRadiusM: 80,
+        headsUpThreshold: 2,
+        maxQueueSize: 15,
+      }),
+    ).toEqual({
+      ok: true,
+      value: { lat: 3.14, lng: 101.7, joinRadiusM: 80, headsUpThreshold: 2, maxQueueSize: 15 },
+    });
+  });
+
+  test("refuses to change the slug, and says why", () => {
+    const result = parseUpdateShopInput({ name: "Kedai Ali", slug: "kedai-ali-2" });
+
+    expect(result).toEqual({
+      ok: false,
+      field: "slug",
+      message: expect.stringMatching(/QR code/),
+    });
+  });
+
+  test("refuses a field it does not know rather than ignoring it", () => {
+    expect(rejectedUpdateField({ ownerEmail: "new@example.com" })).toBe("ownerEmail");
+    expect(rejectedUpdateField({ name: "Kedai Ali", nmae: "typo" })).toBe("nmae");
+  });
+
+  test("refuses a body with nothing to update", () => {
+    expect(rejectedUpdateField({})).toBe("body");
+    expect(rejectedUpdateField(null)).toBe("body");
+    expect(rejectedUpdateField([{ name: "x" }])).toBe("body");
+  });
+
+  test("checks each field as creation does", () => {
+    expect(rejectedUpdateField({ name: "   " })).toBe("name");
+    expect(rejectedUpdateField({ lat: 91 })).toBe("lat");
+    expect(rejectedUpdateField({ lng: "101.7" })).toBe("lng");
+    expect(rejectedUpdateField({ joinRadiusM: 0 })).toBe("joinRadiusM");
+    expect(rejectedUpdateField({ headsUpThreshold: 2.5 })).toBe("headsUpThreshold");
+    expect(rejectedUpdateField({ maxQueueSize: "30" })).toBe("maxQueueSize");
+  });
+
+  test("takes isActive as a boolean only", () => {
+    expect(rejectedUpdateField({ isActive: "false" })).toBe("isActive");
+    expect(rejectedUpdateField({ isActive: 0 })).toBe("isActive");
+    expect(rejectedUpdateField({ isActive: true })).toBe("(accepted)");
+  });
+
+  test("treats null as a bad value, since no setting can be unset", () => {
+    expect(rejectedUpdateField({ joinRadiusM: null })).toBe("joinRadiusM");
+    expect(rejectedUpdateField({ name: null })).toBe("name");
+  });
+});
+
+describe("parseOwnerPasswordInput", () => {
+  test("accepts a password of at least 10 characters", () => {
+    expect(parseOwnerPasswordInput({ password: "exactly-10" })).toEqual({
+      ok: true,
+      value: { password: "exactly-10" },
+    });
+  });
+
+  test("rejects a short, missing or non-string password", () => {
+    for (const password of ["short-one", undefined, 1234567890, null]) {
+      expect(parseOwnerPasswordInput({ password })).toMatchObject({
+        ok: false,
+        field: "password",
+      });
+    }
+  });
+
+  test("rejects a body that is not an object", () => {
+    expect(parseOwnerPasswordInput("correct-horse-battery")).toMatchObject({ field: "body" });
   });
 });

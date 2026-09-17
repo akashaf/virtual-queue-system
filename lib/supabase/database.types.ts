@@ -438,6 +438,25 @@ export type Database = {
       mark_no_show: { Args: { p_ticket_id: string }; Returns: Json }
       mark_served: { Args: { p_ticket_id: string }; Returns: Json }
       no_show_window: { Args: never; Returns: string }
+      operator_shops: {
+        Args: { p_slug?: string }
+        Returns: {
+          created_at: string
+          current_queue_day_id: string
+          heads_up_threshold: number
+          id: string
+          is_active: boolean
+          join_radius_m: number
+          joining_state: Database["public"]["Enums"]["joining_state"]
+          lat: number
+          lng: number
+          max_queue_size: number
+          name: string
+          owner_email: string
+          served_this_month: number
+          slug: string
+        }[]
+      }
       owner_ticket: {
         Args: {
           p_shop: Database["public"]["Tables"]["shops"]["Row"]
@@ -477,6 +496,7 @@ export type Database = {
         Returns: Json
       }
       remove_ticket: { Args: { p_ticket_id: string }; Returns: Json }
+      revoke_owner_sessions: { Args: { p_user_id: string }; Returns: undefined }
       save_push_subscription: {
         Args: {
           p_auth: string

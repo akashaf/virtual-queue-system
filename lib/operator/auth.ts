@@ -1,4 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { requireEnv } from "@/lib/env";
+import { noStoreJson } from "@/lib/http";
 
 const BEARER = /^Bearer[ ]+(\S+)$/i;
 
@@ -22,4 +24,17 @@ export function isAuthorizedOperator(
 
 function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest();
+}
+
+/**
+ * The 401 every Operator route answers a missing or wrong key with, or null
+ * when the request may proceed.
+ *
+ * `requireEnv`, not `?? ""`: a missing key must fail loudly rather than turn
+ * every Operator request into a plain 401 that looks like a typo.
+ */
+export function rejectUnauthorizedOperator(request: Request): Response | null {
+  const operatorKey = requireEnv("OPERATOR_API_KEY", process.env.OPERATOR_API_KEY);
+  if (isAuthorizedOperator(request.headers.get("authorization"), operatorKey)) return null;
+  return noStoreJson({ error: "unauthorized" }, 401);
 }

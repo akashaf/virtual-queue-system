@@ -75,6 +75,17 @@ export async function createShop(
   return { owner, shop: data as ShopRow };
 }
 
+/** How many devices an Owner is signed in on, straight from the Auth schema. */
+export async function sessionCount(db: Client, email: string) {
+  const { rows } = await db.query(
+    `select count(*)::int as n from auth.sessions s
+       join auth.users u on u.id = s.user_id
+      where u.email = $1`,
+    [email.toLowerCase()],
+  );
+  return rows[0].n as number;
+}
+
 /**
  * Clears everything the database tests create. They share one long-lived local
  * stack, so each file starts from a clean slate rather than relying on `db reset`.

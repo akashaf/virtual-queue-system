@@ -1,12 +1,16 @@
-import { requireEnv } from "@/lib/env";
+import { appBaseUrl } from "@/lib/env";
 import { reportUnexpected } from "@/lib/error-reporting";
 import { noStoreJson as json } from "@/lib/http";
-import { isAuthorizedOperator } from "@/lib/operator/auth";
+import { operatorRoute, readJsonBody } from "@/lib/operator/route";
 import { parseCreateShopInput } from "@/lib/operator/shop-input";
 import { shopUrls, toShopResource } from "@/lib/operator/shop-resource";
+import { listShops } from "@/lib/operator/shops";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const UNIQUE_VIOLATION = "23505";
+
+/** Every Shop, with its Owner's email and the month's Served count so far. */
+export const GET = operatorRoute(async () => json({ shops: await listShops() }, 200));
 
 /**
  * Onboards a Shop: the Owner's Auth user, the Shop and its first Queue Day.
@@ -16,37 +20,14 @@ const UNIQUE_VIOLATION = "23505";
  * transaction. If the Shop is rejected, the Auth user is deleted again — without
  * that, a retry with a corrected slug would fail on the duplicate email.
  */
-export async function POST(request: Request) {
-  // requireEnv, not `?? ""`: a missing key must fail loudly rather than turn
-  // every Operator request into a plain 401 that looks like a typo.
-  const operatorKey = requireEnv("OPERATOR_API_KEY", process.env.OPERATOR_API_KEY);
-  if (!isAuthorizedOperator(request.headers.get("authorization"), operatorKey)) {
-    return json({ error: "unauthorized" }, 401);
-  }
-
+export const POST = operatorRoute(async (request) => {
   // Read before anything is written. Reading it at the end would throw after both
   // the Owner and the Shop had been committed, and the Operator would never learn
   // the new Shop's id — while a retry failed on the duplicate email.
-  const baseUrl = requireEnv("APP_BASE_URL", process.env.APP_BASE_URL);
+  const baseUrl = appBaseUrl();
 
-  let payload: unknown;
-  try {
-    payload = await request.json();
-  } catch {
-    return json(
-      { error: "invalid_body", field: "body", message: "Expected JSON." },
-      400,
-    );
-  }
-
-  const parsed = parseCreateShopInput(payload);
-  if (!parsed.ok) {
-    return json(
-      { error: "invalid_body", field: parsed.field, message: parsed.message },
-      400,
-    );
-  }
-  const input = parsed.value;
+  const input = await readJsonBody(request, parseCreateShopInput);
+  if (input instanceof Response) return input;
 
   const admin = createAdminClient();
 
@@ -93,9 +74,10 @@ export async function POST(request: Request) {
 
   return json(
     {
-      shop: toShopResource(shop, created.user.email ?? input.ownerEmail),
+      // A Shop that has just opened has Served nobody this month or any other.
+      shop: toShopResource(shop, created.user.email ?? input.ownerEmail, 0),
       ...shopUrls(baseUrl, shop.slug),
     },
     201,
   );
-}
+});
