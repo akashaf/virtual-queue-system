@@ -5,6 +5,7 @@ Walk-in customers join a barbershop's queue from their phone and are alerted whe
 - Domain language: [CONTEXT.md](CONTEXT.md)
 - Decisions: [docs/adr/](docs/adr/)
 - MVP specs: [docs/specs/](docs/specs/)
+- Running it, onboarding a Shop and the daily flow: [docs/operator-guide.md](docs/operator-guide.md)
 
 ## Development
 
