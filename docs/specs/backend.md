@@ -241,8 +241,13 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Every Shop is listed, oldest first, Deactivated ones included and a Shop that Served nobody at `0`, so "nothing to invoice" is never confused with "not counted".
   - A month that is not `YYYY-MM` is a `22023`; the admin API checks first.
   - Delivered so far (#13): all of it.
-- `expire_carried_over()` → alerts
-- `erase_expired_personal_data()` sets `customer_name` and `device_id` to null, and deletes push subscriptions, where `finished_at < now() - 30 days`
+- `expire_carried_over()` → `{ result: { expired }, alerts }`
+  - Removes Waiting Tickets with `carried_over_at < now() - 3 days` as `carry_over_expired` and deletes their push subscriptions. A Called one is left in the chair.
+  - Locks each affected Shop in id order, then returns the Heads-ups the Tickets behind are now owed. None for a Deactivated Shop, which cannot call anyone.
+- `erase_expired_personal_data()` → `{ erased_tickets, deleted_subscriptions }`. Sets `customer_name` and `device_id` to null, and deletes push subscriptions, where `finished_at < now() - 30 days`
+  - Never deletes a Ticket: Served ones are billed, and the rest are counted in the Owner's history.
+  - Updates only Tickets that still hold a name or device, so a second run counts and touches nothing. Partial index `tickets_awaiting_erasure` keeps the nightly search for names and devices to exactly those.
+  - Delivered so far (#15): both functions.
 - `revoke_owner_sessions(user_id)` deletes the user's rows from `auth.sessions`, and the refresh tokens cascade with them. An access JWT already issued is still accepted by the Data API until it expires, so the JWT expiry is 10 minutes; the Auth server itself refuses a `getUser()` for a deleted session at once, which is what the dashboard layout asks on every render.
 - `operator_shops(slug?)` → rows of every Shop column but `owner_user_id`, plus `owner_email` (joined from `auth.users`, so the API makes no Auth round trip per Shop) and `served_this_month`, the Served Tickets in the current Billing Month (Malaysia time; `status = 'served'` only, so an undone Done is not counted). With a slug, that one Shop or no rows. Both the list and the single-Shop reads go through it, so they cannot disagree.
   - Delivered so far (#14): both functions.
@@ -330,18 +335,25 @@ Netlify Scheduled Functions can't be called by URL in production and have a shor
 `netlify/functions/daily.mts`:
 ```ts
 export default async () => {
-  await fetch(`${process.env.URL}/api/cron/daily`, {
+  const response = await fetch(`${process.env.URL}/api/cron/daily`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
   })
+  if (!response.ok) throw new Error(`POST /api/cron/daily answered ${response.status}`)
 }
 export const config = { schedule: '0 19 * * *' } // 19:00 UTC = 03:00 Malaysia time
 ```
+
+It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken run shows as failed in the Netlify function log. `URL` is one of the three read-only variables Netlify provides to functions at runtime. It imports nothing from the app, because Netlify bundles it separately from Next.js.
 
 `POST /api/cron/daily`:
 - Verifies `Authorization: Bearer ${CRON_SECRET}` in constant time; returns 401 otherwise. Netlify does **not** add this header automatically, so the scheduled function sends it.
 - Runs `expire_carried_over`, dispatches the resulting alerts, then runs `erase_expired_personal_data`.
 - Must be idempotent, because a manual "Run now" from the Netlify UI or a retry may call it twice.
+- Sends the alerts inline rather than in `after()`, because nobody is waiting on this response except the scheduled function.
+- Answers `200 { expired, alerts, erasedTickets, deletedSubscriptions }`: counts only, never names. Anything unexpected is reported to Sentry and answered `500 { error: "internal_error" }`. A missing `CRON_SECRET` crashes through, as a missing Operator key does.
+- The bearer check, the 401, and the reported 500 all come from `bearerRoute` in `lib/bearer.ts`, which the Operator API uses too.
+- Delivered so far (#15): all of it.
 
 ## 10. Environment variables
 

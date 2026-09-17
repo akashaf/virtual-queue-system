@@ -95,6 +95,33 @@ export async function setServedAt(db: Client, ticketId: string, servedAt: string
   await db.query("update public.tickets set served_at = $1 where id = $2", [servedAt, ticketId]);
 }
 
+/** Makes a Ticket a Carried-over one, carried `ago` (a Postgres interval) before now. */
+export async function setCarriedOverAgo(db: Client, ticketId: string, ago: string) {
+  await db.query(
+    "update public.tickets set carried_over_at = now() - $1::interval where id = $2",
+    [ago, ticketId],
+  );
+}
+
+/** Moves a finished Ticket's ending `ago` (a Postgres interval) into the past. */
+export async function setFinishedAgo(db: Client, ticketId: string, ago: string) {
+  await db.query(
+    "update public.tickets set finished_at = now() - $1::interval where id = $2",
+    [ago, ticketId],
+  );
+}
+
+/** Gives a Ticket a push subscription without a browser, returning its endpoint. */
+export async function insertPushSubscription(db: Client, ticketId: string) {
+  const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
+  await db.query(
+    `insert into public.push_subscriptions (ticket_id, endpoint, p256dh, auth)
+     values ($1, $2, 'p256dh', 'auth')`,
+    [ticketId, endpoint],
+  );
+  return endpoint;
+}
+
 /** SQL for the instant the current Billing Month began, in Malaysia time. */
 export const MONTH_START_SQL = `
   date_trunc('month', now() at time zone 'Asia/Kuala_Lumpur')

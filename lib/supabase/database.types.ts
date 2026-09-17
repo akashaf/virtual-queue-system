@@ -308,6 +308,7 @@ export type Database = {
         Returns: Json
       }
       cancel_last_call: { Args: never; Returns: Json }
+      carry_over_lifetime: { Args: never; Returns: string }
       choose_last_call: {
         Args: {
           p_choice: Database["public"]["Enums"]["last_call_choice"]
@@ -362,6 +363,7 @@ export type Database = {
         Args: { p_ticket_id: string }
         Returns: undefined
       }
+      erase_expired_personal_data: { Args: never; Returns: Json }
       estimated_wait: {
         Args: {
           p_shop: Database["public"]["Tables"]["shops"]["Row"]
@@ -369,6 +371,7 @@ export type Database = {
         }
         Returns: Json
       }
+      expire_carried_over: { Args: never; Returns: Json }
       get_customer_view: {
         Args: { p_device_id?: string; p_slug: string }
         Returns: Json
@@ -504,6 +507,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      personal_data_retention: { Args: never; Returns: string }
       rejoin_queue: {
         Args: { p_device_id: string; p_ticket_id: string }
         Returns: Json
