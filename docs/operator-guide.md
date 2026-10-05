@@ -1,161 +1,71 @@
 # Operator Guide
 
-How to run the Barbershop Virtual Queue: on your laptop, in production, and day to day with
-real Shops. Capitalised words (Shop, Owner, Ticket, Queue Day…) are defined in
-[CONTEXT.md](../CONTEXT.md).
+This guide explains how to run the Barbershop Virtual Queue every day: adding Shops, looking
+after them, and collecting money at the end of the month. Words that start with a capital letter
+(Shop, Owner, Ticket, Queue Day…) have a fixed meaning, explained in [CONTEXT.md](../CONTEXT.md).
 
-- [1. The three people in the system](#1-the-three-people-in-the-system)
-- [2. What's next](#2-whats-next)
-- [3. Run it on your laptop](#3-run-it-on-your-laptop)
-- [4. Add a Shop and its Owner](#4-add-a-shop-and-its-owner)
-- [5. The daily flow](#5-the-daily-flow)
-- [6. Looking after Shops](#6-looking-after-shops)
-- [7. Monthly billing](#7-monthly-billing)
-- [8. What runs by itself](#8-what-runs-by-itself)
-- [9. When something goes wrong](#9-when-something-goes-wrong)
+- [1. Who uses the system](#1-who-uses-the-system)
+- [2. Before you start](#2-before-you-start)
+- [3. Add a new Shop](#3-add-a-new-shop)
+- [4. How a normal day works](#4-how-a-normal-day-works)
+- [5. Look after your Shops](#5-look-after-your-shops)
+- [6. Monthly billing](#6-monthly-billing)
+- [7. Things that happen automatically](#7-things-that-happen-automatically)
+- [8. When something goes wrong](#8-when-something-goes-wrong)
 
 ---
 
-## 1. The three people in the system
+## 1. Who uses the system
 
 | Who | What they use | How they get in |
 |---|---|---|
-| **Operator** (you) | The admin API, with `curl` or Postman | A bearer key, `OPERATOR_API_KEY` |
-| **Owner** (the barber running a Shop) | `/login`, then `/dashboard` on their phone or tablet | Email and password that **you** create. There is no sign-up and no "forgot password" |
-| **Customer** (a walk-in) | `/s/<slug>`, opened by scanning the Shop's QR poster | Nothing: no account. Must be standing at the Shop to join |
+| **You, the Operator** | Commands you type in a terminal (`curl`) or Postman | A secret key called `OPERATOR_API_KEY` |
+| **Owner** (the barber who runs a Shop) | The `/login` page, then `/dashboard`, on a phone or tablet | An email and password that **you** create for them. Owners cannot sign up or reset their own password |
+| **Customer** (someone who walks in) | The Shop's page, opened by scanning the QR poster | No account needed. They must be at the Shop to join |
 
-There is no admin web page. Everything the Operator does is an API call.
-
----
-
-## 2. What's next
-
-Every build ticket is closed (#2–#18). The MVP is built and deployed at
-`https://virtual-queue-system.netlify.app`. What's left isn't code; it's getting a real Shop live:
-
-1. **Run the manual checklist** on real phones, using a test Shop (§4) at a place you can stand in:
-   - iPhone Safari: joining works, the sound plays after the Join tap, and the screen stays awake.
-     iPhones get **no push** unless the page is added to the Home Screen.
-   - Android Chrome with the screen locked: the "almost your turn" and "your turn" pushes arrive.
-   - Location permission denied: the page explains how to turn it back on.
-   - Two Owner phones pressing **Call next** at the same moment: two different Customers are called.
-2. **Onboard the first real Shop** (§4), print its poster, and stand inside to check the Join
-   Radius.
-3. **Before the first Shop pays**, upgrade the hosting plans ([third-party.md §8](specs/third-party.md#8-upgrade-triggers)):
-   - **Netlify paid plan:** on Free, running out of monthly credits pauses the whole site and
-     every Shop's Queue goes offline.
-   - **Supabase Pro:** adds daily backups and never pauses. Free pauses after 7 days with no
-     activity (the daily job keeps it awake for now) and has **no backups**.
-4. **Watch the Netlify usage page** while still on Free. Upgrade if it passes ~70% mid-month.
-5. **Close the parent spec, issue #1**, once you're happy the MVP is done.
+There is no admin website. Everything you do as Operator is a command sent to the system.
 
 ---
 
-## 3. Run it on your laptop
+## 2. Before you start
 
-You need [bun](https://bun.sh) and a Docker runtime ([Colima](https://github.com/abiosoft/colima)).
-
-### First time only
-
-```bash
-bun install
-bunx playwright install chromium
-```
-
-### Every session
-
-```bash
-colima start          # Docker for the local database
-bun run db:start      # local Postgres, Auth and Realtime (run again if it fails while booting)
-bun run dev           # the app at http://127.0.0.1:3000
-```
-
-`.env.local` already points at the local database. If it's ever lost, rebuild it:
-`bun run db:env > .env.local`, then copy the other values from `.env.example`.
-
-Stop everything with:
-
-```bash
-bun run db:stop && colima stop
-```
-
-### Useful local addresses
-
-| Address | What |
-|---|---|
-| http://127.0.0.1:3000 | The app |
-| http://127.0.0.1:3000/login | Owner login |
-| http://127.0.0.1:54323 | Supabase Studio: **look only**. Change the database through migrations, never here |
-
-### Pretending to be at the Shop
-
-Customers can only join from within the Shop's Join Radius (150 m by default). On a laptop:
-
-1. Create the local Shop (§4) using **your own current coordinates**, or
-2. In Chrome, open DevTools → ⋮ → *More tools* → **Sensors**, and set *Location* to the Shop's
-   latitude and longitude.
-
-Use `127.0.0.1` or `localhost` in the browser. A phone opening your laptop's LAN address
-(`http://192.168.x.x:3000`) **cannot join**: browsers only share location over HTTPS or
-localhost. Test real phones against production instead.
-
-### Checks before you push code
-
-```bash
-bun run typecheck
-bun run lint
-bun run test          # unit + database tests (needs db:start)
-bun run e2e           # browser tests
-```
-
-If a change adds a migration, then after pushing to `main`:
-
-```bash
-bunx supabase db push --dry-run   # lists what production is missing
-bunx supabase db push             # applies it
-```
-
-**Pushing to `main` deploys the code but does not update the production database.** You have
-to run `db push` yourself.
-
----
-
-## 4. Add a Shop and its Owner
-
-A Shop and its Owner are created together, in one call. One Owner account runs exactly one Shop.
-
-### Step 1: decide the details
-
-| Field | Rules | Notes |
-|---|---|---|
-| `slug` | 3–40 characters: `a-z`, `0-9`, `-` | Printed in the QR code. **It can never be changed**, so choose carefully, e.g. `kedai-ali-bangsar` |
-| `name` | Not blank | Shown to Customers. Can be changed later |
-| `lat`, `lng` | Numbers | In Google Maps, long-press the Shop's doorway and copy the two numbers |
-| `ownerEmail` | An email address | The Owner's login. No email is ever sent to it |
-| `ownerPassword` | At least 10 characters | Generate one: `openssl rand -base64 15` |
-| `joinRadiusM` | Optional, whole number ≥ 1 | Default **150** metres |
-| `headsUpThreshold` | Optional, whole number ≥ 1 | Default **3**: "almost your turn" when 3 or fewer are ahead |
-| `maxQueueSize` | Optional, whole number ≥ 1 | Default **30** Customers Waiting + Called |
-
-### Step 2: load the key
-
-**Production.** The key is in `.env.netlify.production`, the only readable copy:
+Every command in this guide needs two things: the site address and your secret key. Run these
+two lines once, each time you open a new terminal:
 
 ```bash
 export BASE=https://virtual-queue-system.netlify.app
 export OPERATOR_API_KEY=$(grep '^OPERATOR_API_KEY=' .env.netlify.production | cut -d= -f2-)
 ```
 
-**Local** (the app running from §3):
+The key is saved in the file `.env.netlify.production`. This is the only copy you can read, so
+don't lose it.
 
-```bash
-export BASE=http://127.0.0.1:3000
-export OPERATOR_API_KEY=$(grep '^OPERATOR_API_KEY=' .env.local | cut -d= -f2-)
-```
+**Keep the key secret.** Never paste it into a chat, an email, a GitHub issue or a commit.
+Anyone with this key can control every Shop.
 
-Never paste the production key into a chat, an issue or a commit.
+---
 
-### Step 3: create it
+## 3. Add a new Shop
+
+You create a Shop and its Owner's login at the same time, with one command. Each Owner runs
+exactly one Shop.
+
+### Step 1: Prepare the details
+
+| Field | What to enter | Tips |
+|---|---|---|
+| `slug` | 3–40 characters, using only `a-z`, `0-9` and `-` | This becomes part of the QR code link, and **it can never be changed**. Pick it carefully, for example `kedai-ali-bangsar` |
+| `name` | The Shop's name | Customers see this. You can change it later |
+| `lat`, `lng` | The Shop's location as two numbers | In Google Maps, press and hold on the Shop's front door, then copy the two numbers |
+| `ownerEmail` | The Owner's email address | Used only to log in. The system never sends emails to it |
+| `ownerPassword` | At least 10 characters | To make a strong one, run `openssl rand -base64 15` |
+| `joinRadiusM` | Optional. A whole number of metres | How close a Customer must be to join. Default is **150** m |
+| `headsUpThreshold` | Optional. A whole number | Customers get an "almost your turn" alert when this many people, or fewer, are ahead of them. Default is **3** |
+| `maxQueueSize` | Optional. A whole number | The most Customers allowed in the Queue at once. Default is **30** |
+
+### Step 2: Create the Shop
+
+Change the values below to the real ones, then run it:
 
 ```bash
 curl -sS -X POST "$BASE/api/operator/shops" \
@@ -173,125 +83,131 @@ curl -sS -X POST "$BASE/api/operator/shops" \
 EOF
 ```
 
-| Answer | Meaning |
+What the reply means:
+
+| Reply | Meaning |
 |---|---|
-| **201** | Done. The reply includes `queueUrl` (the Customer page) and `qrUrl` (the poster image) |
-| **400** `invalid_body` | The `field` in the reply is wrong, and `message` says why |
-| **409** `slug_taken` / `email_taken` | Choose another slug, or that email already runs a Shop |
-| **401** `unauthorized` | Wrong or missing key |
+| **201** | Success. The reply includes `queueUrl` (the Customer page) and `qrUrl` (the poster image) |
+| **400** `invalid_body` | One of the details is wrong. `field` says which one and `message` says why |
+| **409** `slug_taken` | Another Shop already uses this slug. Pick a different one |
+| **409** `email_taken` | This email already belongs to another Shop's Owner |
+| **401** `unauthorized` | The key is wrong or missing. Repeat §2 |
 
-If the Shop is rejected, the Owner account is removed again, so you can simply fix the mistake
-and retry.
+If something fails, nothing is saved. Just fix the mistake and run the command again.
 
-### Step 4: download the QR code
+### Step 3: Download the QR code
 
 ```bash
 curl -sS "$BASE/api/operator/shops/kedai-ali-bangsar/qr.png" \
   -H "Authorization: Bearer $OPERATOR_API_KEY" -o kedai-ali-bangsar-qr.png
 ```
 
-It's a 1024×1024 PNG that opens `https://virtual-queue-system.netlify.app/s/kedai-ali-bangsar`.
-Put it on a poster (Canva is fine), print it, and **test-scan the printed poster with both an
-iPhone and an Android camera**.
+This saves a square image. Put it on a poster (Canva works well) and print it. Then **scan the
+printed poster with both an iPhone and an Android phone** to make sure it works.
 
-### Step 5: check it at the Shop
+### Step 4: Test it at the Shop
 
-Stand inside the Shop, scan the poster and join. If it says you're too far away, raise the radius
-(§6) and try again. Then **Leave** so the test Ticket isn't left in the Queue.
+Go to the Shop, stand inside, scan the poster and join the Queue. If the page says you are too
+far away, make the join distance bigger (see §5, *Change a Shop's settings*) and try again.
+When it works, tap **Leave** so your test doesn't stay in the Queue.
 
-### Step 6: hand over
+### Step 5: Hand it over to the Owner
 
 Give the Owner:
-- the login page, `https://virtual-queue-system.netlify.app/login`
-- their email and password, sent privately
-- the one-line rule of their day: **Call next → Done → Last Call → Close Shop** (§5)
+- the login page: `https://virtual-queue-system.netlify.app/login`
+- their email and password (send these privately)
+- the order of their day: **Call next → Done → Last Call → Close Shop** (see §4)
 
 ---
 
-## 5. The daily flow
+## 4. How a normal day works
 
 ```
 Customer scans QR ─► joins (must be at the Shop) ─► Waiting, "N ahead of you"
                                                         │
-                        "Almost your turn" push ◄───────┤ N ≤ Heads-up Threshold
+                        "Almost your turn" alert ◄──────┤ when few people are ahead
                                                         │
 Owner: Call next ─────────────────────────────────────► Called, "It's your turn"
                                                         │
           ┌──────────────────────┬──────────────────────┼──────────────────────┐
      Owner: Done            Owner: No-show         Owner: Remove        Customer: Leave
-     (Undo for 2 min)       (after 5 min)
+     (can Undo for 2 min)   (after 5 min)
           ▼                      ▼                      ▼                      ▼
        Served                 No-show                Removed                 Left
-    (billed RM0.25)      (Customer may Rejoin once)
+    (charged RM0.25)     (Customer can Rejoin once)
 ```
 
-Remove and Leave work while Waiting too, not only once Called.
+The Owner can **Remove**, and the Customer can **Leave**, at any time, not only after being called.
 
-### The Customer
+### What the Customer does
 
-1. Scans the poster, which opens `/s/<slug>`.
-2. Types a name (1–30 characters) and taps **Join queue**. The phone asks for location. Joining
-   only works at the Shop, and only while the Shop is open to joining.
-3. Allows notifications if asked. Then they can walk away:
-   - **Almost your turn** when few enough people are ahead of them
-   - **Your turn** when the Owner calls them, repeating on an open page until they tap
+1. Scans the poster. This opens the Shop's page.
+2. Types their name (1–30 characters) and taps **Join queue**. The phone asks to share
+   location. Joining only works at the Shop, and only while the Shop is accepting people.
+3. Allows notifications if the phone asks. Now they can walk away and wait somewhere else. They
+   will get:
+   - **Almost your turn**, when only a few people are ahead of them
+   - **Your turn**, when the Owner calls them. If the page is open, this repeats until they tap
      *I'm coming*
-4. They can **Leave** at any time, while Waiting or Called.
-5. If they miss their call (No-show), they get **one** Rejoin to the back of the Queue, same
-   day, without the location check.
+4. Can tap **Leave** at any time.
+5. If they miss their turn (No-show), they can **Rejoin** once, at the back of the Queue, on the
+   same day. They don't need to be at the Shop to do this.
 
-On iPhone, alerts only reach them while the page is open, unless they added it to the Home
-Screen. The page tells them this.
+**iPhone users:** alerts only arrive while the page is open, unless they add the page to their
+Home Screen. The page explains this to them.
 
-### The Owner, during the day
+### What the Owner does during the day
 
-On `/dashboard`:
+On the `/dashboard` page:
 
 | Button | What it does |
 |---|---|
-| **Call next** | Calls the first Waiting Customer. Press again for each free chair: several can be Called at once |
-| **Done** | Haircut finished: the Ticket is **Served**. An **Undo** stays available for 2 minutes |
-| **No-show** | Customer never came. Unlocks 5 minutes after the call |
-| **Remove** (⋯ menu) | Takes a Ticket out of the Queue |
+| **Call next** | Calls the next Customer in line. If several chairs are free, press it once per chair |
+| **Done** | The haircut is finished. The Customer is marked **Served**. **Undo** is available for 2 minutes in case of a mistake |
+| **No-show** | The Customer was called but never came. This button appears 5 minutes after the call |
+| **Remove** (in the ⋯ menu) | Takes someone out of the Queue |
 
-Several phones can run the same dashboard at once and stay in sync.
+The Owner can use the dashboard on several phones at the same time. They all stay in sync.
 
-`/dashboard/history` shows today's Tickets, the Served count for each of the last 30 days, and
-**This month: Served N · Amount due RM x.xx**.
+The `/dashboard/history` page shows today's Tickets, how many people were Served each day for
+the last 30 days, and how much the Owner owes this month.
 
-### The Owner, at closing time
+### What the Owner does at closing time
 
-1. **Last Call**: nobody new can join. Every Waiting Customer is asked to choose:
-   - **Stay today** (they may not be served), or
-   - **Move to next day** (they go to the front of the next Queue Day)
+1. Press **Last Call**. Nobody new can join. Everyone still waiting is asked to choose:
+   - **Stay today** (they might not get served before closing), or
+   - **Move to next day** (they go to the front of the line next time the Shop opens)
 
-   If the Owner changes their mind, **Reopen joining** cancels it and keeps the choices made.
-2. Serve whoever they can.
-3. **Close Shop**, only once nobody is Called (finish them first with Done or No-show).
-   - Customers who chose *Move to next day* go to the front of tomorrow, numbered #1, #2… in
-     their original order.
-   - Everyone else still Waiting is Removed and told "Shop closed".
-   - Joining reopens straight away, for the next Queue Day.
+   If the Owner changes their mind, **Reopen joining** undoes Last Call. Choices already made
+   are kept.
+2. Serve as many people as possible.
+3. Press **Close Shop**. This only works when nobody is in the *Called* state, so finish those
+   first with **Done** or **No-show**. After closing:
+   - People who chose *Move to next day* are first in line next time, as #1, #2… in the same
+     order as before.
+   - Everyone else still waiting is removed and told the Shop has closed.
+   - The Queue opens again straight away for the next day.
 
-A Queue Day runs from one Close Shop to the next, not by the calendar. Ticket numbers restart
-at #1 after each Close Shop.
+A Queue Day runs from one Close Shop to the next. It does not follow the calendar. Ticket numbers
+start again at #1 after every Close Shop.
 
-A Ticket moved to the next day can only move **once**. If it's still Waiting 3 days later, the
-nightly job removes it (§8).
+A Customer can only move to the next day **once**. If they are still waiting 3 days later, the
+system removes them automatically (see §7).
 
 ---
 
-## 6. Looking after Shops
+## 5. Look after your Shops
 
-Every call uses the same `BASE` and `OPERATOR_API_KEY` as §4.
+All commands below need `BASE` and `OPERATOR_API_KEY` from §2.
 
-### List every Shop
+### See all Shops
 
 ```bash
 curl -sS "$BASE/api/operator/shops" -H "Authorization: Bearer $OPERATOR_API_KEY"
 ```
 
-Each Shop comes back with its Owner's email, whether it's active, and `servedThisMonth`.
+For each Shop you see the Owner's email, whether the Shop is switched on, and
+`servedThisMonth` (how many Customers were Served this month).
 
 ### See one Shop
 
@@ -299,10 +215,12 @@ Each Shop comes back with its Owner's email, whether it's active, and `servedThi
 curl -sS "$BASE/api/operator/shops/kedai-ali-bangsar" -H "Authorization: Bearer $OPERATOR_API_KEY"
 ```
 
-### Change settings
+### Change a Shop's settings
 
-Send only the fields you want to change: `name`, `lat`, `lng`, `joinRadiusM`,
-`headsUpThreshold`, `maxQueueSize`, `isActive`. The slug can never be changed.
+Send only the settings you want to change. You can change `name`, `lat`, `lng`, `joinRadiusM`,
+`headsUpThreshold`, `maxQueueSize` and `isActive`. You cannot change the slug.
+
+This example makes the join distance 200 metres:
 
 ```bash
 curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
@@ -311,7 +229,7 @@ curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
   -d '{ "joinRadiusM": 200 }'
 ```
 
-### Switch a Shop off (e.g. it stopped paying)
+### Switch a Shop off (for example, if it stops paying)
 
 ```bash
 curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
@@ -320,40 +238,49 @@ curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
   -d '{ "isActive": false }'
 ```
 
-- The Owner is signed out everywhere within about 10 minutes and can't log back in.
-- Customers can't join.
-- Nothing is deleted.
+After this:
+- The Owner is logged out on all devices within about 10 minutes, and cannot log in again.
+- Customers cannot join the Queue.
+- Nothing is deleted. All history is kept.
 
-Send `{ "isActive": true }` to switch it back on.
+To switch it back on, send `{ "isActive": true }` the same way.
 
 ### Reset an Owner's password
+
+Use this when an Owner forgets their password. Make a new password with
+`openssl rand -base64 15`, then:
 
 ```bash
 curl -sS -X POST "$BASE/api/operator/shops/kedai-ali-bangsar/owner-password" \
   -H "Authorization: Bearer $OPERATOR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "password": "a-new-generated-password" }'
+  -d '{ "password": "the-new-password" }'
 ```
 
-It answers **204**, and signs the Owner out of every device.
+A **204** reply means it worked. The Owner is logged out on every device, so send them the new
+password privately.
 
 ### Change an Owner's email
 
-The API can't do this. Shops are never deleted either. If an Owner must change, create a new
-Shop with a new slug and poster, then switch the old one off.
+This is not possible, and Shops cannot be deleted. If a Shop gets a new Owner, create a new Shop
+with a new slug and a new poster, then switch the old Shop off.
 
 ---
 
-## 7. Monthly billing
+## 6. Monthly billing
 
-Each **Served** Ticket costs the Owner **RM0.25**. It counts in the month (Malaysia time) in
-which it was marked Done. An undone Done isn't counted.
+Owners pay **RM0.25 for every Served Customer** (every time they press **Done**). If they press
+**Undo**, that Customer is not charged. Each charge belongs to the month, in Malaysia time, when
+**Done** was pressed.
 
-At the start of each month, pull the month that just ended:
+At the start of every month, get the totals for the month that just ended. Change `2026-08` to
+that month:
 
 ```bash
 curl -sS "$BASE/api/operator/billing?month=2026-08" -H "Authorization: Bearer $OPERATOR_API_KEY"
 ```
+
+The reply looks like this:
 
 ```json
 {
@@ -363,37 +290,43 @@ curl -sS "$BASE/api/operator/billing?month=2026-08" -H "Authorization: Bearer $O
 }
 ```
 
-Amounts are in **sen** (10300 = RM103.00). Every Shop is listed, including switched-off ones and
-Shops at 0. Send each Owner their amount for payment by DuitNow or bank transfer. Invoicing is
-manual for now.
+Amounts are in **sen**, so 10300 means RM103.00. Every Shop is listed, even switched-off Shops
+and Shops with nothing to pay.
+
+Send each Owner their amount and ask them to pay by DuitNow or bank transfer. For now, you do
+this by hand.
 
 ---
 
-## 8. What runs by itself
+## 7. Things that happen automatically
 
-| When | What |
+| When | What happens |
 |---|---|
-| Every night, 03:00 Malaysia time | Netlify's `daily` function calls `/api/cron/daily`, which: <br>1. removes moved-to-next-day Tickets still Waiting after 3 days, and sends "almost your turn" to anyone who moved up <br>2. erases Customer names and devices from Tickets that finished more than 30 days ago (PDPA). Ticket counts and billing are kept |
-| Every push to `main` | Netlify builds and deploys the site. **Not** the database: see §3 |
-| Any error in production | Recorded in Sentry, which emails the Operator if its alert rule is set up |
+| Every night at 3:00 am (Malaysia time) | The system cleans up: <br>1. Customers who moved to the next day but are still waiting after 3 days are removed. People behind them who move closer get their "almost your turn" alert <br>2. Customer names and device IDs are erased from Tickets older than 30 days, to protect their privacy (PDPA). The counts used for billing are kept |
+| Whenever an error happens on the live site | It is recorded in Sentry, which can email you about it |
 
-To run the nightly job by hand, open Netlify → *Functions* → `daily` → **Run now**. Running it
-twice is safe.
+If the nightly cleanup didn't run, you can start it yourself: open Netlify → *Functions* →
+`daily` → **Run now**. Running it twice does no harm.
 
 ---
 
-## 9. When something goes wrong
+## 8. When something goes wrong
 
-| Symptom | Where to look |
+| Problem | What to do |
 |---|---|
-| The whole site is down or "paused" | Netlify dashboard: credits used up on the Free plan. Upgrade |
-| The Customer page or dashboard shows errors | Supabase dashboard: a Free project **pauses** after a week idle. Restore it, and consider Pro |
-| An error email from Sentry | Sentry, for the message and the page it happened on |
-| The nightly job failed | Netlify → *Functions* → `daily` log. A 401 there means `CRON_SECRET` in Netlify is wrong: fix it by hand in the Netlify UI |
-| A Customer says "too far" while inside the Shop | Raise `joinRadiusM` (§6). Indoor GPS is often 20–100 m off |
-| An Owner can't log in | Is the Shop switched off? (§6 *See one Shop*.) Otherwise reset the password |
-| iPhone Customers miss alerts | Expected without Home Screen install. They must keep the page open |
-| A code change works locally but breaks in production | Did the migration reach production? `bunx supabase db push --dry-run` |
+| The whole site is down or shows "paused" | Open the Netlify dashboard. The free plan stops the site when its monthly allowance runs out. Upgrade to a paid plan |
+| The Customer page or the dashboard shows errors | Open the Supabase dashboard. A free project goes to sleep after a week without use. Wake it up (restore it), and consider upgrading to Pro |
+| You got an error email from Sentry | Open Sentry to see the error and which page it happened on |
+| The nightly cleanup failed | Open Netlify → *Functions* → `daily` and read the log. If it shows **401**, the `CRON_SECRET` setting in Netlify is wrong. Fix it by hand in Netlify |
+| A Customer is inside the Shop but the page says "too far" | Make `joinRadiusM` bigger (§5). Phone location indoors can be 20–100 m wrong |
+| An Owner can't log in | Check whether the Shop is switched off (§5, *See one Shop*). If it is on, reset their password |
+| Customers with iPhones miss their alerts | This is normal unless they added the page to their Home Screen. They need to keep the page open |
 
-More detail on every service is in [third-party.md](specs/third-party.md). Surprises found while
-building are in [agents/gotchas.md](agents/gotchas.md).
+### Keep the site running safely
+
+The site currently runs on free plans. **Before the first Shop starts paying you**, upgrade:
+- **Netlify** to a paid plan. On the free plan, the whole site stops if the monthly allowance
+  runs out, and every Shop's Queue goes offline. Until you upgrade, check the Netlify usage page
+  often, and upgrade if it is above about 70% in the middle of the month.
+- **Supabase** to Pro. The free plan has **no backups** and goes to sleep after 7 days without
+  use. Pro makes a backup every day and never sleeps.
