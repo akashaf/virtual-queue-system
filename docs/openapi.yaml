@@ -1,0 +1,436 @@
+openapi: 3.1.0
+info:
+  title: Barbershop Virtual Queue — Operator API
+  version: 1.0.0
+  description: |
+    Every call the Operator makes to run the system: adding and looking after Shops, QR
+    posters and monthly billing. How to use it from Postman is in `docs/operator-guide.md` §2.
+
+    Every call except the health check needs the Operator key, `OPERATOR_API_KEY`, sent as a
+    bearer token. The key is never written in this file: type it into your Postman environment.
+
+    Errors always look like `{ "error": "...", "field": "...", "message": "..." }`. `field` and
+    `message` only appear when they help.
+
+servers:
+  - url: https://virtual-queue-system.netlify.app
+    description: Production
+  - url: http://127.0.0.1:3000
+    description: Local (the app running on your laptop, key `local-operator-key`)
+
+security:
+  - operatorKey: []
+
+tags:
+  - name: Shops
+    description: Add Shops, see them and change their settings
+  - name: Owners
+    description: Owner logins
+  - name: Billing
+    description: What each Shop owes
+  - name: Health
+    description: Is the site up?
+
+paths:
+  /api/operator/shops:
+    get:
+      tags: [Shops]
+      summary: See all Shops
+      description: Every Shop, oldest first, with its Owner's email, whether it is switched on, and how many Customers were Served this month.
+      operationId: listShops
+      responses:
+        "200":
+          description: The list of Shops
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shops]
+                properties:
+                  shops:
+                    type: array
+                    items: { $ref: "#/components/schemas/Shop" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Shops]
+      summary: Add a new Shop
+      description: |
+        Creates the Shop, its Owner's login and its first Queue Day, all at once. If anything
+        fails, nothing is saved, so you can fix the mistake and send it again.
+      operationId: createShop
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateShop" }
+            example:
+              slug: kedai-ali-bangsar
+              name: Kedai Gunting Ali
+              lat: 3.1319
+              lng: 101.671
+              ownerEmail: ali@example.com
+              ownerPassword: paste-the-generated-password
+      responses:
+        "201":
+          description: Shop created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopWithUrls" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: |
+            `slug_taken`: another Shop already uses this slug.
+            `email_taken`: this email already belongs to another Shop's Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                slugTaken:
+                  value: { error: slug_taken, message: That slug is already in use. }
+                emailTaken:
+                  value: { error: email_taken, message: That email already has an Owner account. }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/operator/shops/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      tags: [Shops]
+      summary: See one Shop
+      operationId: getShop
+      responses:
+        "200":
+          description: The Shop, with its Customer page and QR code links
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopWithUrls" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [Shops]
+      summary: Change a Shop's settings, or switch it off or on
+      description: |
+        Send only the settings you want to change. The slug can never be changed, and any
+        unknown field is refused, so a typo can't be silently ignored.
+
+        Switching a Shop off (`isActive: false`) logs its Owner out on every device within
+        about 10 minutes and stops Customers joining. Nothing is deleted.
+      operationId: updateShop
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateShop" }
+            examples:
+              joinRadius:
+                summary: Make the join distance 200 metres
+                value: { joinRadiusM: 200 }
+              switchOff:
+                summary: Switch the Shop off
+                value: { isActive: false }
+              switchOn:
+                summary: Switch the Shop back on
+                value: { isActive: true }
+      responses:
+        "200":
+          description: The Shop after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopWithUrls" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/operator/shops/{slug}/owner-password:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    post:
+      tags: [Owners]
+      summary: Reset an Owner's password
+      description: Sets a new password without needing the old one, then logs the Owner out on every device.
+      operationId: resetOwnerPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              additionalProperties: false
+              properties:
+                password:
+                  type: string
+                  minLength: 10
+                  description: The new password. Make one with `openssl rand -base64 15`
+            example:
+              password: the-new-password
+      responses:
+        "204":
+          description: Done. The Owner is logged out everywhere
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/operator/shops/{slug}/qr.png:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      tags: [Shops]
+      summary: Download the QR code
+      description: A 1024×1024 PNG that opens the Shop's Customer page. Postman can save it with *Save response → Save to a file*.
+      operationId: getShopQr
+      responses:
+        "200":
+          description: The QR code image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/operator/billing:
+    get:
+      tags: [Billing]
+      summary: Get one month's bill for every Shop
+      description: |
+        Every Shop, including switched-off ones and Shops with nothing to pay. Each Served
+        Customer costs RM0.25, counted in the month (Malaysia time) when **Done** was pressed.
+        Amounts are in sen: 10300 means RM103.00.
+      operationId: getBilling
+      parameters:
+        - name: month
+          in: query
+          required: true
+          description: The month, as `YYYY-MM`. Usually the month that just ended
+          schema:
+            type: string
+            pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+          example: "2026-08"
+      responses:
+        "200":
+          description: The month's totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Billing" }
+              example:
+                month: "2026-08"
+                shops:
+                  - { slug: kedai-ali-bangsar, name: Kedai Gunting Ali, servedCount: 412, amountSen: 10300 }
+                totalSen: 10300
+        "400":
+          description: "`invalid_query`: the month is missing or not written as `YYYY-MM`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: invalid_query, field: month, message: Expected a month as YYYY-MM. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Check the site is up
+      description: Needs no key. If this doesn't answer, the whole site is down.
+      operationId: health
+      security: []
+      responses:
+        "200":
+          description: The site is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, const: true }
+
+components:
+  securitySchemes:
+    operatorKey:
+      type: http
+      scheme: bearer
+      description: The Operator key, `OPERATOR_API_KEY`. Never paste it into a chat, an issue or a commit.
+
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      description: The Shop's slug, as used in its QR code
+      schema: { type: string, pattern: "^[a-z0-9-]{3,40}$" }
+      example: kedai-ali-bangsar
+
+  schemas:
+    CreateShop:
+      type: object
+      required: [slug, name, lat, lng, ownerEmail, ownerPassword]
+      additionalProperties: false
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9-]{3,40}$"
+          description: Part of the QR code link. **It can never be changed**
+        name:
+          type: string
+          minLength: 1
+          description: Shown to Customers. Can't be blank. Can be changed later
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+          description: The Shop's latitude. In Google Maps, press and hold the front door
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+          description: The Shop's longitude
+        ownerEmail:
+          type: string
+          format: email
+          description: The Owner's login. No email is ever sent to it
+        ownerPassword:
+          type: string
+          minLength: 10
+          description: Make one with `openssl rand -base64 15`
+        joinRadiusM:
+          type: integer
+          minimum: 1
+          default: 150
+          description: How close, in metres, a Customer must be to join
+        headsUpThreshold:
+          type: integer
+          minimum: 1
+          default: 3
+          description: Customers get "almost your turn" when this many people, or fewer, are ahead
+        maxQueueSize:
+          type: integer
+          minimum: 1
+          default: 30
+          description: The most Customers allowed in the Queue at once
+
+    UpdateShop:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      description: Any of these. The slug and the Owner can't be changed
+      properties:
+        name: { type: string, minLength: 1 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        joinRadiusM: { type: integer, minimum: 1 }
+        headsUpThreshold: { type: integer, minimum: 1 }
+        maxQueueSize: { type: integer, minimum: 1 }
+        isActive:
+          type: boolean
+          description: "`false` switches the Shop off, `true` switches it back on"
+
+    Shop:
+      type: object
+      required:
+        [id, slug, name, ownerEmail, lat, lng, joinRadiusM, headsUpThreshold, maxQueueSize,
+         isActive, joiningState, currentQueueDayId, createdAt, servedThisMonth]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        ownerEmail: { type: string, format: email }
+        lat: { type: number }
+        lng: { type: number }
+        joinRadiusM: { type: integer }
+        headsUpThreshold: { type: integer }
+        maxQueueSize: { type: integer }
+        isActive:
+          type: boolean
+          description: "`false` when the Shop is switched off"
+        joiningState:
+          type: string
+          enum: [open, last_call]
+          description: "`last_call` after the Owner pressed Last Call and before Close Shop"
+        currentQueueDayId: { type: [string, "null"], format: uuid }
+        createdAt: { type: string, format: date-time }
+        servedThisMonth:
+          type: integer
+          description: Customers Served so far this month (Malaysia time)
+
+    ShopWithUrls:
+      type: object
+      required: [shop, queueUrl, qrUrl]
+      properties:
+        shop: { $ref: "#/components/schemas/Shop" }
+        queueUrl:
+          type: string
+          format: uri
+          description: The Customer page the QR code opens
+          example: https://virtual-queue-system.netlify.app/s/kedai-ali-bangsar
+        qrUrl:
+          type: string
+          format: uri
+          description: Where to download the QR code
+          example: https://virtual-queue-system.netlify.app/api/operator/shops/kedai-ali-bangsar/qr.png
+
+    Billing:
+      type: object
+      required: [month, shops, totalSen]
+      properties:
+        month: { type: string }
+        shops:
+          type: array
+          items:
+            type: object
+            required: [slug, name, servedCount, amountSen]
+            properties:
+              slug: { type: string }
+              name: { type: string }
+              servedCount: { type: integer }
+              amountSen:
+                type: integer
+                description: What the Shop owes, in sen
+        totalSen: { type: integer }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [invalid_body, invalid_query, unauthorized, not_found, slug_taken, email_taken, internal_error]
+        field:
+          type: string
+          description: Which field was wrong
+        message:
+          type: string
+          description: Why it was wrong
+
+  responses:
+    InvalidBody:
+      description: "`invalid_body`: one of the details is wrong. `field` says which one and `message` says why"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: invalid_body, field: ownerPassword, message: Must be at least 10 characters. }
+    Unauthorized:
+      description: "`unauthorized`: the key is wrong or missing"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: unauthorized }
+    NotFound:
+      description: "`not_found`: no Shop has that slug"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: not_found }
+    InternalError:
+      description: "`internal_error`: something unexpected went wrong. The details are in Sentry"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: internal_error }

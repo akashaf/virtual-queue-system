@@ -5,7 +5,7 @@ after them, and collecting money at the end of the month. Words that start with 
 (Shop, Owner, Ticket, Queue Day…) have a fixed meaning, explained in [CONTEXT.md](../CONTEXT.md).
 
 - [1. Who uses the system](#1-who-uses-the-system)
-- [2. Before you start](#2-before-you-start)
+- [2. Set up Postman](#2-set-up-postman)
 - [3. Add a new Shop](#3-add-a-new-shop)
 - [4. How a normal day works](#4-how-a-normal-day-works)
 - [5. Look after your Shops](#5-look-after-your-shops)
@@ -19,99 +19,140 @@ after them, and collecting money at the end of the month. Words that start with 
 
 | Who | What they use | How they get in |
 |---|---|---|
-| **You, the Operator** | Commands you type in a terminal (`curl`) or Postman | A secret key called `OPERATOR_API_KEY` |
+| **You, the Operator** | Postman, using the requests in `docs/openapi.yaml` | A secret key called `OPERATOR_API_KEY` |
 | **Owner** (the barber who runs a Shop) | The `/login` page, then `/dashboard`, on a phone or tablet | An email and password that **you** create for them. Owners cannot sign up or reset their own password |
 | **Customer** (someone who walks in) | The Shop's page, opened by scanning the QR poster | No account needed. They must be at the Shop to join |
 
-There is no admin website. Everything you do as Operator is a command sent to the system.
+There is no admin website. Everything you do as Operator is a request you send from Postman.
 
 ---
 
-## 2. Before you start
+## 2. Set up Postman
 
-Every command in this guide needs two things: the site address and your secret key. Run these
-two lines once, each time you open a new terminal:
+You send every Operator request from [Postman](https://www.postman.com/downloads/). The file
+[`openapi.yaml`](openapi.yaml), next to this guide, describes every request, so Postman can turn
+each one into a form with a **Send** button. You only need to set this up once.
 
-```bash
-export BASE=https://virtual-queue-system.netlify.app
-export OPERATOR_API_KEY=$(grep '^OPERATOR_API_KEY=' .env.netlify.production | cut -d= -f2-)
-```
+### Step 1: Import the requests
 
-The key is saved in the file `.env.netlify.production`. This is the only copy you can read, so
-don't lose it.
+1. In Postman, click **Import** and choose `docs/openapi.yaml`.
+2. Import it as a **collection**. You now have a folder called *Barbershop Virtual Queue —
+   Operator API*, with every request inside.
 
-**Keep the key secret.** Never paste it into a chat, an email, a GitHub issue or a commit.
-Anyone with this key can control every Shop.
+If `openapi.yaml` changes later, import it again and replace the old collection.
+
+### Step 2: Create two environments
+
+An environment tells Postman which site to talk to, and with which key. Click
+**Environments → +** and create these two:
+
+| Environment | `baseUrl` | `bearerToken` |
+|---|---|---|
+| **Production** | `https://virtual-queue-system.netlify.app` | Your Operator key (see below) |
+| **Local** | `http://127.0.0.1:3000` | `local-operator-key` |
+
+For `bearerToken` in *Production*, set the type to **secret**. Copy the key from the
+`OPERATOR_API_KEY=` line in the file `.env.netlify.production`. That file is the only copy you
+can read, so don't lose it.
+
+Then click the collection and open its **Authorization** tab. It should say **Bearer Token**
+with `{{bearerToken}}` as the token; if not, set it that way. Every request in the collection now uses the key from whichever environment
+you choose in the top-right corner.
+
+**Keep the key secret.** Never paste it into a chat, an email, a GitHub issue or a commit, and
+never export the Production environment to share it. Anyone with this key can control every Shop.
+
+### Step 3: Check it works
+
+Choose the *Production* environment, open **See all Shops** and click **Send**. A **200** reply
+with a list of Shops means everything is set up. A **401** means the key is wrong.
+
+### How to read the request cards in this guide
+
+Each request below has a card like this. The same details are in Postman:
+
+- The first line is the **method** (`GET`, `POST` or `PATCH`) and the **path**. `{slug}` means
+  "put the Shop's slug here". In Postman, fill it in under *Params → Path Variables*.
+- **Body fields** go in Postman's *Body* tab, as JSON. Postman fills in the example for you;
+  change it to the real values.
+- **Replies** lists every answer you might get back, and what each one means.
 
 ---
 
 ## 3. Add a new Shop
 
-You create a Shop and its Owner's login at the same time, with one command. Each Owner runs
+You create a Shop and its Owner's login at the same time, with one request. Each Owner runs
 exactly one Shop.
 
-### Step 1: Prepare the details
+### Step 1: Create the Shop
 
-| Field | What to enter | Tips |
-|---|---|---|
-| `slug` | 3–40 characters, using only `a-z`, `0-9` and `-` | This becomes part of the QR code link, and **it can never be changed**. Pick it carefully, for example `kedai-ali-bangsar` |
-| `name` | The Shop's name | Customers see this. You can change it later |
-| `lat`, `lng` | The Shop's location as two numbers | In Google Maps, press and hold on the Shop's front door, then copy the two numbers |
-| `ownerEmail` | The Owner's email address | Used only to log in. The system never sends emails to it |
-| `ownerPassword` | At least 10 characters | To make a strong one, run `openssl rand -base64 15` |
-| `joinRadiusM` | Optional. A whole number of metres | How close a Customer must be to join. Default is **150** m |
-| `headsUpThreshold` | Optional. A whole number | Customers get an "almost your turn" alert when this many people, or fewer, are ahead of them. Default is **3** |
-| `maxQueueSize` | Optional. A whole number | The most Customers allowed in the Queue at once. Default is **30** |
+In Postman: **Shops → Add a new Shop**. Fill in the body with the real details, then click
+**Send**.
 
-### Step 2: Create the Shop
+`POST /api/operator/shops` · needs the key
 
-Change the values below to the real ones, then run it:
+| Body field | Type | Required | Rules and tips |
+|---|---|---|---|
+| `slug` | text | yes | 3–40 characters, using only `a-z`, `0-9` and `-`. It becomes part of the QR code link, and **it can never be changed**. Pick it carefully, for example `kedai-ali-bangsar` |
+| `name` | text | yes | The Shop's name. Can't be blank. Customers see it. You can change it later |
+| `lat` | number | yes | Between -90 and 90. In Google Maps, press and hold on the Shop's front door, then copy the first number |
+| `lng` | number | yes | Between -180 and 180. The second number from Google Maps |
+| `ownerEmail` | text | yes | The Owner's email address. Used only to log in. The system never sends emails to it |
+| `ownerPassword` | text | yes | At least 10 characters. To make a strong one, run `openssl rand -base64 15` in a terminal |
+| `joinRadiusM` | whole number | no | At least 1. How close, in metres, a Customer must be to join. Default **150** |
+| `headsUpThreshold` | whole number | no | At least 1. Customers get an "almost your turn" alert when this many people, or fewer, are ahead of them. Default **3** |
+| `maxQueueSize` | whole number | no | At least 1. The most Customers allowed in the Queue at once. Default **30** |
 
-```bash
-curl -sS -X POST "$BASE/api/operator/shops" \
-  -H "Authorization: Bearer $OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d @- <<'EOF'
+Example body:
+
+```json
 {
   "slug": "kedai-ali-bangsar",
   "name": "Kedai Gunting Ali",
   "lat": 3.1319,
-  "lng": 101.6710,
+  "lng": 101.671,
   "ownerEmail": "ali@example.com",
   "ownerPassword": "paste-the-generated-password"
 }
-EOF
 ```
-
-What the reply means:
 
 | Reply | Meaning |
 |---|---|
-| **201** | Success. The reply includes `queueUrl` (the Customer page) and `qrUrl` (the poster image) |
+| **201** | Success. The reply shows the Shop, plus `queueUrl` (the Customer page) and `qrUrl` (the QR code image) |
 | **400** `invalid_body` | One of the details is wrong. `field` says which one and `message` says why |
+| **401** `unauthorized` | The key is wrong or missing. Check your environment (§2) |
 | **409** `slug_taken` | Another Shop already uses this slug. Pick a different one |
 | **409** `email_taken` | This email already belongs to another Shop's Owner |
-| **401** `unauthorized` | The key is wrong or missing. Repeat §2 |
 
-If something fails, nothing is saved. Just fix the mistake and run the command again.
+If something fails, nothing is saved. Just fix the mistake and click **Send** again.
 
-### Step 3: Download the QR code
+### Step 2: Download the QR code
 
-```bash
-curl -sS "$BASE/api/operator/shops/kedai-ali-bangsar/qr.png" \
-  -H "Authorization: Bearer $OPERATOR_API_KEY" -o kedai-ali-bangsar-qr.png
-```
+In Postman: **Shops → Download the QR code**. Put the slug in the path, click **Send**, then
+choose **Save response → Save to a file** and name it, for example, `kedai-ali-bangsar-qr.png`.
 
-This saves a square image. Put it on a poster (Canva works well) and print it. Then **scan the
-printed poster with both an iPhone and an Android phone** to make sure it works.
+`GET /api/operator/shops/{slug}/qr.png` · needs the key
 
-### Step 4: Test it at the Shop
+| Path value | Meaning |
+|---|---|
+| `slug` | The Shop, for example `kedai-ali-bangsar` |
+
+| Reply | Meaning |
+|---|---|
+| **200** | The QR code, as a 1024×1024 PNG image |
+| **401** `unauthorized` | The key is wrong or missing |
+| **404** `not_found` | No Shop has that slug |
+
+Put the image on a poster (Canva works well) and print it. Then **scan the printed poster with
+both an iPhone and an Android phone** to make sure it works.
+
+### Step 3: Test it at the Shop
 
 Go to the Shop, stand inside, scan the poster and join the Queue. If the page says you are too
 far away, make the join distance bigger (see §5, *Change a Shop's settings*) and try again.
 When it works, tap **Leave** so your test doesn't stay in the Queue.
 
-### Step 5: Hand it over to the Owner
+### Step 4: Hand it over to the Owner
 
 Give the Owner:
 - the login page: `https://virtual-queue-system.netlify.app/login`
@@ -198,67 +239,114 @@ system removes them automatically (see §7).
 
 ## 5. Look after your Shops
 
-All commands below need `BASE` and `OPERATOR_API_KEY` from §2.
-
 ### See all Shops
 
-```bash
-curl -sS "$BASE/api/operator/shops" -H "Authorization: Bearer $OPERATOR_API_KEY"
-```
+In Postman: **Shops → See all Shops**.
 
-For each Shop you see the Owner's email, whether the Shop is switched on, and
-`servedThisMonth` (how many Customers were Served this month).
+For each Shop you see the Owner's email, whether the Shop is switched on (`isActive`), and
+`servedThisMonth` (how many Customers were Served this month). The oldest Shop comes first.
+
+`GET /api/operator/shops` · needs the key
+
+| Reply | Meaning |
+|---|---|
+| **200** | `{ "shops": [...] }`, every Shop |
+| **401** `unauthorized` | The key is wrong or missing |
 
 ### See one Shop
 
-```bash
-curl -sS "$BASE/api/operator/shops/kedai-ali-bangsar" -H "Authorization: Bearer $OPERATOR_API_KEY"
-```
+In Postman: **Shops → See one Shop**.
 
-### Change a Shop's settings
+`GET /api/operator/shops/{slug}` · needs the key
 
-Send only the settings you want to change. You can change `name`, `lat`, `lng`, `joinRadiusM`,
-`headsUpThreshold`, `maxQueueSize` and `isActive`. You cannot change the slug.
+| Path value | Meaning |
+|---|---|
+| `slug` | The Shop, for example `kedai-ali-bangsar` |
 
-This example makes the join distance 200 metres:
+| Reply | Meaning |
+|---|---|
+| **200** | The Shop, plus `queueUrl` and `qrUrl` |
+| **401** `unauthorized` | The key is wrong or missing |
+| **404** `not_found` | No Shop has that slug |
 
-```bash
-curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
-  -H "Authorization: Bearer $OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "joinRadiusM": 200 }'
-```
+### Change a Shop's settings, or switch it off
 
-### Switch a Shop off (for example, if it stops paying)
+In Postman: **Shops → Change a Shop's settings, or switch it off or on**. Send only the settings
+you want to change.
 
-```bash
-curl -sS -X PATCH "$BASE/api/operator/shops/kedai-ali-bangsar" \
-  -H "Authorization: Bearer $OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "isActive": false }'
-```
-
-After this:
+Switching a Shop off (for example, if it stops paying) means:
 - The Owner is logged out on all devices within about 10 minutes, and cannot log in again.
 - Customers cannot join the Queue.
 - Nothing is deleted. All history is kept.
 
-To switch it back on, send `{ "isActive": true }` the same way.
+`PATCH /api/operator/shops/{slug}` · needs the key
+
+| Path value | Meaning |
+|---|---|
+| `slug` | The Shop, for example `kedai-ali-bangsar` |
+
+| Body field | Type | Required | Rules |
+|---|---|---|---|
+| `name` | text | no | Can't be blank |
+| `lat` | number | no | Between -90 and 90 |
+| `lng` | number | no | Between -180 and 180 |
+| `joinRadiusM` | whole number | no | At least 1 |
+| `headsUpThreshold` | whole number | no | At least 1 |
+| `maxQueueSize` | whole number | no | At least 1 |
+| `isActive` | true / false | no | `false` switches the Shop off, `true` switches it back on |
+
+Send at least one field. The slug can't be changed, and any other field name is refused, so a
+typo can't be silently ignored.
+
+Example bodies (Postman offers all three):
+
+```json
+{ "joinRadiusM": 200 }
+```
+
+```json
+{ "isActive": false }
+```
+
+```json
+{ "isActive": true }
+```
+
+| Reply | Meaning |
+|---|---|
+| **200** | The Shop after the change, plus `queueUrl` and `qrUrl` |
+| **400** `invalid_body` | One of the details is wrong. `field` says which one and `message` says why |
+| **401** `unauthorized` | The key is wrong or missing |
+| **404** `not_found` | No Shop has that slug |
 
 ### Reset an Owner's password
 
 Use this when an Owner forgets their password. Make a new password with
-`openssl rand -base64 15`, then:
+`openssl rand -base64 15` in a terminal. Then, in Postman: **Owners → Reset an Owner's
+password**. The old password isn't needed.
 
-```bash
-curl -sS -X POST "$BASE/api/operator/shops/kedai-ali-bangsar/owner-password" \
-  -H "Authorization: Bearer $OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "password": "the-new-password" }'
+`POST /api/operator/shops/{slug}/owner-password` · needs the key
+
+| Path value | Meaning |
+|---|---|
+| `slug` | The Owner's Shop, for example `kedai-ali-bangsar` |
+
+| Body field | Type | Required | Rules |
+|---|---|---|---|
+| `password` | text | yes | At least 10 characters |
+
+Example body:
+
+```json
+{ "password": "the-new-password" }
 ```
 
-A **204** reply means it worked. The Owner is logged out on every device, so send them the new
-password privately.
+| Reply | Meaning |
+|---|---|
+| **204** | Done. The Owner is logged out on every device. Send them the new password privately |
+| **400** `invalid_body` | The password is too short |
+| **401** `unauthorized` | The key is wrong or missing |
+| **404** `not_found` | No Shop has that slug |
 
 ### Change an Owner's email
 
@@ -273,14 +361,22 @@ Owners pay **RM0.25 for every Served Customer** (every time they press **Done**)
 **Undo**, that Customer is not charged. Each charge belongs to the month, in Malaysia time, when
 **Done** was pressed.
 
-At the start of every month, get the totals for the month that just ended. Change `2026-08` to
-that month:
+At the start of every month, get the totals for the month that just ended. In Postman:
+**Billing → Get one month's bill for every Shop**. Set `month` under *Params* to that month.
 
-```bash
-curl -sS "$BASE/api/operator/billing?month=2026-08" -H "Authorization: Bearer $OPERATOR_API_KEY"
-```
+`GET /api/operator/billing?month=YYYY-MM` · needs the key
 
-The reply looks like this:
+| Query value | Type | Required | Rules |
+|---|---|---|---|
+| `month` | text | yes | Written as `YYYY-MM`, for example `2026-08` |
+
+| Reply | Meaning |
+|---|---|
+| **200** | The month's totals (example below) |
+| **400** `invalid_query` | The month is missing or not written as `YYYY-MM` |
+| **401** `unauthorized` | The key is wrong or missing |
+
+A **200** reply looks like this:
 
 ```json
 {
@@ -311,6 +407,13 @@ If the nightly cleanup didn't run, you can start it yourself: open Netlify → *
 ---
 
 ## 8. When something goes wrong
+
+To check whether the site is up at all, use **Health → Check the site is up** in Postman
+(`GET /api/health`, no key needed). A **200** reply with `{ "ok": true }` means the site is
+running.
+
+Any request can also reply **500** `internal_error`. That means something unexpected went wrong.
+The details are in Sentry.
 
 | Problem | What to do |
 |---|---|
