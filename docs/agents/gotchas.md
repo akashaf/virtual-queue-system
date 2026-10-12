@@ -36,6 +36,14 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Supabase and migrations
 
+- **VS Code can squat on the local database port.** Its extension host (`Code Helper (Plugin)`)
+  was found listening on `127.0.0.1:54322`, so every Postgres connection reached it instead of
+  Docker and died with *Connection terminated unexpectedly*: db tests, and `supabase start`
+  itself, which then leaves the stack stopped. The REST API on 54321 still worked, so e2e
+  seeding looked fine. `lsof -nP -iTCP:54322 -sTCP:LISTEN` names the culprit; quitting VS Code
+  fully frees it. Killing the process also kills the Claude Code extension running in it.
+  Docker here is Colima, so the *healthy* listener is `ssh` (Lima's port-forward mux), not Docker.
+
 - `bun run db:types` regenerates `lib/supabase/database.types.ts`. Run it after every
   migration and commit the result, or `tsc` quietly stops checking queries.
 - **Supabase auto-grants new `public` tables to `anon` / `authenticated`**, so every migration

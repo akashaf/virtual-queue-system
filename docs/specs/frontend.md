@@ -10,6 +10,11 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
   - Session refresh lives in `proxy.ts`.
 - **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Card, Dialog, AlertDialog, DropdownMenu, Sonner toast, Badge, Tabs).
   - Design mobile-first: 360 px minimum width, touch targets ≥ 44 px.
+  - **Official shadcn components only.** Plain Tailwind is for layout (flex, grid, spacing, sizing), never for hand-styling a control.
+  - **Theme:** burgundy `primary`, orange-red `destructive` (kept apart so a destructive action never reads as a normal one), faintly warm neutrals. Typeface is Clarity City, self-hosted from `@clr/city` through `next/font/local` because it is not on Google Fonts.
+  - **Colours come from theme tokens only** (`bg-primary`, `text-muted-foreground`, …), never fixed Tailwind palette colours or arbitrary values, so a Shop's look can later be changed by overriding tokens. `lib/theme-tokens.test.ts` enforces this for every `.tsx` file in `app/` and `components/` outside the vendored `components/ui/`.
+  - **Ticket status tokens:** `status-waiting`, `status-called`, `status-served` and `status-ended` (No-show, Left, Removed), each with a `-foreground` pair, so a status has the same colour on the Customer page and the queue board.
+  - **Dark mode follows the device setting** through `next-themes` (class-based). There is no toggle.
 - **Data:**
   - Server Components render the first view.
   - Client components refetch from Route Handlers when a Realtime ping arrives, every 30 s, and on `visibilitychange`.
