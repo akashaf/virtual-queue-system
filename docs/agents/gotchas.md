@@ -23,9 +23,14 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **ESLint here rejects `setState` in an effect body** (`react-hooks/set-state-in-effect`),
   which rules out the usual "reset derived state when a prop changes" effect. `tsc` is happy
   with it, so only `bun run lint` catches it. Use React's adjust-while-rendering pattern
-  instead (`if (key !== last) { setLast(key); setCount(0) }`, as `queue-board.tsx` does), and
+  instead (`if (key !== last) { setLast(key); setCount(0) }`, as `app/dashboard/use-elapsed-ms.ts` does), and
   read browser storage through `useSyncExternalStore` rather than an effect — the customer
   page needs both.
+- **A Radix Collapsible on a native `<details>` must not toggle too.** The queue board's
+  "Just served" is a Collapsible on `<details>`/`<summary>` (an e2e test finds it by
+  `locator("details")`). With the Collapsible also handling the click, React applied
+  `open` during the click and the browser's own summary toggle then flipped it back shut.
+  The `<details>` `onToggle` is the single source of truth and the Collapsible is only told.
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps` / `PageProps` /
   `RouteContext` are generated. After deleting routes, `rm -rf .next` clears stale
   `.next/types`.

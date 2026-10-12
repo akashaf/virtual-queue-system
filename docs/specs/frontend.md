@@ -8,7 +8,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
   - Read `node_modules/next/dist/docs/` before implementing.
   - `params` and `searchParams` are Promises.
   - Session refresh lives in `proxy.ts`.
-- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Card, Dialog, AlertDialog, DropdownMenu, Sonner toast, Badge, Tabs).
+- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Card, Dialog, AlertDialog, DropdownMenu, Sonner toast, Badge, Tabs, Collapsible).
   - Design mobile-first: 360 px minimum width, touch targets ≥ 44 px.
   - **Official shadcn components only.** Plain Tailwind is for layout (flex, grid, spacing, sizing), never for hand-styling a control.
   - **Theme:** burgundy `primary`, orange-red `destructive` (kept apart so a destructive action never reads as a normal one), faintly warm neutrals. Typeface is Clarity City, self-hosted from `@clr/city` through `next/font/local` because it is not on Google Fonts.
@@ -150,6 +150,8 @@ app/
   s/[slug]/page.tsx, customer-queue.tsx, language-toggle.tsx, actions.ts
   login/page.tsx, actions.ts, messages.ts
   dashboard/layout.tsx, page.tsx, queue-board.tsx, actions.ts, messages.ts
+  dashboard/{called-card,waiting-list,ticket-menu,undo,queue-controls,move-form}.tsx, use-elapsed-ms.ts
+                              (presentational pieces of the queue board; state and actions stay in queue-board.tsx)
   dashboard/history/page.tsx
   api/s/[slug]/me/route.ts
   api/owner/queue/route.ts, api/owner/history/route.ts
