@@ -17,6 +17,11 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+        // Ticket status: the same colours on the Customer page and the queue board.
+        waiting: "bg-status-waiting text-status-waiting-foreground",
+        called: "bg-status-called text-status-called-foreground",
+        served: "bg-status-served text-status-served-foreground",
+        ended: "bg-status-ended text-status-ended-foreground",
       },
     },
     defaultVariants: {

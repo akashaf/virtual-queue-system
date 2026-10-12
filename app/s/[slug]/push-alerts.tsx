@@ -1,5 +1,6 @@
 "use client";
 
+import { BellOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   AlertDialog,
@@ -11,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import type { Dictionary } from "@/lib/i18n";
 import {
   pushPlan,
@@ -161,13 +163,14 @@ export function PushStatusNote({
   dict: Dictionary;
 }) {
   if (status === "on") {
-    return <p className="text-sm text-muted-foreground">{dict.pushOn}</p>;
+    return <p className="text-center text-sm text-muted-foreground">{dict.pushOn}</p>;
   }
   if (status === "off") {
     return (
-      <p role="status" className="rounded-lg bg-muted px-4 py-3 text-sm font-medium">
-        {dict.keepPageOpen}
-      </p>
+      <Alert role="status">
+        <BellOff aria-hidden />
+        <AlertTitle className="line-clamp-none">{dict.keepPageOpen}</AlertTitle>
+      </Alert>
     );
   }
   return null;

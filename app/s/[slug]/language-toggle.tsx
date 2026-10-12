@@ -1,5 +1,5 @@
 import type { Lang } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { chooseLang } from "./actions";
 
 const LANGS: { code: Lang; label: string }[] = [
@@ -28,7 +28,7 @@ export function LanguageToggle({
         {label}
       </span>
       {LANGS.map(({ code, label: text }) => (
-        <button
+        <Button
           key={code}
           type="submit"
           name="lang"
@@ -36,15 +36,11 @@ export function LanguageToggle({
           aria-describedby="language-toggle-label"
           aria-current={code === lang ? "true" : undefined}
           lang={code}
-          className={cn(
-            "min-h-11 min-w-11 rounded-md px-3 text-sm font-medium",
-            code === lang
-              ? "bg-secondary text-secondary-foreground"
-              : "text-muted-foreground",
-          )}
+          variant={code === lang ? "secondary" : "ghost"}
+          className="h-11 min-w-11"
         >
           {text}
-        </button>
+        </Button>
       ))}
     </form>
   );
