@@ -3,19 +3,24 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { signIn, type SignInState } from "./actions";
+import { LoginNotice } from "./login-notice";
 
 const initialState: SignInState = { error: null };
 
-export function LoginForm() {
+/**
+ * `notice` is why the dashboard sent the Owner here. It sits where a refused
+ * sign-in shows, and the next attempt's own answer replaces it.
+ */
+export function LoginForm({ notice }: { notice: string | null }) {
   const [state, formAction, pending] = useActionState(signIn, initialState);
+  const message = state.error ?? notice;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          Email
-        </label>
+    <form action={formAction} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           name="email"
@@ -26,10 +31,8 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="password" className="text-sm font-medium">
-          Password
-        </label>
+      <div className="flex flex-col gap-3">
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           name="password"
@@ -40,11 +43,7 @@ export function LoginForm() {
         />
       </div>
 
-      {state.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {state.error}
-        </p>
-      ) : null}
+      {message ? <LoginNotice message={message} /> : null}
 
       <Button type="submit" size="lg" className="h-11" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}

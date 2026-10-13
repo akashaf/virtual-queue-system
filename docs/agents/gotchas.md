@@ -156,6 +156,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   at its default, the push explanation sheet (#10) opens as a modal right after a successful
   join and blocks every later click in the test. Granted, the page subscribes silently and no
   sheet appears. `test.use({ permissions: ["geolocation", "notifications"] })` is the pattern.
+- **A busy Mac fails e2e tests that a quiet one passes.** With macOS indexing and updating in the
+  background (load average 70–100 on 8 cores), sign-in alone took up to 5 s and every run lost one
+  to four tests to timeouts, the same tests passing in isolation. It looked exactly like a
+  regression from the change under test. Check `uptime` before blaming the diff, and compare
+  against `git stash` back to back, or with `--workers=2`, rather than against an earlier run.
 - **Vitest only collects `{app,lib}/**/*.test.ts` (unit) and `tests/db/**` (db).** A scratch
   test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
   green while proving nothing. Check the file is under one of those roots before trusting a pass.
