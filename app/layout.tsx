@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -15,11 +14,6 @@ const clarityCity = localFont({
   ],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "Barbershop Virtual Queue",
   description: "Join your barbershop's queue from your phone.",
@@ -30,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // next-themes sets the `dark` class before hydration, which React would otherwise flag.
     <html
       lang="en"
-      className={`${clarityCity.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${clarityCity.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

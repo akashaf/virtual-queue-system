@@ -8,7 +8,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-clarity-city);
-  --font-mono: var(--font-geist-mono);
   --color-status-waiting: var(--status-waiting);
   --color-status-waiting-foreground: var(--status-waiting-foreground);
   --color-status-called: var(--status-called);

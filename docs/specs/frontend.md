@@ -8,7 +8,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
   - Read `node_modules/next/dist/docs/` before implementing.
   - `params` and `searchParams` are Promises.
   - Session refresh lives in `proxy.ts`.
-- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Label, Card, Alert, Dialog, AlertDialog, DropdownMenu, Sonner toast, Badge, Tabs, Collapsible, Table).
+- **UI:** Tailwind CSS 4 plus shadcn/ui (Button, Input, Label, Card, Alert, AlertDialog, DropdownMenu, Sonner toast, Badge, Collapsible, Table).
   - Design mobile-first: 360 px minimum width, touch targets ≥ 44 px.
   - **Official shadcn components only.** Plain Tailwind is for layout (flex, grid, spacing, sizing), never for hand-styling a control.
   - **Theme:** burgundy `primary`, orange-red `destructive` (kept apart so a destructive action never reads as a normal one), faintly warm neutrals. Typeface is Clarity City, self-hosted from `@clr/city` through `next/font/local` because it is not on Google Fonts.
@@ -167,7 +167,7 @@ lib/queue-changed.ts          (the ping, the poll and the visibilitychange refet
 lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts
 lib/alerts.ts                 (pure: which alert a view change calls for)
 lib/alert-effects.ts          (sound, vibration, title flash and wake lock, acting on it)
-components/ui/…              (shadcn)
+components/ui/…              (shadcn; only what a screen imports, which lib/ui-components.test.ts checks)
 public/sw.js
 proxy.ts
 netlify/functions/daily.mts  (schedule only; calls api/cron/daily)
