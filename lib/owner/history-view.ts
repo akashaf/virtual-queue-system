@@ -77,6 +77,19 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   removed: "Removed",
 };
 
+/**
+ * Which status colour each Ticket status wears, as on the Customer page and the
+ * queue board. No-show, Left and Removed share the ended colour.
+ */
+export const STATUS_BADGES = {
+  waiting: "waiting",
+  called: "called",
+  served: "served",
+  no_show: "ended",
+  left: "ended",
+  removed: "ended",
+} as const satisfies Record<TicketStatus, string>;
+
 const ringgit = new Intl.NumberFormat("en-MY", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
