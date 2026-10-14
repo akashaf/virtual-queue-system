@@ -24,13 +24,14 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
   - A small EN | BM toggle overrides it.
   - Translations are plain dictionaries in `lib/i18n/{en,ms}.ts`, with no i18n library.
   - The Owner dashboard is English-only.
+  - The one exception on an Owner page: `/login` has a line below its card telling a Customer who edited the URL to scan the QR code, in the language the Customer page would use.
 - **Errors:** Sentry `@sentry/nextjs` on the client and server.
 
 ## 2. Routes
 
 | Route | Audience | Rendering |
 |---|---|---|
-| `/` | Public | Static page: "Scan the QR code at your barbershop" |
+| `/` | Public | Temporary redirect to `/login`. Customers only arrive by QR code, so the bare domain is the Owner's way in |
 | `/s/[slug]` | Customer | Dynamic. The QR code target and the whole customer experience |
 | `/login` | Owner | Email and password form |
 | `/dashboard` | Owner | Live queue |
@@ -109,6 +110,8 @@ The page compares the previous view with the new one after each refetch, in `lib
 - Email and password fields.
 - Errors: "Wrong email or password"; "This shop account is inactive, contact support".
 - No sign-up and no forgot-password link. Owners contact the Operator instead (deferred).
+- An Owner who is already signed in is sent on to `/dashboard`. `/` relies on this rather than checking the session itself.
+- Below the card, a small line for Customers: "Waiting for a haircut? Scan the QR code at the shop." (§1 covers its language).
 
 ### 4.2 `/dashboard`
 The layout checks the session and `is_active` on the server, and redirects to `/login` otherwise.

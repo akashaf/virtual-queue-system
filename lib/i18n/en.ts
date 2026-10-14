@@ -90,6 +90,9 @@ export const en = {
   leftTitle: "You left the queue",
   removedTitle: "Your ticket was removed",
   ticketGone: "That ticket has already ended",
+
+  // A Customer who edited the URL and landed on the Owner's sign-in page
+  scanAtShop: "Waiting for a haircut? Scan the QR code at the shop.",
 };
 
 export type Dictionary = Record<keyof typeof en, string>;

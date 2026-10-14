@@ -92,4 +92,7 @@ export const ms: Dictionary = {
   leftTitle: "Anda telah keluar dari giliran",
   removedTitle: "Tiket anda telah dibuang",
   ticketGone: "Tiket itu telah pun berakhir",
+
+  // A Customer who edited the URL and landed on the Owner's sign-in page
+  scanAtShop: "Menunggu giliran untuk gunting rambut? Imbas kod QR di kedai.",
 };
