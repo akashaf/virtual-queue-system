@@ -31,6 +31,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   `locator("details")`). With the Collapsible also handling the click, React applied
   `open` during the click and the browser's own summary toggle then flipped it back shut.
   The `<details>` `onToggle` is the single source of truth and the Collapsible is only told.
+- **`bun run e2e` cannot start while `bun run dev` is running.** Next allows one dev server
+  per project directory, so Playwright's own server on 3100 exits at once. Run
+  `E2E_PORT=3000 bun run e2e` to reuse the running one instead (it already talks to local
+  Supabase through `.env.local`).
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps` / `PageProps` /
   `RouteContext` are generated. After deleting routes, `rm -rf .next` clears stale
   `.next/types`.

@@ -70,7 +70,14 @@ describe("GET /api/operator/billing", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({
+    const body = await response.json();
+    // Every active Shop is listed, so a Shop made by hand in the local database
+    // appears too, with nothing Served in a month before it existed.
+    const ours = [first.shop.slug, second.shop.slug];
+    expect({
+      ...body,
+      shops: body.shops.filter((shop: { slug: string }) => ours.includes(shop.slug)),
+    }).toEqual({
       month: "2026-06",
       shops: [
         { slug: first.shop.slug, name: "Kedai Ali", servedCount: 3, amountSen: 75 },

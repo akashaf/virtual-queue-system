@@ -3,6 +3,7 @@ import { Client } from "pg";
 import { inject } from "vitest";
 import type { Database } from "@/lib/supabase/database.types";
 import { metresNorthOf, SHOP_LAT, SHOP_LNG } from "../shop-location";
+import { deleteTestData } from "../test-data";
 
 export { metresNorthOf, SHOP_LAT, SHOP_LNG };
 
@@ -160,8 +161,8 @@ export async function sessionCount(db: Client, email: string) {
 /**
  * Clears everything the database tests create. They share one long-lived local
  * stack, so each file starts from a clean slate rather than relying on `db reset`.
+ * Only test-owned rows go: a Shop made by hand for local development survives.
  */
 export async function resetTestData(db: Client) {
-  await db.query("truncate public.shops, public.queue_days, public.tickets cascade");
-  await db.query("delete from auth.users where email like '%@example.test'");
+  await deleteTestData(db);
 }
