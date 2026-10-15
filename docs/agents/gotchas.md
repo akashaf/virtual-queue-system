@@ -100,6 +100,19 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   proceeds without confirmation. `docs/specs/third-party.md` §3 has the safe scratch-workdir
   recipe. `supabase config diff` is read-only and safe.
 
+- **An iPhone Home Screen app does not share cookies with Safari.** Adding the queue page to
+  the Home Screen gives it its own storage, so the device cookie — and with it the Ticket —
+  stays behind in Safari, and the installed app sees a new device. Joining again there puts the
+  same person in the Queue twice. Advice to install has to come before joining, not after.
+- **A Ticket's push subscription only exists once the Customer has finished the sheet.**
+  `dispatchAlerts` silently skips a Ticket with no subscription, so a Call next pressed
+  seconds after a join can send nothing and report nothing. When testing push, check
+  `push_subscriptions` before calling. Leaving the Queue deletes the row, so check before
+  that too.
+- **An iPhone plays the page's alert sound at the media volume, not the ringer.** A
+  "silent alert" in testing turned out to be media volume turned down, with the ringer up.
+  Check the media volume before debugging.
+
 - **A supabase-js `.select()` string must be one literal.** The client parses the
   column string *at the type level*, and TypeScript only gives it a literal type when it is a
   single literal: split a long select across two strings with `+` and every row property

@@ -71,6 +71,11 @@ Once a Ticket reaches a final state, the page keeps showing that state until the
 Every final state therefore has a way on, Served included — otherwise a Customer who has had their haircut could not queue again that day, for a child or for a second cut.
 
 ### 3.2 Join flow
+0. **iPhone install gate** ([ADR 0001 amendment](../adr/0001-web-push-not-whatsapp-for-mvp-alerts.md#amendment-2026-10-16-iphone-customers-must-install-to-join)). Before the form is usable, on an iPhone with iOS 16.4 or later only (iPads are not gated):
+   - **In Safari** (not standalone): show the install steps (Share → Add to Home Screen → open it from there and join) in place of the Join button. There is no way to join from Safari.
+   - **In an in-app browser** (WhatsApp, Instagram, Facebook and the like): say to open the page in Safari first, then show the same steps.
+   - **Standalone (installed)**, iOS older than 16.4, and every non-iOS browser: the normal form.
+   - The gate is for new joins only. A device already holding a Ticket sees that Ticket, and Rejoin is never gated.
 1. The customer taps **Join queue**. This tap is the user gesture that everything below needs.
 2. **Unlock audio:** play a silent audio clip, which lets the alert sound play later on iOS.
 3. **Get location:** call `navigator.geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })` and show "Checking you're at the shop…".
@@ -78,7 +83,7 @@ Every final state therefore has a way on, Served included — otherwise a Custom
 5. **Ask for notifications.** On success, if `'PushManager' in window`:
    - Show a short explanation sheet, then `Notification.requestPermission()`.
    - If granted: register `/sw.js`, subscribe with `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and call `savePushSubscription`.
-   - If denied or unsupported (for example iOS Safari that isn't installed to the Home Screen): show a persistent banner "Keep this page open, we'll alert you with sound" and **do not re-prompt**.
+   - If denied or unsupported (for example iOS Safari that isn't installed to the Home Screen): show a persistent banner "Keep this page open, we'll alert you with sound" and **do not re-prompt**. The banner also tells the Customer that alerts play at the media volume, not the ringer, so turn it up.
 6. Switch to the Waiting state.
 
 ### 3.3 Alerts on the open page
