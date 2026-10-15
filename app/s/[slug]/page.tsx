@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { Alert, AlertTitle } from "@/components/ui/alert";
 import { fetchCustomerView } from "@/lib/customer/queue";
 import { DEVICE_COOKIE, isDeviceId } from "@/lib/device-cookie";
 import { dictionaries, LANG_COOKIE, resolveLang } from "@/lib/i18n";
 import { isInAppBrowser } from "@/lib/in-app-browser";
 import { CustomerQueue } from "./customer-queue";
 import { LanguageToggle } from "./language-toggle";
+import { InAppBrowserWarning } from "./page-notices";
 
 export async function generateMetadata({
   params,
@@ -36,6 +36,9 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
   );
   const dict = dictionaries[lang];
   const userAgent = headerList.get("user-agent");
+  // Read from the request so the in-app banner is in the first HTML.
+  // CustomerQueue places it, because the install gate's card replaces it.
+  const inAppBrowser = isInAppBrowser(userAgent);
 
   const cookieValue = cookieStore.get(DEVICE_COOKIE)?.value;
   const view = await fetchCustomerView(
@@ -51,25 +54,21 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
     >
       <LanguageToggle slug={slug} lang={lang} label={dict.langToggleLabel} />
 
-      {/* Above any state (frontend.md §3.1): these webviews get no Web Push,
-          and some of them drop the page as soon as the Customer switches away. */}
-      {isInAppBrowser(userAgent) ? (
-        <Alert>
-          <AlertTitle className="line-clamp-none">{dict.inAppBrowserWarning}</AlertTitle>
-        </Alert>
-      ) : null}
-
       {view?.shop.isActive ? (
         <CustomerQueue
           slug={slug}
           initialView={view}
           dict={dict}
           userAgent={userAgent}
+          inAppBrowser={inAppBrowser}
         />
       ) : (
-        <p role="status" className="my-auto text-center text-lg text-muted-foreground">
-          {dict.shopUnavailable}
-        </p>
+        <>
+          {inAppBrowser ? <InAppBrowserWarning message={dict.inAppBrowserWarning} /> : null}
+          <p role="status" className="my-auto text-center text-lg text-muted-foreground">
+            {dict.shopUnavailable}
+          </p>
+        </>
       )}
     </main>
   );

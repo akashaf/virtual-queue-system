@@ -2,6 +2,18 @@ import { CircleAlert, Clock } from "lucide-react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
+/**
+ * For a social app's own webview (frontend.md §3.1), which gets no Web Push
+ * and may drop the page as soon as the Customer switches away.
+ */
+export function InAppBrowserWarning({ message }: { message: string }) {
+  return (
+    <Alert>
+      <AlertTitle className="line-clamp-none">{message}</AlertTitle>
+    </Alert>
+  );
+}
+
 /** A wait with nothing to do but read what is happening. */
 export function Busy({ message }: { message: string }) {
   return (

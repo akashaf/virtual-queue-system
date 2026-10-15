@@ -29,7 +29,7 @@ import {
 } from "./actions";
 import { Called } from "./called-ticket";
 import { JoinForm } from "./join-form";
-import { Announcement, Blocked, Busy } from "./page-notices";
+import { Announcement, Blocked, Busy, InAppBrowserWarning } from "./page-notices";
 import { PushExplanationSheet, usePushAlerts } from "./push-alerts";
 import { Ended } from "./ticket-ending";
 import { Waiting } from "./waiting-ticket";
@@ -77,12 +77,14 @@ export function CustomerQueue({
   initialView,
   dict,
   userAgent,
+  inAppBrowser,
 }: {
   slug: string;
   initialView: CustomerView;
   dict: Dictionary;
   /** The request's, so the server can tell which phones the gate might stop. */
   userAgent: string | null;
+  inAppBrowser: boolean;
 }) {
   // The view and the alerts move together: every alert is decided by comparing
   // the view the page had with the one that just arrived (lib/alerts.ts).
@@ -102,13 +104,17 @@ export function CustomerQueue({
   const hydrated = useSyncExternalStore(subscribeToNothing, onClient, onServer);
 
   // The iPhone install gate (frontend.md §3.2 step 0). Whether the page is
-  // running as a Home Screen app is only known in the browser, so the server
-  // answers "pending" for any phone the gate could apply to, and the form waits
+  // running as a Home Screen app is only known in the browser, so for a phone
+  // that might be installed the server answers "pending", and the form waits
   // for the browser's answer instead of flashing a Join button it may not keep.
+  // A webview is never installed, so its answer is already certain.
   const gate = useSyncExternalStore(
     subscribeToNothing,
     () => installGate(navigator.userAgent, isStandalone()),
-    () => (installGate(userAgent, false) === "none" ? "none" : "pending"),
+    () => {
+      const outside = installGate(userAgent, false);
+      return outside === "install" ? "pending" : outside;
+    },
   );
 
   const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
@@ -221,13 +227,22 @@ export function CustomerQueue({
     void refetch();
   }
 
+  // Above every screen (frontend.md §3.1): these webviews get no Web Push, and
+  // some of them drop the page as soon as the Customer switches away.
+  const withWarning = (screen: React.ReactNode) => (
+    <>
+      {inAppBrowser ? <InAppBrowserWarning message={dict.inAppBrowserWarning} /> : null}
+      {screen}
+    </>
+  );
+
   if (isBusy(stage)) {
-    return <Busy message={busyMessage(stage.kind, dict)} />;
+    return withWarning(<Busy message={busyMessage(stage.kind, dict)} />);
   }
 
   if (stage.kind === "location_denied" || stage.kind === "location_unavailable") {
     const denied = stage.kind === "location_denied";
-    return (
+    return withWarning(
       <Blocked
         title={denied ? dict.locationDeniedTitle : dict.locationUnavailableTitle}
         detail={denied ? dict.locationDeniedHelp : dict.locationUnavailableHelp}
@@ -238,7 +253,7 @@ export function CustomerQueue({
   }
 
   if (stage.kind === "rejected") {
-    return (
+    return withWarning(
       <Blocked
         title={rejectionMessage(stage.reason, dict)}
         action={dict.tryAgain}
@@ -248,7 +263,7 @@ export function CustomerQueue({
   }
 
   if (ended) {
-    return (
+    return withWarning(
       <Ended
         ticket={ended}
         dict={dict}
@@ -269,7 +284,7 @@ export function CustomerQueue({
     const ticket = view.ticket;
     const leave = () => void act(() => leaveQueue(ticket.id), "leaving");
 
-    return (
+    return withWarning(
       <>
         <PushExplanationSheet
           open={push.status === "ask"}
@@ -309,12 +324,12 @@ export function CustomerQueue({
   }
 
   if (view.shop.joiningState === "last_call") {
-    return (
+    return withWarning(
       <Announcement shopName={view.shop.name} message={dict.lastCallClosed} />
     );
   }
 
-  return (
+  const joinForm = (
     <JoinForm
       dict={dict}
       shopName={view.shop.name}
@@ -330,6 +345,8 @@ export function CustomerQueue({
       onSubmit={handleJoin}
     />
   );
+  // The gate's own card already says to open the page in Safari.
+  return gate === "open_in_safari" ? joinForm : withWarning(joinForm);
 }
 
 function isBusy(stage: Stage): stage is Stage & { kind: BusyStage } {

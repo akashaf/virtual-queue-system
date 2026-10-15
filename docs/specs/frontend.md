@@ -47,7 +47,7 @@ The page is one component that switches on `get_customer_view`. It shows only th
 | State | Condition | Shows | Actions |
 |---|---|---|---|
 | Shop not found / inactive | 404 or `is_active = false` | "This shop isn't accepting customers right now" | — |
-| In-app browser warning | UA matches Instagram, FB, TikTok, Line, WeChat or WhatsApp webviews | Banner shown above any state: "Open in Chrome/Safari to get alerts" | — |
+| In-app browser warning | UA matches Instagram, FB, TikTok, Line, WeChat or WhatsApp webviews | Banner shown above any state: "Open in Chrome/Safari to get alerts". Not over the iPhone install gate's "Open this page in Safari first" card, which says it already | — |
 | Join form | No active Ticket, `joining_state = open` | Shop name, waiting count, name input (1–30 characters), privacy notice | **Join queue** |
 | Last Call, not joined | No Ticket, `last_call` | "Shop is closing soon, not taking new customers" | — |
 | Location denied | Geolocation permission denied | How to enable location in the browser settings | **Try again** |

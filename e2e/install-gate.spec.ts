@@ -5,6 +5,11 @@ const IPHONE_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const IPHONE_WHATSAPP =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21F90 WhatsApp/2.24.9.78";
+const ANDROID_WHATSAPP =
+  "Mozilla/5.0 (Linux; Android 14; SM-S918B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.119 Mobile Safari/537.36 WhatsApp/2.24.9.78";
+const DESKTOP_CHROME =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const IN_APP_BANNER = "Open in Chrome/Safari to get alerts";
 const IPHONE_OLD_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1";
 const IPHONE_HOME_SCREEN =
@@ -68,6 +73,40 @@ test.describe("an iPhone in-app browser", () => {
     ).toBeVisible();
     await expect(page.getByText("Choose Add to Home Screen")).toBeVisible();
     await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
+    // The card says it already; the banner would only repeat it.
+    await expect(page.getByText(IN_APP_BANNER)).toHaveCount(0);
+  });
+
+  test("still shows the banner over a Ticket it already holds", async ({
+    page,
+    browser,
+  }) => {
+    const { shop } = await seedShop();
+    // A new context inherits this block's user agent, so it needs its own.
+    const desktop = await browser.newContext({ ...AT_SHOP_FRONT, userAgent: DESKTOP_CHROME });
+    const joined = await desktop.newPage();
+    await join(joined, shop.slug, "Ali");
+    await expect(joined.getByText("#001")).toBeVisible();
+
+    await page.context().addCookies((await desktop.storageState()).cookies);
+    await page.goto(`/s/${shop.slug}`);
+
+    await expect(page.getByText("#001")).toBeVisible();
+    await expect(page.getByText(IN_APP_BANNER)).toBeVisible();
+
+    await desktop.close();
+  });
+});
+
+test.describe("an Android in-app browser", () => {
+  test.use({ userAgent: ANDROID_WHATSAPP });
+
+  test("keeps the banner and the normal form", async ({ page }) => {
+    const { shop } = await seedShop();
+    await page.goto(`/s/${shop.slug}`);
+
+    await expect(page.getByText(IN_APP_BANNER)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Join queue" })).toBeVisible();
   });
 });
 
