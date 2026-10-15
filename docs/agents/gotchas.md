@@ -100,19 +100,6 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   proceeds without confirmation. `docs/specs/third-party.md` §3 has the safe scratch-workdir
   recipe. `supabase config diff` is read-only and safe.
 
-- **An iPhone Home Screen app does not share cookies with Safari.** Adding the queue page to
-  the Home Screen gives it its own storage, so the device cookie — and with it the Ticket —
-  stays behind in Safari, and the installed app sees a new device. Joining again there puts the
-  same person in the Queue twice. Advice to install has to come before joining, not after.
-- **A Ticket's push subscription only exists once the Customer has finished the sheet.**
-  `dispatchAlerts` silently skips a Ticket with no subscription, so a Call next pressed
-  seconds after a join can send nothing and report nothing. When testing push, check
-  `push_subscriptions` before calling. Leaving the Queue deletes the row, so check before
-  that too.
-- **An iPhone plays the page's alert sound at the media volume, not the ringer.** A
-  "silent alert" in testing turned out to be media volume turned down, with the ringer up.
-  Check the media volume before debugging.
-
 - **A supabase-js `.select()` string must be one literal.** The client parses the
   column string *at the type level*, and TypeScript only gives it a literal type when it is a
   single literal: split a long select across two strings with `+` and every row property
@@ -124,6 +111,26 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   through on the error object. Sentry's scrubber in `lib/error-reporting.ts` filters by key, so
   it cannot see into that string; the reporting helpers send only `message` and `code` for this
   reason. Do not hand a Supabase error to `Sentry.captureException` directly.
+
+## iPhone and the Home Screen app
+
+- **An iPhone Home Screen app does not share cookies with Safari.** Adding the queue page to
+  the Home Screen gives it its own storage, so the device cookie — and with it the Ticket —
+  stays behind in Safari, and the installed app sees a new device. Joining again there puts the
+  same person in the Queue twice. Advice to install has to come before joining, not after.
+- **Before iOS 26, Add to Home Screen needs a manifest to make an app.** Without a manifest
+  asking for `display: standalone`, it saves a bookmark that opens in Safari again, so the
+  install gate would stop the Customer a second time. iOS 26 opens every Home Screen page as an
+  app, which is why testing on a current iPhone never showed it. Each Shop's page links
+  `/s/{slug}/app.webmanifest` for this reason.
+- **A Ticket's push subscription only exists once the Customer has finished the sheet.**
+  `dispatchAlerts` silently skips a Ticket with no subscription, so a Call next pressed
+  seconds after a join can send nothing and report nothing. When testing push, check
+  `push_subscriptions` before calling. Leaving the Queue deletes the row, so check before
+  that too.
+- **An iPhone plays the page's alert sound at the media volume, not the ringer.** A
+  "silent alert" in testing turned out to be media volume turned down, with the ringer up.
+  Check the media volume before debugging.
 
 ## Sentry
 
@@ -173,6 +180,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   at its default, the push explanation sheet (#10) opens as a modal right after a successful
   join and blocks every later click in the test. Granted, the page subscribes silently and no
   sheet appears. `test.use({ permissions: ["geolocation", "notifications"] })` is the pattern.
+- **Headless Chromium answers notifications with "denied" unless granted.** A context
+  without `"notifications"` in `permissions` never sees the push explanation sheet: the page
+  reads the refusal and goes straight to the keep-this-page-open banner. That is the state a
+  Customer who declined ends up in, so it is the way to test one; a "Not now" click will wait
+  for a sheet that never opens.
 - **A busy Mac fails e2e tests that a quiet one passes.** With macOS indexing and updating in the
   background (load average 70–100 on 8 cores), sign-in alone took up to 5 s and every run lost one
   to four tests to timeouts, the same tests passing in isolation. It looked exactly like a

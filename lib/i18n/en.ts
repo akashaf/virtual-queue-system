@@ -15,6 +15,17 @@ export const en = {
     "Only the shop sees your name, and we delete it 30 days after your visit.",
   joinButton: "Join queue",
 
+  // iPhone install gate
+  installTitle: "Add this page to your Home Screen to join",
+  installWhy:
+    "On iPhone, your turn alert only reaches a locked phone if you join from the Home Screen.",
+  openInSafariTitle: "Open this page in Safari first",
+  openInSafariHelp:
+    "This browser can't add the page to your Home Screen. Open the menu and choose Open in Safari, or copy the link into Safari. Then:",
+  installStepShare: "Tap the Share button",
+  installStepAdd: "Choose Add to Home Screen",
+  installStepOpen: "Open it from your Home Screen and join there",
+
   // Joining
   checkingLocation: "Checking you're at the shop…",
   joining: "Joining the queue…",
@@ -69,6 +80,8 @@ export const en = {
   pushExplainNotNow: "Not now",
   pushOn: "Alerts are on — we'll notify you",
   keepPageOpen: "Keep this page open, we'll alert you with sound",
+  mediaVolumeHint:
+    "The sound plays at your media volume, not your ringer, so turn the volume up.",
 
   // Last Call and Close Shop
   lastCallChoiceTitle: "Shop is closing soon",

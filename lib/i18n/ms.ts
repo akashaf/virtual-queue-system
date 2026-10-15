@@ -16,6 +16,17 @@ export const ms: Dictionary = {
     "Hanya kedai melihat nama anda, dan kami memadamnya 30 hari selepas kunjungan anda.",
   joinButton: "Sertai giliran",
 
+  // Pasang di iPhone
+  installTitle: "Tambah halaman ini ke Skrin Utama untuk menyertai",
+  installWhy:
+    "Di iPhone, makluman giliran hanya sampai ke telefon yang dikunci jika anda menyertai dari Skrin Utama.",
+  openInSafariTitle: "Buka halaman ini dalam Safari dahulu",
+  openInSafariHelp:
+    "Pelayar ini tidak boleh menambah halaman ke Skrin Utama. Buka menu dan pilih Buka dalam Safari, atau salin pautan ke Safari. Kemudian:",
+  installStepShare: "Ketik butang Kongsi",
+  installStepAdd: "Pilih Tambah ke Skrin Utama",
+  installStepOpen: "Bukanya dari Skrin Utama dan sertai di sana",
+
   // Sedang menyertai
   checkingLocation: "Memastikan anda berada di kedai…",
   joining: "Menyertai giliran…",
@@ -70,6 +81,8 @@ export const ms: Dictionary = {
   pushExplainNotNow: "Bukan sekarang",
   pushOn: "Makluman dihidupkan — kami akan maklumkan anda",
   keepPageOpen: "Biarkan halaman ini terbuka, kami akan maklumkan anda dengan bunyi",
+  mediaVolumeHint:
+    "Bunyi dimainkan pada kelantangan media, bukan nada dering, jadi kuatkan kelantangan.",
 
   // Panggilan terakhir dan kedai tutup
   lastCallChoiceTitle: "Kedai akan tutup sebentar lagi",

@@ -72,10 +72,13 @@ Every final state therefore has a way on, Served included — otherwise a Custom
 
 ### 3.2 Join flow
 0. **iPhone install gate** ([ADR 0001 amendment](../adr/0001-web-push-not-whatsapp-for-mvp-alerts.md#amendment-2026-10-16-iphone-customers-must-install-to-join)). Before the form is usable, on an iPhone with iOS 16.4 or later only (iPads are not gated):
-   - **In Safari** (not standalone): show the install steps (Share → Add to Home Screen → open it from there and join) in place of the Join button. There is no way to join from Safari.
+   - **In Safari** (not standalone): show the install steps (Share → Add to Home Screen → open it from there and join) in place of the join form. The name field goes too, because a name typed in Safari would not follow the Customer into the installed app. There is no way to join from Safari.
    - **In an in-app browser** (WhatsApp, Instagram, Facebook and the like): say to open the page in Safari first, then show the same steps.
    - **Standalone (installed)**, iOS older than 16.4, and every non-iOS browser: the normal form.
    - The gate is for new joins only. A device already holding a Ticket sees that Ticket, and Rejoin is never gated.
+   - Other iPhone browsers (Chrome, Firefox and the like) get the same install steps: since iOS 16.4 they can add to the Home Screen from their own Share button.
+   - Each Shop's page links a web app manifest (`/s/{slug}/app.webmanifest`, `display: standalone`, scoped to the Shop and named after it). Before iOS 26, Add to Home Screen without one makes a bookmark that opens in Safari, which the gate would stop again.
+   - Detection runs in the browser (`lib/install-gate.ts`). The server renders nothing in place of the form for a phone the gate might stop, so no Join button flashes before the steps.
 1. The customer taps **Join queue**. This tap is the user gesture that everything below needs.
 2. **Unlock audio:** play a silent audio clip, which lets the alert sound play later on iOS.
 3. **Get location:** call `navigator.geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })` and show "Checking you're at the shop…".

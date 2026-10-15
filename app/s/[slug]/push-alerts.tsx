@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Dictionary } from "@/lib/i18n";
 import {
   pushPlan,
@@ -153,7 +153,7 @@ export function PushExplanationSheet({
 /**
  * The Waiting view's alert status (frontend.md §3.1): one quiet line when push
  * is on, and the persistent keep-this-page-open banner when the page's own
- * sound is all there is.
+ * sound is all there is, with a reminder of which volume that sound obeys.
  */
 export function PushStatusNote({
   status,
@@ -170,6 +170,8 @@ export function PushStatusNote({
       <Alert role="status">
         <BellOff aria-hidden />
         <AlertTitle className="line-clamp-none">{dict.keepPageOpen}</AlertTitle>
+        {/* An iPhone plays it at the media volume, which is easy to have down. */}
+        <AlertDescription>{dict.mediaVolumeHint}</AlertDescription>
       </Alert>
     );
   }

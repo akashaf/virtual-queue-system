@@ -8,7 +8,16 @@ import { isInAppBrowser } from "@/lib/in-app-browser";
 import { CustomerQueue } from "./customer-queue";
 import { LanguageToggle } from "./language-toggle";
 
-export const metadata: Metadata = { title: "Join the queue" };
+export async function generateMetadata({
+  params,
+}: PageProps<"/s/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  return {
+    title: "Join the queue",
+    // So Add to Home Screen opens this page as an app (./app.webmanifest).
+    manifest: `/s/${slug}/app.webmanifest`,
+  };
+}
 
 /**
  * The QR code's target, and the whole Customer experience.
@@ -26,6 +35,7 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
     headerList.get("accept-language"),
   );
   const dict = dictionaries[lang];
+  const userAgent = headerList.get("user-agent");
 
   const cookieValue = cookieStore.get(DEVICE_COOKIE)?.value;
   const view = await fetchCustomerView(
@@ -43,14 +53,19 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
 
       {/* Above any state (frontend.md §3.1): these webviews get no Web Push,
           and some of them drop the page as soon as the Customer switches away. */}
-      {isInAppBrowser(headerList.get("user-agent")) ? (
+      {isInAppBrowser(userAgent) ? (
         <Alert>
           <AlertTitle className="line-clamp-none">{dict.inAppBrowserWarning}</AlertTitle>
         </Alert>
       ) : null}
 
       {view?.shop.isActive ? (
-        <CustomerQueue slug={slug} initialView={view} dict={dict} />
+        <CustomerQueue
+          slug={slug}
+          initialView={view}
+          dict={dict}
+          userAgent={userAgent}
+        />
       ) : (
         <p role="status" className="my-auto text-center text-lg text-muted-foreground">
           {dict.shopUnavailable}

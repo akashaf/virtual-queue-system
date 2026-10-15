@@ -19,6 +19,7 @@ import {
 } from "@/lib/alerts";
 import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
 import { recordLocationFailure } from "@/lib/error-reporting";
+import { installGate, isStandalone } from "@/lib/install-gate";
 import {
   chooseLastCall,
   joinQueue,
@@ -75,10 +76,13 @@ export function CustomerQueue({
   slug,
   initialView,
   dict,
+  userAgent,
 }: {
   slug: string;
   initialView: CustomerView;
   dict: Dictionary;
+  /** The request's, so the server can tell which phones the gate might stop. */
+  userAgent: string | null;
 }) {
   // The view and the alerts move together: every alert is decided by comparing
   // the view the page had with the one that just arrived (lib/alerts.ts).
@@ -96,6 +100,16 @@ export function CustomerQueue({
   // hydration-safe way to ask "is the browser running this yet?": the server
   // snapshot is false and the client's is true.
   const hydrated = useSyncExternalStore(subscribeToNothing, onClient, onServer);
+
+  // The iPhone install gate (frontend.md §3.2 step 0). Whether the page is
+  // running as a Home Screen app is only known in the browser, so the server
+  // answers "pending" for any phone the gate could apply to, and the form waits
+  // for the browser's answer instead of flashing a Join button it may not keep.
+  const gate = useSyncExternalStore(
+    subscribeToNothing,
+    () => installGate(navigator.userAgent, isStandalone()),
+    () => (installGate(userAgent, false) === "none" ? "none" : "pending"),
+  );
 
   const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
 
@@ -312,6 +326,7 @@ export function CustomerQueue({
       }}
       nameProblem={nameProblem}
       ready={hydrated}
+      gate={gate}
       onSubmit={handleJoin}
     />
   );
