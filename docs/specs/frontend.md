@@ -36,7 +36,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Server contracts are in [back
 | `/login` | Owner | Email and password form |
 | `/dashboard` | Owner | Live queue |
 | `/dashboard/history` | Owner | Today's Tickets plus Served counts |
-| `/sw.js` (in `public/`) | — | Service worker for push |
+| `/OneSignalSDKWorker.js` (in `public/`) | — | OneSignal's service worker for push |
 
 ## 3. Customer page `/s/[slug]`
 
@@ -83,9 +83,9 @@ Every final state therefore has a way on, Served included — otherwise a Custom
 2. **Unlock audio:** play a silent audio clip, which lets the alert sound play later on iOS.
 3. **Get location:** call `navigator.geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })` and show "Checking you're at the shop…".
 4. Call `joinQueue(slug, name, { lat, lng, accuracy })`.
-5. **Ask for notifications.** On success, if `'PushManager' in window`:
-   - Show a short explanation sheet, then `Notification.requestPermission()`.
-   - If granted: register `/sw.js`, subscribe with `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and call `savePushSubscription`.
+5. **Ask for notifications** through OneSignal ([ADR 0005](../adr/0005-onesignal-delivers-web-push.md)). The page initialises the OneSignal Web SDK on load, with its own prompts off, so the sheet's button reaches the browser's prompt inside the tap. On success, if `'PushManager' in window` and `NEXT_PUBLIC_ONESIGNAL_APP_ID` is set:
+   - Show a short explanation sheet, then `OneSignal.Notifications.requestPermission()`.
+   - If granted: `OneSignal.login(ticketId)` (the Ticket id is the External ID, never the device id), `OneSignal.User.setLanguage(lang)`, and opt the push subscription in. A reload or a Rejoin logs in again silently, which moves the subscription to the Ticket the Customer holds now.
    - If denied or unsupported (for example iOS Safari that isn't installed to the Home Screen): show a persistent banner "Keep this page open, we'll alert you with sound" and **do not re-prompt**. The banner also tells the Customer that alerts play at the media volume, not the ringer, so turn it up.
 6. Switch to the Waiting state.
 
@@ -103,13 +103,9 @@ The page compares the previous view with the new one after each refetch, in `lib
 - **Screen Wake Lock:** request `navigator.wakeLock` while the Ticket is Waiting or Called — Called too, or the screen could go dark while the chime rings — and re-acquire it on `visibilitychange`. Treat it as a best-effort extra, not a guarantee.
 - **Push over an open page:** a push that arrives while the page is focused is still shown as a notification, so the Customer is alerted twice. Safari revokes a push subscription after three pushes that show nothing, so the service worker must never skip one.
 
-### 3.4 Service worker `public/sw.js`
-- `push`: parse `{ kind, shopName, number, url, lang }`, then `showNotification` with localised text:
-  - `heads_up`: "Almost your turn at {shop}"
-  - `called`: "Your turn at {shop}: #{number}", with `requireInteraction: true`
-  - `last_call`: "{shop} is closing soon, choose to stay or move to the next day"
-  - `shop_closed`: "{shop} has closed"
-- `notificationclick`: focus an existing `/s/{slug}` window or open one.
+### 3.4 Service worker `public/OneSignalSDKWorker.js`
+- OneSignal's standard worker, one `importScripts` line. It shows every push and opens the notification's `url` on click.
+- The text is written by the server (backend.md §7): the Shop's name as the title, and the message in English and Malay, of which OneSignal shows the subscriber's language.
 - No offline caching in the MVP.
 
 ## 4. Owner app
@@ -175,11 +171,11 @@ lib/owner/{view,queue}.ts     (same split: view.ts is pure, queue.ts calls the d
 lib/owner/{history-view,history}.ts (the same split for the history page)
 lib/operator/{auth,shop-input,shop-resource}.ts
 lib/queue-changed.ts          (the ping, the poll and the visibilitychange refetch, shared by both screens)
-lib/push.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts
+lib/push.ts, lib/push-client.ts, lib/device-cookie.ts, lib/uuid.ts, lib/time.ts, lib/i18n/{en,ms}.ts
 lib/alerts.ts                 (pure: which alert a view change calls for)
 lib/alert-effects.ts          (sound, vibration, title flash and wake lock, acting on it)
 components/ui/…              (shadcn; only what a screen imports, which lib/ui-components.test.ts checks)
-public/sw.js
+public/OneSignalSDKWorker.js
 proxy.ts
 netlify/functions/daily.mts  (schedule only; calls api/cron/daily)
 netlify.toml

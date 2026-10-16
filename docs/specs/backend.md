@@ -8,7 +8,7 @@ In scope for the MVP:
 - Customer join, position tracking, leave, rejoin, and the Last Call choice
 - The Owner queue operations
 - The Operator admin API
-- Web Push dispatch
+- Web Push dispatch through OneSignal
 - Scheduled cleanup jobs
 - Billing counts
 
@@ -20,7 +20,7 @@ Out of scope: payments, WhatsApp/SMS, multi-shop Owners, Barbers, In-person Cust
 Browser (customer / owner)
   │  Server Actions (mutations)      Route Handlers (reads, operator API, cron)
   ▼                                   ▼
-Next.js 16 on Netlify (Free plan; functions region us-east-2, Singapore is paid-only) ── after() ──► web-push ──► browser push services
+Next.js 16 on Netlify (Free plan; functions region us-east-2, Singapore is paid-only) ── after() ──► OneSignal REST API ──► browser push services
   │  supabase-js (@supabase/ssr)
   ▼
 Supabase (ap-southeast-1): Postgres + Auth + Realtime
@@ -95,16 +95,17 @@ Indexes and constraints:
 - `(queue_day_id, device_id, joined_at desc)` finds the Ticket a device last took in a Queue Day, which is what `get_customer_view` answers with
 - `tickets.customer_name` is null or 1-30 characters; `tickets.number` is at least 1
 
-### `push_subscriptions`
+### `push_sends`
 | column | type | notes |
 |---|---|---|
 | id | uuid pk | |
 | ticket_id | uuid → tickets on delete cascade | |
-| endpoint | text unique | |
-| p256dh, auth | text | |
+| kind | text | `heads_up`, `called`, `last_call` or `shop_closed` |
+| outcome | text | `sent`, `no_subscriber` or `error` |
+| notification_id | text null | OneSignal's id, when `sent` |
 | created_at | timestamptz | |
 
-A ticket's subscriptions are deleted when it reaches a final status, except No-show while a Rejoin is still possible. They are also deleted when a push service answers 404 or 410. Close Shop is the one ending that alerts the Tickets it finishes, so `close_shop` leaves their subscriptions in place and the dispatcher deletes them after sending the `shop_closed` push — deleting inside the function would silence the very alert it returns.
+One row per alert the dispatcher tried to send (#29). Push subscriptions themselves live in OneSignal, under the Ticket id as External ID ([ADR 0005](../adr/0005-onesignal-delivers-web-push.md)), not in our database. An ended Ticket is simply never alerted again. Its OneSignal user is deleted 30 days after it finishes, with the rest of its personal data (§9).
 
 ### Row Level Security
 - Enable RLS on every table.
@@ -242,9 +243,10 @@ Some helpers are never called from outside the database, and are revoked from ev
   - A month that is not `YYYY-MM` is a `22023`; the admin API checks first.
   - Delivered so far (#13): all of it.
 - `expire_carried_over()` → `{ result: { expired }, alerts }`
-  - Removes Waiting Tickets with `carried_over_at < now() - 3 days` as `carry_over_expired` and deletes their push subscriptions. A Called one is left in the chair.
+  - Removes Waiting Tickets with `carried_over_at < now() - 3 days` as `carry_over_expired`. A Called one is left in the chair.
   - Locks each affected Shop in id order, then returns the Heads-ups the Tickets behind are now owed. None for a Deactivated Shop, which cannot call anyone.
-- `erase_expired_personal_data()` → `{ erased_tickets, deleted_subscriptions }`. Sets `customer_name` and `device_id` to null, and deletes push subscriptions, where `finished_at < now() - 30 days`
+- `erase_expired_personal_data()` → `{ erased_tickets, erased_ticket_ids, deleted_push_sends }`. Sets `customer_name` and `device_id` to null where `finished_at < now() - 30 days`, and deletes `push_sends` rows older than 30 days
+  - The cron route then deletes each erased Ticket's user in OneSignal (`DELETE /apps/{app_id}/users/by/external_id/{ticketId}`), which takes the phone's subscription with it. 404 is the usual answer, for a Customer who never allowed alerts; other failures go to Sentry and are not retried
   - Never deletes a Ticket: Served ones are billed, and the rest are counted in the Owner's history.
   - Updates only Tickets that still hold a name or device, so a second run counts and touches nothing. Partial index `tickets_awaiting_erasure` keeps the nightly search for names and devices to exactly those.
   - Delivered so far (#15): both functions.
@@ -268,7 +270,6 @@ Some helpers are never called from outside the database, and are revoked from ev
 |---|---|---|
 | `joinQueue(slug, name, coords)` | Device cookie (created here if missing) | `join_queue` |
 | `rejoinQueue(ticketId)`, `leaveQueue(ticketId)`, `chooseLastCall(ticketId, choice)` | Device cookie | Matching function |
-| `savePushSubscription(ticketId, subscription)` | Device cookie; the Ticket must belong to the device | Upsert into `push_subscriptions` |
 | `callNext()`, `markServed(id)`, `undoServed(id)`, `markNoShow(id)`, `removeTicket(id)`, `startLastCall()`, `cancelLastCall()`, `closeShop()` | Supabase session, Shop active | Matching function via the user-JWT client |
 | `signIn(email, password)`, `signOut()` | — | Supabase Auth. `signIn` rejects Deactivated Shops |
 
@@ -293,11 +294,11 @@ Device cookie `vq_device`:
 
 ### Push dispatch (`lib/push.ts`)
 - `dispatchAlerts(alerts)`:
-  1. Load the subscriptions for the alerted Tickets.
-  2. Send with `web-push`, TTL 10 min for `called` and `heads_up`, 1 h for the others, and urgency `high` for `called`.
-  3. Delete subscriptions that return 404 or 410.
-  4. Report other failures to Sentry.
-- Payload: `{ kind, shopName, number, url: '/s/{slug}' }`. Text is localised in the service worker using the language stored when the customer subscribed.
+  1. Load the alerted Tickets' numbers and Shops.
+  2. Send one OneSignal notification per alert (`POST https://api.onesignal.com/notifications`), to `include_aliases.external_id = [ticketId]` on the `push` channel. TTL 10 min for `called` and `heads_up`, 1 h for the others; priority 10 for `called`, 5 otherwise; `web_push_topic` is the kind, so a newer alert of a kind replaces the older one.
+  3. Write one `push_sends` row per alert: `sent` with OneSignal's id, `no_subscriber` when OneSignal answers with an empty id, `error` when it refuses or cannot be reached.
+  4. Report errors to Sentry, with the status code only.
+- Text: `headings` is the Shop's name and `contents` the message (`pushHeadsUp`, `pushCalled`, `pushLastCall`, `pushShopClosed` in `lib/i18n`), both as `{ en, ms }`. OneSignal shows the language the page set with `OneSignal.User.setLanguage`. `url` is `{APP_BASE_URL}/s/{slug}`.
 
 ## 8. Operator admin API
 
@@ -351,7 +352,7 @@ It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken 
 - Runs `expire_carried_over`, dispatches the resulting alerts, then runs `erase_expired_personal_data`.
 - Must be idempotent, because a manual "Run now" from the Netlify UI or a retry may call it twice.
 - Sends the alerts inline rather than in `after()`, because nobody is waiting on this response except the scheduled function.
-- Answers `200 { expired, alerts, erasedTickets, deletedSubscriptions }`: counts only, never names. Anything unexpected is reported to Sentry and answered `500 { error: "internal_error" }`. A missing `CRON_SECRET` crashes through, as a missing Operator key does.
+- Answers `200 { expired, alerts, erasedTickets, deletedPushSends, deletedOneSignalUsers }`: counts only, never names. Anything unexpected is reported to Sentry and answered `500 { error: "internal_error" }`. A missing `CRON_SECRET` crashes through, as a missing Operator key does.
 - The bearer check, the 401, and the reported 500 all come from `bearerRoute` in `lib/bearer.ts`, which the Operator API uses too.
 - Delivered so far (#15): all of it.
 
@@ -361,7 +362,8 @@ It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken 
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | client + server | Supabase |
 | `SUPABASE_SECRET_KEY` | server only | Customer and Operator functions |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:`) | public / server | Web Push |
+| `NEXT_PUBLIC_ONESIGNAL_APP_ID` | client + server | OneSignal app, for the Web SDK and the REST API |
+| `ONESIGNAL_REST_API_KEY` | server only, secret | OneSignal REST API |
 | `OPERATOR_API_KEY` | server | Admin API |
 | `CRON_SECRET` | server | Cron route |
 | `APP_BASE_URL` | server | QR target: `https://virtual-queue-system.netlify.app` in production |

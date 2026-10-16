@@ -1,14 +1,11 @@
+import OneSignal from "react-onesignal";
+import type { Lang } from "@/lib/i18n";
+
 /**
  * The browser's half of Web Push (frontend.md §3.2 step 5): deciding whether to
- * ask, and turning a granted permission into a saved subscription. The server
- * half — storing it, sending to it — lives in `lib/push.ts`.
+ * ask, and signing this browser up with OneSignal under the Customer's Ticket
+ * (ADR 0005). The server half — sending to that Ticket — lives in `lib/push.ts`.
  */
-
-/** What `PushSubscription.toJSON()` gives the page to send to the server. */
-export interface PushSubscriptionInput {
-  endpoint: string;
-  keys: { p256dh: string; auth: string };
-}
 
 /**
  * Set once the Customer has said no — to our sheet or to the browser's prompt —
@@ -44,7 +41,9 @@ export function readPushState(): {
   declined: boolean;
 } {
   return {
-    supported: "PushManager" in window && "serviceWorker" in navigator,
+    // No App ID (local development, e2e) is a browser without push: sound only.
+    supported:
+      Boolean(ONESIGNAL_APP_ID) && "PushManager" in window && "serviceWorker" in navigator,
     permission: "Notification" in window ? Notification.permission : "denied",
     declined: readPushDeclined(),
   };
@@ -68,37 +67,63 @@ export function rememberPushDeclined(): void {
   }
 }
 
+const ONESIGNAL_APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+
+let initialised: Promise<boolean> | null = null;
+
 /**
- * Registers the service worker and subscribes this browser, or null when any
- * step refuses — a missing VAPID key, a push service that cannot be reached.
- * Null means the sound fallback, which is never wrong, so no error escapes.
+ * Loads OneSignal's SDK and registers its service worker, once per page. False
+ * when it cannot — no App ID, a blocked script, a browser OneSignal refuses —
+ * which means the sound fallback, never wrong, so no error escapes.
+ *
+ * Its own prompts stay off: our explanation sheet is the only thing that asks
+ * (frontend.md §3.2), from the join tap.
  */
-export async function subscribeToPush(): Promise<PushSubscriptionInput | null> {
-  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!vapidKey) return null;
+export function initPush(): Promise<boolean> {
+  initialised ??= (async () => {
+    if (!ONESIGNAL_APP_ID) return false;
+    try {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        serviceWorkerPath: "OneSignalSDKWorker.js",
+        allowLocalhostAsSecureOrigin: process.env.NODE_ENV === "development",
+        autoResubscribe: true,
+        promptOptions: { slidedown: { prompts: [] } },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return initialised;
+}
 
+/**
+ * Points this browser's OneSignal user at the Ticket the Customer holds now:
+ * the Ticket id is the External ID the server sends to, and never the device
+ * id, which is the Customer's whole claim to the Ticket (ADR 0005). A Rejoin
+ * logs in again and moves the subscription to the new Ticket.
+ *
+ * Resolves to whether this browser will get the Ticket's pushes.
+ */
+export async function linkPushToTicket(ticketId: string, lang: Lang): Promise<boolean> {
+  if (!(await initPush())) return false;
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js");
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: toApplicationServerKey(vapidKey),
-    });
-
-    const { endpoint, keys } = subscription.toJSON();
-    if (!endpoint || !keys?.p256dh || !keys.auth) return null;
-    return { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } };
+    await OneSignal.login(ticketId);
+    OneSignal.User.setLanguage(lang);
+    if (OneSignal.Notifications.permission) await OneSignal.User.PushSubscription.optIn();
+    return OneSignal.User.PushSubscription.optedIn === true;
   } catch {
-    return null;
+    return false;
   }
 }
 
-/** The VAPID public key as bytes: base64url strings still trip some browsers. */
-function toApplicationServerKey(vapidKey: string): Uint8Array<ArrayBuffer> {
-  const base64 = vapidKey.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const bytes = atob(padded);
-
-  const key = new Uint8Array(new ArrayBuffer(bytes.length));
-  for (let i = 0; i < bytes.length; i++) key[i] = bytes.charCodeAt(i);
-  return key;
+/** The browser's own permission prompt, through OneSignal. True when granted. */
+export async function requestPushPermission(): Promise<boolean> {
+  if (!(await initPush())) return false;
+  try {
+    return await OneSignal.Notifications.requestPermission();
+  } catch {
+    return false;
+  }
 }

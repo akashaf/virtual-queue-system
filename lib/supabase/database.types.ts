@@ -34,37 +34,34 @@ export type Database = {
   }
   public: {
     Tables: {
-      push_subscriptions: {
+      push_sends: {
         Row: {
-          auth: string
           created_at: string
-          endpoint: string
           id: string
-          lang: string
-          p256dh: string
+          kind: string
+          notification_id: string | null
+          outcome: string
           ticket_id: string
         }
         Insert: {
-          auth: string
           created_at?: string
-          endpoint: string
           id?: string
-          lang?: string
-          p256dh: string
+          kind: string
+          notification_id?: string | null
+          outcome: string
           ticket_id: string
         }
         Update: {
-          auth?: string
           created_at?: string
-          endpoint?: string
           id?: string
-          lang?: string
-          p256dh?: string
+          kind?: string
+          notification_id?: string | null
+          outcome?: string
           ticket_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "push_subscriptions_ticket_id_fkey"
+            foreignKeyName: "push_sends_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "tickets"
@@ -359,10 +356,6 @@ export type Database = {
         }
         Returns: Json
       }
-      delete_push_subscriptions: {
-        Args: { p_ticket_id: string }
-        Returns: undefined
-      }
       erase_expired_personal_data: { Args: never; Returns: Json }
       estimated_wait: {
         Args: {
@@ -514,17 +507,6 @@ export type Database = {
       }
       remove_ticket: { Args: { p_ticket_id: string }; Returns: Json }
       revoke_owner_sessions: { Args: { p_user_id: string }; Returns: undefined }
-      save_push_subscription: {
-        Args: {
-          p_auth: string
-          p_device_id: string
-          p_endpoint: string
-          p_lang: string
-          p_p256dh: string
-          p_ticket_id: string
-        }
-        Returns: undefined
-      }
       served_count: {
         Args: { p_shop_id: string; p_span: unknown }
         Returns: number

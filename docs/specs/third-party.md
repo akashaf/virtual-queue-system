@@ -10,9 +10,9 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 |---|---|---|---|
 | Netlify | Hosting (Next.js runtime), Server Actions, Route Handlers, Scheduled Functions | **Free plan** until the first paying Shop ([ADR 0003](../adr/0003-netlify-free-plan-until-first-paying-shop.md)). The site is paused if monthly credits run out, which would take every Shop's Queue offline; see [§8](#8-upgrade-triggers) | US$0, then ~US$9 (Personal) or ~US$20 per member (Pro) |
 | Supabase | Postgres, Auth (Owners only), Realtime | Free, then Pro when limits are near | US$0, then ~US$25 |
-| Browser push services (FCM for Chrome/Android, Mozilla Autopush, Apple Push for installed web apps) | Deliver Web Push | No account needed; uses the VAPID keys we generate | US$0 |
+| OneSignal | Web Push: holds subscriptions, sends through the browsers' push services ([ADR 0005](../adr/0005-onesignal-delivers-web-push.md)) | Free plan (10,000 Web Push subscribers per send) | US$0 |
 | Sentry | Error tracking for client and server | Free Developer plan | US$0 |
-| npm libraries: `@supabase/supabase-js`, `@supabase/ssr`, `server-only`, `web-push`, `qrcode`, `@sentry/nextjs`, shadcn/ui (Radix, with shadcn's `cn` class merger), `sonner` | Code dependencies | Open source | US$0 |
+| npm libraries: `@supabase/supabase-js`, `@supabase/ssr`, `server-only`, `react-onesignal`, `qrcode`, `@sentry/nextjs`, shadcn/ui (Radix, with shadcn's `cn` class merger), `sonner` | Code dependencies | Open source | US$0 |
 | Dev tooling: Supabase CLI (a devDependency, run with `bunx supabase`), a Docker-compatible runtime such as Colima, Vitest, `pg`, Playwright | Local database, tests | Open source | US$0 |
 
 **Not used in the MVP (deferred):**
@@ -46,7 +46,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
   - Set `APP_BASE_URL` to `https://virtual-queue-system.netlify.app`.
 - **Environment variables:** everything in [backend.md §10](./backend.md#10-environment-variables). Set in the **Production** context only, with `netlify env:set NAME value --context production`.
   - **Per-scope variables are a paid feature.** On Free, `--scope` is rejected and every variable applies to all scopes (Builds, Functions, Runtime), so `NEXT_PUBLIC_*` values reach the build as needed without extra configuration. The CLI fails *silently* on `--scope` — it prints nothing and still exits 0 — so always confirm a write with `netlify env:list --context production`.
-  - Mark `SUPABASE_SECRET_KEY`, `VAPID_PRIVATE_KEY`, `OPERATOR_API_KEY` and `CRON_SECRET` as secret with `--secret`, which does work on Free.
+  - Mark `SUPABASE_SECRET_KEY`, `ONESIGNAL_REST_API_KEY`, `OPERATOR_API_KEY` and `CRON_SECRET` as secret with `--secret`, which does work on Free.
   - **Secret values are write-only:** once set, neither the CLI nor the dashboard can read them back. The Operator needs `OPERATOR_API_KEY` for the Postman runbook in [§7](#7-operator-runbook-onboarding-a-shop), so the generated values are mirrored to a local, gitignored `.env.netlify.production`. That file is the only readable copy — losing it means rotating the key. It is deliberately *not* called `.env.production.local`, a name `next build` loads by itself.
   - Only **Production** is deployed, and it points at the real Supabase project. Deploy Previews and Branch deploys stay disabled (below); if they're ever enabled, give them values for a separate Supabase project.
 - **Scheduled Functions:** one function, `netlify/functions/daily.mts`, scheduled `0 19 * * *` (UTC). It only calls `POST /api/cron/daily` with the `CRON_SECRET` header; see [backend.md §9](./backend.md#9-scheduled-jobs-netlify-scheduled-functions). Scheduled functions only run on published production deploys, and can be triggered with *Run now* in the Netlify UI for testing.
@@ -96,10 +96,11 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 
 ## 4. Web Push
 
-- **Standard:** the Push API with VAPID. No vendor account; the browser picks its own push service.
-- **Key generation, done once:** `bunx web-push generate-vapid-keys`.
-  - Store the public key in `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, the private key in `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT=mailto:<operator email>`.
-  - **Rotating these keys invalidates every existing subscription.**
+- **Vendor:** OneSignal, set up the standard way for a website with custom code ([ADR 0005](../adr/0005-onesignal-delivers-web-push.md)).
+  - **Dashboard setup, done once:** create an app, add the Web platform with *Custom Code*, site URL `https://virtual-queue-system.netlify.app`, and no prompts (the page asks through its own sheet). OneSignal generates and keeps the VAPID keys.
+  - `NEXT_PUBLIC_ONESIGNAL_APP_ID` is the App ID (public). `ONESIGNAL_REST_API_KEY` is an App API key, a secret: add it in the Netlify UI by hand, never through an agent.
+  - The SDK registers `public/OneSignalSDKWorker.js` at the site root.
+  - **Free plan limits:** Confirmed Delivery is paid-only, and not available for Safari on any plan, so for iPhones the dashboard shows sent and clicked, not delivered. `push_sends` (backend.md §3) is our own record of every send.
 - **Support matrix (the reason ADR 0001 exists):**
 
 | Platform | Push when page closed | Our fallback |
@@ -110,8 +111,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 | In-app webviews (Instagram, TikTok, etc.) | No | "Open in browser" banner |
 
 - **Operational rules:**
-  - Delete a subscription when the push service answers 404 or 410.
-  - Payload limit is about 4 KB; ours is under 300 bytes.
+  - Send by External ID (the Ticket id). OneSignal drops subscriptions the push service reports gone. The nightly job deletes a Ticket's OneSignal user 30 days after it finishes (PDPA).
   - TTL 600 s for `heads_up` and `called`, so a late alert isn't delivered after it's useless.
 
 ## 5. Sentry
@@ -119,7 +119,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 - **SDK:** `@sentry/nextjs`, set up through `instrumentation.ts` and `instrumentation-client.ts`, with `app/global-error.tsx` reporting render errors the SDK's global handlers never see. Every `Sentry.init` takes its options from `lib/error-reporting.ts`. Upload source maps at build time with `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT`; a build without the token skips the upload, and a runtime without `NEXT_PUBLIC_SENTRY_DSN` sends nothing.
 - **Capture:**
   - Unhandled errors
-  - Push send failures other than 404 and 410
+  - Push send failures (OneSignal refusing or unreachable), with the status code only
   - Unexpected function errors (anything not in the known error-code list), through `functionErrorReason`, which passes known codes through unreported. It leaves out the error's `details`, which Postgres fills with the failing row
   - Geolocation timeouts, as breadcrumbs only
 - **Privacy:**

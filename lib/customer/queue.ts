@@ -1,6 +1,5 @@
 import "server-only";
 import { functionErrorReason } from "@/lib/error-reporting";
-import type { Lang } from "@/lib/i18n";
 import { toQueueAlerts, type Mutated } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -126,39 +125,6 @@ export async function chooseTicketLastCall(
     p_device_id: deviceId,
     p_choice: choice,
   });
-}
-
-/**
- * Stores the browser's push subscription against the Customer's Ticket. The
- * device id is the whole of their claim, checked inside the function as ever:
- * a Ticket another device holds gets the same answer as one that has ended.
- */
-export async function savePushSubscriptionForTicket(subscription: {
-  ticketId: string;
-  deviceId: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  lang: Lang;
-}): Promise<{ ok: boolean }> {
-  const { error } = await createAdminClient().rpc("save_push_subscription", {
-    p_ticket_id: subscription.ticketId,
-    p_device_id: subscription.deviceId,
-    p_endpoint: subscription.endpoint,
-    p_p256dh: subscription.p256dh,
-    p_auth: subscription.auth,
-    p_lang: subscription.lang,
-  });
-
-  if (error) {
-    // ticket_not_found is a situation — a stale page, someone else's Ticket —
-    // and the page has nothing to say about it beyond falling back to sound;
-    // anything else is a bug, which functionErrorReason reports.
-    functionErrorReason("save_push_subscription", error, CUSTOMER_ERRORS);
-    return { ok: false };
-  }
-
-  return { ok: true };
 }
 
 async function customerCall(

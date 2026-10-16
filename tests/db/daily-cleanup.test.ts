@@ -4,7 +4,7 @@ import {
   anonClient,
   connectDb,
   createShop,
-  insertPushSubscription,
+  insertPushSend,
   joinQueue,
   resetTestData,
   serveOne,
@@ -32,7 +32,8 @@ interface ExpireEnvelope {
 
 interface Erased {
   erased_tickets: number;
-  deleted_subscriptions: number;
+  erased_ticket_ids: string[];
+  deleted_push_sends: number;
 }
 
 async function expireCarriedOver() {
@@ -47,12 +48,9 @@ async function erasePersonalData() {
   return data as unknown as Erased;
 }
 
-async function subscriptionCount(ticketId: string) {
-  const { rows } = await db.query(
-    "select count(*)::int as n from public.push_subscriptions where ticket_id = $1",
-    [ticketId],
-  );
-  return rows[0].n as number;
+async function pushSendExists(id: string) {
+  const { rows } = await db.query("select 1 from public.push_sends where id = $1", [id]);
+  return rows.length === 1;
 }
 
 interface TicketRow {
@@ -81,7 +79,6 @@ describe("expire_carried_over", () => {
     const neverCarried = await joinQueue(shop.slug, "Chong");
     await setCarriedOverAgo(db, expired.id, "3 days 1 minute");
     await setCarriedOverAgo(db, fresh.id, "3 days -1 minute");
-    await insertPushSubscription(db, expired.id);
 
     const { result } = await expireCarriedOver();
 
@@ -91,8 +88,6 @@ describe("expire_carried_over", () => {
       removed_reason: "carry_over_expired",
       finished_at: expect.anything(),
     });
-    // An ending that can alert nobody again, so its subscriptions go (backend.md §3).
-    expect(await subscriptionCount(expired.id)).toBe(0);
     expect((await ticketRow(fresh.id))?.status).toBe("waiting");
     expect((await ticketRow(neverCarried.id))?.status).toBe("waiting");
   });
@@ -168,7 +163,7 @@ describe("expire_carried_over", () => {
 });
 
 describe("erase_expired_personal_data", () => {
-  test("erases the name and device of Tickets finished more than 30 days ago, and deletes their subscriptions", async () => {
+  test("erases the name and device of Tickets finished more than 30 days ago", async () => {
     const { shop, owner } = await createShop();
     const client = await signInAs(owner.email, owner.password);
     const old = await serveOne(client, shop.slug, "Ali");
@@ -176,25 +171,33 @@ describe("erase_expired_personal_data", () => {
     const waiting = await joinQueue(shop.slug, "Chong");
     await setFinishedAgo(db, old.id, "30 days 1 minute");
     await setFinishedAgo(db, recent.id, "30 days -1 minute");
-    await insertPushSubscription(db, old.id);
-    await insertPushSubscription(db, recent.id);
-    await insertPushSubscription(db, waiting.id);
 
     const erased = await erasePersonalData();
 
-    expect(erased).toEqual({ erased_tickets: 1, deleted_subscriptions: 1 });
+    expect(erased.erased_tickets).toBe(1);
+    expect(erased.erased_ticket_ids).toEqual([old.id]);
     expect(await ticketRow(old.id)).toMatchObject({ customer_name: null, device_id: null });
-    expect(await subscriptionCount(old.id)).toBe(0);
     expect(await ticketRow(recent.id)).toMatchObject({
       customer_name: "Bala",
       device_id: expect.any(String),
     });
-    expect(await subscriptionCount(recent.id)).toBe(1);
     expect(await ticketRow(waiting.id)).toMatchObject({
       customer_name: "Chong",
       device_id: expect.any(String),
     });
-    expect(await subscriptionCount(waiting.id)).toBe(1);
+  });
+
+  test("deletes push sends logged more than 30 days ago, whatever their Ticket", async () => {
+    const { shop } = await createShop();
+    const ticket = await joinQueue(shop.slug, "Ali");
+    const old = await insertPushSend(db, ticket.id, "30 days 1 minute");
+    const recent = await insertPushSend(db, ticket.id, "30 days -1 minute");
+
+    const erased = await erasePersonalData();
+
+    expect(erased.deleted_push_sends).toBe(1);
+    expect(await pushSendExists(old)).toBe(false);
+    expect(await pushSendExists(recent)).toBe(true);
   });
 
   test("never deletes a Served Ticket: it is what the Shop is billed for", async () => {
@@ -217,12 +220,12 @@ describe("erase_expired_personal_data", () => {
     const client = await signInAs(owner.email, owner.password);
     const ticket = await serveOne(client, shop.slug);
     await setFinishedAgo(db, ticket.id, "31 days");
-    await insertPushSubscription(db, ticket.id);
+    await insertPushSend(db, ticket.id, "31 days");
     await erasePersonalData();
 
     const again = await erasePersonalData();
 
-    expect(again).toEqual({ erased_tickets: 0, deleted_subscriptions: 0 });
+    expect(again).toEqual({ erased_tickets: 0, erased_ticket_ids: [], deleted_push_sends: 0 });
     expect(await ticketRow(ticket.id)).toMatchObject({
       status: "served",
       customer_name: null,

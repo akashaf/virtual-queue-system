@@ -123,16 +123,16 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   install gate would stop the Customer a second time. iOS 26 opens every Home Screen page as an
   app, which is why testing on a current iPhone never showed it. Each Shop's page links
   `/s/{slug}/app.webmanifest` for this reason.
-- **A Ticket's push subscription only exists once the Customer has finished the sheet.**
-  `dispatchAlerts` silently skips a Ticket with no subscription, so a Call next pressed
-  seconds after a join can send nothing and report nothing. When testing push, check
-  `push_subscriptions` before calling. Leaving the Queue deletes the row, so check before
-  that too.
+- **A Ticket only has a OneSignal subscriber once the Customer has finished the sheet.**
+  A Call next pressed seconds after a join can find nobody under that Ticket's External ID.
+  It is not silent any more: `push_sends` gets a `no_subscriber` row. When testing push,
+  read `push_sends` for the Ticket before blaming OneSignal or the phone.
 - **Safari revokes a push subscription after three pushes that show nothing.** The service
   worker used to skip the notification when the queue page was focused, to avoid alerting
   twice. On an iPhone, testing with the app open used up those three pushes, after which
   pushes stopped arriving even with the screen locked, and nothing on the page says so
-  (it still reads "alerts on"). Every push must call `showNotification`.
+  (it still reads "alerts on"). Every push must call `showNotification`. OneSignal's worker
+  always does; never add a handler to `OneSignalSDKWorker.js` that suppresses one.
 - **An iPhone plays the page's alert sound at the media volume, not the ringer.** A
   "silent alert" in testing turned out to be media volume turned down, with the ringer up.
   Check the media volume before debugging.
@@ -181,15 +181,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Testing
 
-- **An e2e context that joins the Queue must grant `"notifications"`.** With the permission
-  at its default, the push explanation sheet (#10) opens as a modal right after a successful
-  join and blocks every later click in the test. Granted, the page subscribes silently and no
-  sheet appears. `test.use({ permissions: ["geolocation", "notifications"] })` is the pattern.
-- **Headless Chromium answers notifications with "denied" unless granted.** A context
-  without `"notifications"` in `permissions` never sees the push explanation sheet: the page
-  reads the refusal and goes straight to the keep-this-page-open banner. That is the state a
-  Customer who declined ends up in, so it is the way to test one; a "Not now" click will wait
-  for a sheet that never opens.
+- **e2e runs without OneSignal, so push is always "off" there.** With no
+  `NEXT_PUBLIC_ONESIGNAL_APP_ID`, the page treats the browser as having no push: no sheet,
+  straight to the keep-this-page-open banner. Contexts still grant `"notifications"` so that a
+  run with an App ID set does not block on the sheet. The dev server then logs a
+  `MissingEnvError` from `after()` on every alert, which is expected: the sender requires the
+  App ID, so that a production deploy without it fails loudly.
 - **A busy Mac fails e2e tests that a quiet one passes.** With macOS indexing and updating in the
   background (load average 70–100 on 8 cores), sign-in alone took up to 5 s and every run lost one
   to four tests to timeouts, the same tests passing in isolation. It looked exactly like a

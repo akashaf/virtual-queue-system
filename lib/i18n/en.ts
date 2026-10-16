@@ -83,6 +83,12 @@ export const en = {
   mediaVolumeHint:
     "The sound plays at your media volume, not your ringer, so turn the volume up.",
 
+  // Push notifications: the Shop's name is the title, these are the text
+  pushHeadsUp: "It's almost your turn ({number}).",
+  pushCalled: "It's your turn: {number}",
+  pushLastCall: "Closing soon. Choose to stay or move to the next day.",
+  pushShopClosed: "The shop has closed.",
+
   // Last Call and Close Shop
   lastCallChoiceTitle: "Shop is closing soon",
   lastCallChoiceBody:

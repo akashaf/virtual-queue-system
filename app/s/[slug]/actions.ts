@@ -1,17 +1,15 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
   chooseTicketLastCall,
   createTicket,
   leaveTicket,
   rejoinTicket,
-  savePushSubscriptionForTicket,
   type TicketOutcome,
 } from "@/lib/customer/queue";
 import { dispatched, type Mutated } from "@/lib/push";
-import type { PushSubscriptionInput } from "@/lib/push-client";
 import {
   checkCustomerName,
   type CustomerView,
@@ -20,7 +18,7 @@ import {
 } from "@/lib/customer/view";
 import { DEVICE_COOKIE, deviceCookieOptions, isDeviceId } from "@/lib/device-cookie";
 import { isUuid } from "@/lib/uuid";
-import { isLang, LANG_COOKIE, LANG_COOKIE_MAX_AGE, resolveLang } from "@/lib/i18n";
+import { isLang, LANG_COOKIE, LANG_COOKIE_MAX_AGE } from "@/lib/i18n";
 
 export interface Coords {
   lat: number;
@@ -176,56 +174,3 @@ async function deviceAction(
     : { status: "rejected", reason: outcome.reason };
 }
 
-/**
- * Stores the browser's push subscription against the Customer's Ticket, with
- * the page's language, so a closed tab can still be told in the right words.
- *
- * `ok: false` is not worth a message: the page falls back to the keep-open
- * banner, which is also the answer for a browser with no push at all.
- */
-export async function savePushSubscription(
-  ticketId: unknown,
-  subscription: unknown,
-): Promise<{ ok: boolean }> {
-  if (!isUuid(ticketId) || !isPushSubscription(subscription)) return { ok: false };
-
-  const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
-  const deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
-  if (!isDeviceId(deviceId)) return { ok: false };
-
-  return savePushSubscriptionForTicket({
-    ticketId,
-    deviceId,
-    endpoint: subscription.endpoint,
-    p256dh: subscription.keys.p256dh,
-    auth: subscription.keys.auth,
-    lang: resolveLang(
-      cookieStore.get(LANG_COOKIE)?.value,
-      headerList.get("accept-language"),
-    ),
-  });
-}
-
-/**
- * Takes `unknown` for the same reason `isCoords` does: a Server Action is a
- * public endpoint. The length caps keep a forged request from storing an
- * essay; real endpoints and keys are comfortably inside them.
- */
-function isPushSubscription(value: unknown): value is PushSubscriptionInput {
-  if (typeof value !== "object" || value === null) return false;
-  const { endpoint, keys } = value as { endpoint?: unknown; keys?: unknown };
-
-  return (
-    typeof endpoint === "string" &&
-    endpoint.startsWith("https://") &&
-    endpoint.length <= 2_048 &&
-    typeof keys === "object" &&
-    keys !== null &&
-    isKey((keys as { p256dh?: unknown }).p256dh) &&
-    isKey((keys as { auth?: unknown }).auth)
-  );
-}
-
-function isKey(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 256;
-}

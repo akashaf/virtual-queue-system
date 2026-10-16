@@ -8,7 +8,7 @@ import {
   type CustomerError,
   type NameProblem,
 } from "@/lib/customer/view";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Lang } from "@/lib/i18n";
 import { useQueueChanged } from "@/lib/queue-changed";
 import {
   acknowledgeCalled,
@@ -76,12 +76,15 @@ export function CustomerQueue({
   slug,
   initialView,
   dict,
+  lang,
   userAgent,
   inAppBrowser,
 }: {
   slug: string;
   initialView: CustomerView;
   dict: Dictionary;
+  /** OneSignal is told it, so a closed page is still alerted in this language. */
+  lang: Lang;
   /** The request's, so the server can tell which phones the gate might stop. */
   userAgent: string | null;
   inAppBrowser: boolean;
@@ -138,7 +141,7 @@ export function CustomerQueue({
   useQueueChanged(view.shop.id, refetch);
 
   const active = view.ticket !== null && !isFinalStatus(view.ticket.status);
-  const push = usePushAlerts(active && view.ticket ? view.ticket.id : null);
+  const push = usePushAlerts(active && view.ticket ? view.ticket.id : null, lang);
   useAlertEffects(alerts, {
     headsUpTitle: dict.headsUpTitle,
     calledTitle: dict.calledTitle,
@@ -270,8 +273,8 @@ export function CustomerQueue({
         onRejoin={() => {
           unlockAudio();
           void act(() => rejoinQueue(ended.id), "rejoining").then((result) => {
-            // The new Ticket needs its own subscription; a Customer never yet
-            // asked is asked now, and a granted browser re-saves silently.
+            // The new Ticket needs the subscription moved to it; a Customer never
+            // yet asked is asked now, and a granted browser moves it silently.
             if (result.status === "done") push.offerPush();
           });
         }}

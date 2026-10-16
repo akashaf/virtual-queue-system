@@ -59,6 +59,7 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
           slug={slug}
           initialView={view}
           dict={dict}
+          lang={lang}
           userAgent={userAgent}
           inAppBrowser={inAppBrowser}
         />

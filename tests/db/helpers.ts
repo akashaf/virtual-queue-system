@@ -112,15 +112,15 @@ export async function setFinishedAgo(db: Client, ticketId: string, ago: string) 
   );
 }
 
-/** Gives a Ticket a push subscription without a browser, returning its endpoint. */
-export async function insertPushSubscription(db: Client, ticketId: string) {
-  const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
-  await db.query(
-    `insert into public.push_subscriptions (ticket_id, endpoint, p256dh, auth)
-     values ($1, $2, 'p256dh', 'auth')`,
-    [ticketId, endpoint],
+/** Logs a push send for a Ticket, `ago` (a Postgres interval) in the past, returning its id. */
+export async function insertPushSend(db: Client, ticketId: string, ago = "0 seconds") {
+  const { rows } = await db.query(
+    `insert into public.push_sends (ticket_id, kind, outcome, created_at)
+     values ($1, 'heads_up', 'sent', now() - $2::interval)
+     returning id`,
+    [ticketId, ago],
   );
-  return endpoint;
+  return rows[0].id as string;
 }
 
 /** SQL for the instant the current Billing Month began, in Malaysia time. */

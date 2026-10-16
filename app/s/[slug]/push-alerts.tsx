@@ -13,14 +13,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Lang } from "@/lib/i18n";
 import {
+  initPush,
+  linkPushToTicket,
   pushPlan,
   readPushState,
   rememberPushDeclined,
-  subscribeToPush,
+  requestPushPermission,
 } from "@/lib/push-client";
-import { savePushSubscription } from "./actions";
 
 /**
  * What the page knows about push alerts for the Ticket it is showing.
@@ -34,23 +35,30 @@ export type PushStatus = "unknown" | "ask" | "on" | "off";
 /**
  * Step 5 of the join flow (frontend.md §3.2), and the bookkeeping around it.
  *
- * The effect keeps the browser's one subscription pointing at the Ticket the
- * Customer holds *now*: a reload while waiting re-saves it silently, and after
- * a Rejoin — whose new Ticket the database moved nothing to — it is what signs
- * the new Ticket up. It never asks: `ask` only ever comes from `offerPush`,
+ * The effect keeps this browser's OneSignal login pointing at the Ticket the
+ * Customer holds *now*: a reload while waiting logs in again silently, and
+ * after a Rejoin it is what moves the subscription to the new Ticket. It never
+ * asks: `ask` only ever comes from `offerPush`,
  * inside the join tap, so a Customer is prompted at the one moment the sheet
  * was explained by what they just did. A reload that finds the question still
  * unanswered reports push as off instead — the Waiting view has to say
  * something true, and re-prompting out of nowhere is not the way.
  */
-export function usePushAlerts(activeTicketId: string | null) {
+export function usePushAlerts(activeTicketId: string | null, lang: Lang) {
   const [status, setStatus] = useState<PushStatus>("unknown");
+
+  // OneSignal loads before the join tap, so that the sheet's button can reach
+  // the browser's prompt while the tap still counts as one: iOS only shows it
+  // from a user gesture.
+  useEffect(() => {
+    void initPush();
+  }, []);
 
   useEffect(() => {
     if (activeTicketId === null) return;
     let cancelled = false;
 
-    void syncSubscription(activeTicketId).then((resolved) => {
+    void syncSubscription(activeTicketId, lang).then((resolved) => {
       if (cancelled) return;
       if (resolved === "unanswered") {
         // The plan is "ask", but asking belongs to the join tap. Right after a
@@ -66,7 +74,7 @@ export function usePushAlerts(activeTicketId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [activeTicketId]);
+  }, [activeTicketId, lang]);
 
   /** Called on a successful join or Rejoin: show the sheet if there is anything to ask. */
   const offerPush = () => {
@@ -78,13 +86,12 @@ export function usePushAlerts(activeTicketId: string | null) {
     // Closes the sheet while the browser asks; the outcome sets the real state.
     setStatus("unknown");
 
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
+    if (!(await requestPushPermission())) {
       rememberPushDeclined();
       setStatus("off");
       return;
     }
-    setStatus(await saveSubscription(ticketId));
+    setStatus((await linkPushToTicket(ticketId, lang)) ? "on" : "off");
   };
 
   /** The sheet's no, remembered for good: they are not asked again. */
@@ -98,19 +105,12 @@ export function usePushAlerts(activeTicketId: string | null) {
 
 async function syncSubscription(
   ticketId: string,
+  lang: Lang,
 ): Promise<PushStatus | "unanswered"> {
   const plan = pushPlan(readPushState());
   if (plan === "ask") return "unanswered";
   if (plan === "fallback") return "off";
-  return saveSubscription(ticketId);
-}
-
-async function saveSubscription(ticketId: string): Promise<PushStatus> {
-  const subscription = await subscribeToPush();
-  if (subscription === null) return "off";
-
-  const { ok } = await savePushSubscription(ticketId, subscription);
-  return ok ? "on" : "off";
+  return (await linkPushToTicket(ticketId, lang)) ? "on" : "off";
 }
 
 /**

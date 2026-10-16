@@ -84,6 +84,12 @@ export const ms: Dictionary = {
   mediaVolumeHint:
     "Bunyi dimainkan pada kelantangan media, bukan nada dering, jadi kuatkan kelantangan.",
 
+  // Notifikasi tolak: nama kedai ialah tajuk, ini teksnya
+  pushHeadsUp: "Hampir giliran anda ({number}).",
+  pushCalled: "Giliran anda: {number}",
+  pushLastCall: "Akan tutup sebentar lagi. Pilih untuk kekal atau pindah ke hari esok.",
+  pushShopClosed: "Kedai telah tutup.",
+
   // Panggilan terakhir dan kedai tutup
   lastCallChoiceTitle: "Kedai akan tutup sebentar lagi",
   lastCallChoiceBody:

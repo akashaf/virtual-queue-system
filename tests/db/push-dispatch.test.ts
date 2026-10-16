@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Client } from "pg";
 import { inject } from "vitest";
+import type { OneSignalNotification, SendResult } from "@/lib/push";
+import { formatTicketNumber } from "@/lib/ticket";
 import {
   connectDb,
   createShop,
@@ -10,15 +12,25 @@ import {
   SHOP_LNG,
 } from "./helpers";
 
+const APP_ID = "00000000-0000-4000-8000-000000000000";
+const APP_BASE_URL = "https://virtual-queue-system.netlify.app";
+
 let db: Client;
 let dispatchAlerts: typeof import("@/lib/push").dispatchAlerts;
+let parseOneSignalAnswer: typeof import("@/lib/push").parseOneSignalAnswer;
+let OneSignalError: typeof import("@/lib/push").OneSignalError;
+let forgetTicketsInOneSignal: typeof import("@/lib/push").forgetTicketsInOneSignal;
 
 beforeAll(async () => {
   const { apiUrl, secretKey } = inject("supabase");
   process.env.NEXT_PUBLIC_SUPABASE_URL = apiUrl;
   process.env.SUPABASE_SECRET_KEY = secretKey;
 
-  ({ dispatchAlerts } = await import("@/lib/push"));
+  process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID = APP_ID;
+  process.env.APP_BASE_URL = APP_BASE_URL;
+
+  ({ dispatchAlerts, parseOneSignalAnswer, OneSignalError, forgetTicketsInOneSignal } =
+    await import("@/lib/push"));
   db = await connectDb();
   await resetTestData(db);
 });
@@ -47,51 +59,29 @@ async function join(slug: string, deviceId = crypto.randomUUID()) {
   return { ...envelope.result.ticket, deviceId };
 }
 
-async function subscribe(
-  ticket: { id: string; deviceId: string },
-  endpoint: string,
-  lang = "en",
-) {
-  const { error } = await serviceClient().rpc("save_push_subscription", {
-    p_ticket_id: ticket.id,
-    p_device_id: ticket.deviceId,
-    p_endpoint: endpoint,
-    p_p256dh: `p256dh-${endpoint}`,
-    p_auth: `auth-${endpoint}`,
-    p_lang: lang,
-  });
-  if (error) throw new Error(error.message);
-}
-
-/** The endpoints still subscribed for one Shop; the database is shared across tests. */
-async function endpoints(shopId: string) {
+/** Everything logged for one Ticket, oldest first. */
+async function sends(ticketId: string) {
   const { rows } = await db.query(
-    `select s.endpoint from public.push_subscriptions s
-     join public.tickets t on t.id = s.ticket_id
-     where t.shop_id = $1 order by s.endpoint`,
-    [shopId],
+    `select kind, outcome, notification_id from public.push_sends
+     where ticket_id = $1 order by created_at, kind`,
+    [ticketId],
   );
-  return (rows as { endpoint: string }[]).map((row) => row.endpoint);
+  return rows as { kind: string; outcome: string; notification_id: string | null }[];
 }
 
-/** A sender that always delivers, remembering everything it was handed. */
+/** A sender OneSignal accepts everything from, remembering what it was handed. */
 function recordingSender() {
-  return vi.fn(
-    (
-      _subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
-      _payload: string,
-      _options: { TTL: number; urgency?: string },
-    ) => Promise.resolve(),
+  let n = 0;
+  return vi.fn((_notification: OneSignalNotification) =>
+    Promise.resolve<SendResult>({ outcome: "sent", notificationId: `n-${++n}` }),
   );
 }
 
 describe("dispatchAlerts", () => {
-  test("sends each alerted Ticket's subscriptions the payload, TTL and urgency", async () => {
+  test("sends each alerted Ticket one notification, by its Ticket id, in both languages", async () => {
     const { shop } = await createShop();
     const called = await join(shop.slug);
     const next = await join(shop.slug);
-    await subscribe(called, "https://push.test/called", "ms");
-    await subscribe(next, "https://push.test/next", "en");
 
     const send = recordingSender();
     await dispatchAlerts(
@@ -103,124 +93,130 @@ describe("dispatchAlerts", () => {
     );
 
     expect(send).toHaveBeenCalledTimes(2);
-    const byEndpoint = new Map(
-      send.mock.calls.map(([subscription, payload, options]) => [
-        subscription.endpoint,
-        { subscription, payload: JSON.parse(payload), options },
+    const byTicket = new Map(
+      send.mock.calls.map(([notification]) => [
+        notification.include_aliases.external_id[0],
+        notification,
       ]),
     );
 
-    const calledPush = byEndpoint.get("https://push.test/called");
-    expect(calledPush?.subscription.keys).toEqual({
-      p256dh: "p256dh-https://push.test/called",
-      auth: "auth-https://push.test/called",
+    expect(byTicket.get(called.id)).toEqual({
+      app_id: APP_ID,
+      include_aliases: { external_id: [called.id] },
+      target_channel: "push",
+      headings: { en: shop.name, ms: shop.name },
+      contents: {
+        en: `It's your turn: ${formatTicketNumber(called.number)}`,
+        ms: `Giliran anda: ${formatTicketNumber(called.number)}`,
+      },
+      url: `${APP_BASE_URL}/s/${shop.slug}`,
+      ttl: 600,
+      priority: 10,
+      web_push_topic: "called",
     });
-    expect(calledPush?.payload).toEqual({
-      kind: "called",
-      shopName: shop.name,
-      number: called.number,
-      url: `/s/${shop.slug}`,
-      lang: "ms",
+    expect(byTicket.get(next.id)).toMatchObject({
+      ttl: 600,
+      priority: 5,
+      web_push_topic: "heads_up",
     });
-    expect(calledPush?.options).toEqual({ TTL: 600, urgency: "high" });
-
-    const headsUpPush = byEndpoint.get("https://push.test/next");
-    expect(headsUpPush?.payload).toMatchObject({
-      kind: "heads_up",
-      number: next.number,
-      lang: "en",
-    });
-    expect(headsUpPush?.options).toEqual({ TTL: 600, urgency: undefined });
   });
 
   test("the slower kinds keep for an hour", async () => {
     const { shop } = await createShop();
     const ticket = await join(shop.slug);
-    await subscribe(ticket, "https://push.test/slow");
 
     const send = recordingSender();
     await dispatchAlerts([{ ticketId: ticket.id, kind: "last_call" }], send);
     await dispatchAlerts([{ ticketId: ticket.id, kind: "shop_closed" }], send);
 
-    expect(send.mock.calls.map(([, , options]) => options)).toEqual([
-      { TTL: 3600, urgency: undefined },
-      { TTL: 3600, urgency: undefined },
+    expect(send.mock.calls.map(([notification]) => notification.ttl)).toEqual([3600, 3600]);
+  });
+
+  test("logs every send: sent with OneSignal's id, or no subscriber", async () => {
+    const { shop } = await createShop();
+    const subscribed = await join(shop.slug);
+    const declined = await join(shop.slug);
+
+    await dispatchAlerts(
+      [
+        { ticketId: subscribed.id, kind: "heads_up" },
+        { ticketId: declined.id, kind: "heads_up" },
+      ],
+      (notification) =>
+        Promise.resolve<SendResult>(
+          notification.include_aliases.external_id[0] === subscribed.id
+            ? { outcome: "sent", notificationId: "onesignal-1" }
+            : { outcome: "no_subscriber" },
+        ),
+    );
+
+    expect(await sends(subscribed.id)).toEqual([
+      { kind: "heads_up", outcome: "sent", notification_id: "onesignal-1" },
+    ]);
+    expect(await sends(declined.id)).toEqual([
+      { kind: "heads_up", outcome: "no_subscriber", notification_id: null },
     ]);
   });
 
-  test("deletes a subscription the push service says is gone", async () => {
+  test("a refused send is logged as an error, reported, and does not stop the others", async () => {
     const { shop } = await createShop();
-    const gone = await join(shop.slug);
-    const alive = await join(shop.slug);
-    await subscribe(gone, "https://push.test/gone");
-    await subscribe(alive, "https://push.test/alive");
+    const failing = await join(shop.slug);
+    const fine = await join(shop.slug);
     const reported = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await dispatchAlerts(
       [
-        { ticketId: gone.id, kind: "heads_up" },
-        { ticketId: alive.id, kind: "heads_up" },
+        { ticketId: failing.id, kind: "called" },
+        { ticketId: fine.id, kind: "heads_up" },
       ],
-      (subscription) =>
-        subscription.endpoint === "https://push.test/gone"
-          ? Promise.reject({ statusCode: 410 })
-          : Promise.resolve(),
+      (notification) =>
+        notification.include_aliases.external_id[0] === failing.id
+          ? Promise.reject(new OneSignalError(503))
+          : Promise.resolve<SendResult>({ outcome: "sent", notificationId: "onesignal-2" }),
     );
 
-    expect(await endpoints(shop.id)).toEqual(["https://push.test/alive"]);
-    // A gone subscription is expected wear, not a failure worth reporting.
-    expect(reported).not.toHaveBeenCalled();
-  });
-
-  test("a 404 is gone too", async () => {
-    const { shop } = await createShop();
-    const ticket = await join(shop.slug);
-    await subscribe(ticket, "https://push.test/not-found");
-
-    await dispatchAlerts([{ ticketId: ticket.id, kind: "heads_up" }], () =>
-      Promise.reject({ statusCode: 404 }),
-    );
-
-    expect(await endpoints(shop.id)).toEqual([]);
-  });
-
-  test("any other failure keeps the subscription and is reported", async () => {
-    const { shop } = await createShop();
-    const ticket = await join(shop.slug);
-    await subscribe(ticket, "https://push.test/flaky");
-    const reported = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    await dispatchAlerts([{ ticketId: ticket.id, kind: "called" }], () =>
-      Promise.reject({ statusCode: 500, message: "push service down" }),
-    );
-
-    expect(await endpoints(shop.id)).toEqual(["https://push.test/flaky"]);
+    expect(await sends(failing.id)).toEqual([
+      { kind: "called", outcome: "error", notification_id: null },
+    ]);
+    expect(await sends(fine.id)).toEqual([
+      { kind: "heads_up", outcome: "sent", notification_id: "onesignal-2" },
+    ]);
     expect(reported).toHaveBeenCalled();
   });
 
-  test("shop_closed is a goodbye: the Ticket's subscriptions go once it is sent", async () => {
-    const { shop } = await createShop();
-    const removed = await join(shop.slug);
-    const staying = await join(shop.slug);
-    await subscribe(removed, "https://push.test/removed");
-    await subscribe(staying, "https://push.test/staying");
-
+  test("no alerts, no sends", async () => {
     const send = recordingSender();
-    await dispatchAlerts([{ ticketId: removed.id, kind: "shop_closed" }], send);
-
-    // Told first, deleted after: close_shop leaves the subscriptions in place
-    // precisely so this send can happen.
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(await endpoints(shop.id)).toEqual(["https://push.test/staying"]);
-  });
-
-  test("an alerted Ticket with no subscriptions sends nothing", async () => {
-    const { shop } = await createShop();
-    const ticket = await join(shop.slug);
-
-    const send = recordingSender();
-    await dispatchAlerts([{ ticketId: ticket.id, kind: "called" }], send);
-
+    await dispatchAlerts([], send);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseOneSignalAnswer", () => {
+  test("an id means sent; an empty one means nobody was subscribed", () => {
+    expect(parseOneSignalAnswer({ id: "abc", errors: {} })).toEqual({
+      outcome: "sent",
+      notificationId: "abc",
+    });
+    expect(
+      parseOneSignalAnswer({ id: "", errors: ["All included players are not subscribed"] }),
+    ).toEqual({ outcome: "no_subscriber" });
+    expect(parseOneSignalAnswer(null)).toEqual({ outcome: "no_subscriber" });
+  });
+});
+
+describe("forgetTicketsInOneSignal", () => {
+  test("asks for every Ticket, counts the deletes, and reports a failure without stopping", async () => {
+    const reported = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ids = Array.from({ length: 25 }, (_, i) => `ticket-${i}`);
+    const remove = vi.fn(async (ticketId: string) => {
+      if (ticketId === "ticket-3") throw new OneSignalError(429);
+      return ticketId.endsWith("0") ? ("deleted" as const) : ("not_found" as const);
+    });
+
+    const deleted = await forgetTicketsInOneSignal(ids, remove);
+
+    expect(remove).toHaveBeenCalledTimes(25);
+    expect(deleted).toBe(3); // ticket-0, ticket-10, ticket-20
+    expect(reported).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,11 @@
 import "server-only";
-import { dispatchAlerts, toQueueAlerts, type PushSender } from "@/lib/push";
+import {
+  dispatchAlerts,
+  forgetTicketsInOneSignal,
+  toQueueAlerts,
+  type OneSignalUserRemover,
+  type PushSender,
+} from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** What one run did, for the scheduled function's log. Counts only: no names. */
@@ -7,13 +13,14 @@ export interface DailyCleanupReport {
   expired: number;
   alerts: number;
   erasedTickets: number;
-  deletedSubscriptions: number;
+  deletedPushSends: number;
+  deletedOneSignalUsers: number;
 }
 
 /**
  * The daily job (backend.md §9), in the order the spec gives: expire stale
  * Carried-over Tickets, push the Heads-ups that moved the Queue up, then erase
- * personal data past its 30 days.
+ * personal data past its 30 days, here and in OneSignal.
  *
  * The alerts are sent inline rather than in `after()`: nobody is waiting on
  * this response but the scheduled function, and the job is not done until the
@@ -21,7 +28,10 @@ export interface DailyCleanupReport {
  *
  * Safe to run twice: both functions only act on what is still due.
  */
-export async function runDailyCleanup(send?: PushSender): Promise<DailyCleanupReport> {
+export async function runDailyCleanup(
+  send?: PushSender,
+  removeUser?: OneSignalUserRemover,
+): Promise<DailyCleanupReport> {
   const supabase = createAdminClient();
 
   const expiry = await supabase.rpc("expire_carried_over");
@@ -38,12 +48,22 @@ export async function runDailyCleanup(send?: PushSender): Promise<DailyCleanupRe
   if (erasure.error) {
     throw new Error(`erase_expired_personal_data failed: ${erasure.error.message}`);
   }
-  const erased = erasure.data as { erased_tickets: number; deleted_subscriptions: number };
+  const erased = erasure.data as {
+    erased_tickets: number;
+    erased_ticket_ids: string[];
+    deleted_push_sends: number;
+  };
+
+  const deletedOneSignalUsers = await forgetTicketsInOneSignal(
+    erased.erased_ticket_ids,
+    removeUser,
+  );
 
   return {
     expired: result.expired,
     alerts: alerts.length,
     erasedTickets: erased.erased_tickets,
-    deletedSubscriptions: erased.deleted_subscriptions,
+    deletedPushSends: erased.deleted_push_sends,
+    deletedOneSignalUsers,
   };
 }

@@ -8,7 +8,7 @@ export const TEST_EMAIL_DOMAIN = "example.test";
 
 /**
  * Deletes the Owners the tests created and their Shops, which takes their Queue
- * Days, Tickets and push subscriptions with them. Shops and Owners made by hand
+ * Days, Tickets and push sends with them. Shops and Owners made by hand
  * in the local database are left alone.
  *
  * Shared by the Vitest database suite, which runs it before each file, and the

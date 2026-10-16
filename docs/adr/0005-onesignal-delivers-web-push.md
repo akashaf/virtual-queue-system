@@ -1,0 +1,10 @@
+# OneSignal delivers Web Push
+
+Customer alerts are sent through OneSignal's Web SDK and REST API, following OneSignal's standard setup, in place of our own `web-push` sender, VAPID keys, `push_subscriptions` table and service worker. Push on iPhones was costing us too much time with our own stack, and the main complaint was not being able to tell whether a push was delivered. ADR 0001 still holds: the channel is still Web Push, so the iPhone install gate and the Home Screen app's separate cookies are unchanged. OneSignal cannot get around either.
+
+## Consequences
+
+- **OneSignal's delivery confirmation does not cover iPhones.** Its Confirmed Delivery is a paid feature and is not supported for Safari web push on any plan, so for an iPhone the dashboard shows "sent" (Apple accepted it) and "clicked", not "arrived". We chose OneSignal knowing this. A receipt beacon of our own in the service worker is the fallback if we need more.
+- **Customer data leaves Supabase.** OneSignal holds each subscriber's push subscription, device and browser details, and the notification text (Shop name and Ticket number). The only identifier we give it is the Ticket ID, never the device ID, which is the Customer's credential, and never the display name or coordinates. Each Ticket's OneSignal user is deleted by the nightly job 30 days after the Ticket finishes, the same retention as the rest of its personal data.
+- **Logins are not verified.** Without OneSignal's Identity Verification, a browser that knew a Ticket ID could `login()` as it and receive that Ticket's alerts. We accept this: Ticket IDs are random UUIDs seen only by the Customer's device and the Owner's dashboard, and Identity Verification is a web beta you have to request from OneSignal support. Turn it on if it becomes generally available.
+- **We keep our own record of sends.** Every alert's outcome (sent, with OneSignal's notification ID, or no subscriber) is stored in Supabase, so "did an alert go out for this Ticket?" can be answered without the OneSignal dashboard.
