@@ -4,9 +4,37 @@ import { deactivateShop, seedShop } from "./helpers";
 async function signIn(page: import("@playwright/test").Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
+
+test("the password can be shown and hidden, and is hidden again on sign-in", async ({
+  page,
+}) => {
+  const { email, password } = await seedShop();
+  await page.goto("/login");
+  const field = page.getByLabel("Password", { exact: true });
+
+  await page.getByLabel("Email").fill(email);
+  await field.fill(password);
+  await expect(field).toHaveAttribute("type", "password");
+
+  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(field).toHaveAttribute("type", "text");
+  await expect(field).toHaveValue(password);
+
+  await page.getByRole("button", { name: "Hide password" }).click();
+  await expect(field).toHaveAttribute("type", "password");
+
+  // A refused attempt stays on the page, so it shows what submitting did.
+  await field.fill("not-the-password");
+  await page.getByRole("button", { name: "Show password" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByText("Wrong email or password")).toBeVisible();
+  await expect(field).toHaveAttribute("type", "password");
+  await expect(page.getByRole("button", { name: "Show password" })).toBeVisible();
+});
 
 test("an Owner signs in, sees their Shop, and signs out again", async ({ page }) => {
   const { email, password, shop } = await seedShop();
