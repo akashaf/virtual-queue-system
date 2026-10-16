@@ -128,6 +128,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   seconds after a join can send nothing and report nothing. When testing push, check
   `push_subscriptions` before calling. Leaving the Queue deletes the row, so check before
   that too.
+- **Safari revokes a push subscription after three pushes that show nothing.** The service
+  worker used to skip the notification when the queue page was focused, to avoid alerting
+  twice. On an iPhone, testing with the app open used up those three pushes, after which
+  pushes stopped arriving even with the screen locked, and nothing on the page says so
+  (it still reads "alerts on"). Every push must call `showNotification`.
 - **An iPhone plays the page's alert sound at the media volume, not the ringer.** A
   "silent alert" in testing turned out to be media volume turned down, with the ringer up.
   Check the media volume before debugging.

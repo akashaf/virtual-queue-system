@@ -46,10 +46,10 @@ self.addEventListener("push", (event) => {
 });
 
 async function showPush({ kind, shopName, number, url, lang }) {
-  // A focused queue page is already chiming and vibrating (frontend.md §3.3);
-  // a notification on top would alert the Customer twice for one event.
-  if (await hasFocusedClient(url)) return;
-
+  // Every push shows a notification, even over a focused queue page that is
+  // already chiming. Safari revokes a subscription after three pushes that
+  // show nothing, so skipping them silently cut iPhones off from push for good
+  // (docs/agents/gotchas.md). Alerting twice is the cheaper mistake.
   const texts = TEXTS[lang] || TEXTS.en;
   const text = texts[kind];
   if (!text) return;
@@ -60,17 +60,6 @@ async function showPush({ kind, shopName, number, url, lang }) {
     requireInteraction: kind === "called",
     data: { url },
   });
-}
-
-async function hasFocusedClient(url) {
-  const path = new URL(url, self.location.origin).pathname;
-  const clients = await self.clients.matchAll({
-    type: "window",
-    includeUncontrolled: true,
-  });
-  return clients.some(
-    (client) => client.focused && new URL(client.url).pathname === path,
-  );
 }
 
 self.addEventListener("notificationclick", (event) => {

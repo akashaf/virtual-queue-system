@@ -101,7 +101,7 @@ The page compares the previous view with the new one after each refetch, in `lib
   - Flashes the title "🔔 Your turn!" until acknowledged
 - **Sounds** are synthesised in the browser as WAV clips and played through one `<audio>` element, rather than shipped as files. `<audio>`, not Web Audio, because iOS mutes Web Audio on the silent switch. iOS only plays from an element that has played inside a tap: the Join (and Rejoin) tap plays a silent clip on it, and so does the first tap anywhere on the page, so a Customer who reloads while waiting is not left silent.
 - **Screen Wake Lock:** request `navigator.wakeLock` while the Ticket is Waiting or Called — Called too, or the screen could go dark while the chime rings — and re-acquire it on `visibilitychange`. Treat it as a best-effort extra, not a guarantee.
-- **Push already shown:** if a push notification arrives while the page is focused, the service worker skips it (it checks `clients.matchAll`) so the alert isn't shown twice.
+- **Push over an open page:** a push that arrives while the page is focused is still shown as a notification, so the Customer is alerted twice. Safari revokes a push subscription after three pushes that show nothing, so the service worker must never skip one.
 
 ### 3.4 Service worker `public/sw.js`
 - `push`: parse `{ kind, shopName, number, url, lang }`, then `showNotification` with localised text:
