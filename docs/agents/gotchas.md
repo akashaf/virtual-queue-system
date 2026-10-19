@@ -34,7 +34,8 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **`bun run e2e` cannot start while `bun run dev` is running.** Next allows one dev server
   per project directory, so Playwright's own server on 3100 exits at once. Run
   `E2E_PORT=3000 bun run e2e` to reuse the running one instead (it already talks to local
-  Supabase through `.env.local`).
+  Supabase through `.env.local`). Either way e2e runs against `next dev`, so saving a
+  source file mid-run hot-reloads the page under a test; edit after the run finishes.
 - `bun run typecheck` runs `next typegen` first, because `LayoutProps` / `PageProps` /
   `RouteContext` are generated. After deleting routes, `rm -rf .next` clears stale
   `.next/types`.
@@ -42,6 +43,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   neither `reset` nor `unstable_retry` exists any more, so a boundary copied from older docs
   or from training data renders a dead button. `app/global-error.tsx` uses `retry`. Read
   `node_modules/next/dist/docs/` before assuming any API in this version.
+- **The first join's device cookie arrives with the Server Action's response.** Anything the
+  browser sends before that response lands goes without the cookie, so the server answers as
+  if this browser holds no Ticket. The join's own `queue_changed` ping triggers such a refetch.
+  `customer-queue.tsx` drops a refetch sent before a newer view was shown (#31); any new screen that
+  refetches a view needs the same.
 
 ## Supabase and migrations
 
@@ -196,8 +202,17 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **A busy Mac fails e2e tests that a quiet one passes.** With macOS indexing and updating in the
   background (load average 70–100 on 8 cores), sign-in alone took up to 5 s and every run lost one
   to four tests to timeouts, the same tests passing in isolation. It looked exactly like a
-  regression from the change under test. Check `uptime` before blaming the diff, and compare
-  against `git stash` back to back, or with `--workers=2`, rather than against an earlier run.
+  regression from the change under test. `e2e/global-setup.ts` warns at the start of a run when
+  the load is high; heed it, and compare against `git stash` back to back, or with
+  `--workers=1`, rather than against an earlier run.
+- **For a flaky e2e test, read its `trace.zip` before adding any logging.** Playwright keeps one
+  per failure (`test-results/<test>/trace.zip`, `trace: "retain-on-failure"`), holding the
+  browser console and every network request and response in order. `show-trace` is a GUI, so
+  unzip it instead: each line of `*.network` is one request as JSON, its response body in the
+  file named by `snapshot.response.content._file`, and console messages are the
+  `"type":"console"` lines of `*.trace`. #31 was found by hand-adding `console.log` and
+  rerunning twenty times, when the failing run's trace would have shown the `/me` response
+  that came back with no Ticket.
 - **Vitest only collects `{app,lib}/**/*.test.ts` (unit) and `tests/db/**` (db).** A scratch
   test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
   green while proving nothing. Check the file is under one of those roots before trusting a pass.
