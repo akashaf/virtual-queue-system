@@ -30,6 +30,12 @@ export default defineConfig({
           globalSetup: ["tests/db/global-setup.ts"],
           // Queue-function tests share one local database; run files one at a time.
           fileParallelism: false,
+          // Every round trip goes through the Docker VM, so a busy Mac slows these tests
+          // three to six times over: the slowest took 1 s quiet and 4.3 s loaded, and
+          // crossing Vitest's 5 s default failed whichever test was unlucky. A hang
+          // still fails, only later.
+          testTimeout: 20_000,
+          hookTimeout: 20_000,
         },
       },
     ],

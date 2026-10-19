@@ -233,7 +233,9 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 - **`git push` runs typecheck, lint and the unit and database tests first** (`.githooks/pre-push`,
   about 2 minutes), so it needs local Supabase up and a long command timeout. A failure is a
-  real one: fix it rather than reach for `--no-verify`.
+  real one: fix it rather than reach for `--no-verify`. The db tests run up to six times slower
+  on a busy Mac, which is why their timeout is 20 s rather than Vitest's 5 s (`vitest.config.mts`);
+  a db test timing out past that is most likely a hang, not the load.
 
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when
