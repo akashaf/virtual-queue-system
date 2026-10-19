@@ -210,6 +210,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Shell
 
+- **`git push` runs typecheck, lint and the unit and database tests first** (`.githooks/pre-push`,
+  about 2 minutes), so it needs local Supabase up and a long command timeout. A failure is a
+  real one: fix it rather than reach for `--no-verify`.
+
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when
   polling a deploy state.

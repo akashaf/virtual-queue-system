@@ -1,0 +1,20 @@
+#!/bin/sh
+# Every push to main deploys to production, so nothing leaves this machine
+# without typecheck, lint, and the unit and database tests passing.
+# Installed by `bun install` (the `prepare` script sets core.hooksPath).
+# e2e is left out: it is slow and needs no dev server running.
+set -e
+
+# The database tests need the local stack; say so before spending time on the rest.
+if ! bunx supabase status >/dev/null 2>&1; then
+  echo "pre-push: local Supabase is not running. Start it with \`bun run db:start\`" >&2
+  echo "(Docker first, \`colima start\`, if that fails), then push again." >&2
+  exit 1
+fi
+
+echo "pre-push: typecheck"
+bun run typecheck
+echo "pre-push: lint"
+bun run lint
+echo "pre-push: unit and database tests"
+bun run test
