@@ -17,7 +17,8 @@ import type { CustomerView } from "@/lib/customer/view";
  * left in the background, and this page is its only alert, so a Customer who
  * comes back to a reloaded page that is already Called is rung for. The page
  * cannot tell that from someone opening it fresh, and one chime too many is the
- * cheaper mistake.
+ * cheaper mistake. For the same reason a Called view arriving after one that
+ * did not hold the Ticket rings too: views can land out of order (#31).
  */
 export interface PageAlerts {
   /**
@@ -28,11 +29,18 @@ export interface PageAlerts {
   headsUpTicketId: string | null;
   /** The Called Ticket whose chime repeats until the Customer taps "I'm coming". */
   ringingTicketId: string | null;
+  /**
+   * The Ticket the Customer tapped "I'm coming" for. Remembered rather than
+   * inferred from the ringing having stopped, because views can arrive out of
+   * order (#31): a Called view after a stale one must not ring for it again.
+   */
+  acknowledgedTicketId: string | null;
 }
 
 export const NO_PAGE_ALERTS: PageAlerts = {
   headsUpTicketId: null,
   ringingTicketId: null,
+  acknowledgedTicketId: null,
 };
 
 /** The alerts for a page that has just loaded with `view`: ringing if already Called. */
@@ -84,9 +92,14 @@ export function nextPageAlerts(
     headsUpTicketId = after.id;
   }
 
-  // Waiting to Called only. Served back to Called is an Owner undoing a mis-tap:
-  // the Customer was told once already, and is sitting in the chair.
-  if (sameTicket && before.status === "waiting" && after.status === "called") {
+  // Waiting to Called, or Called from a view without this Ticket, which the page
+  // treats like loading already Called. Served back to Called is an Owner undoing
+  // a mis-tap: the Customer was told once already, and is sitting in the chair.
+  if (
+    after?.status === "called" &&
+    after.id !== alerts.acknowledgedTicketId &&
+    (!sameTicket || before.status === "waiting")
+  ) {
     ringingTicketId = after.id;
   } else if (after?.status !== "called" || after.id !== ringingTicketId) {
     ringingTicketId = null;
@@ -95,10 +108,12 @@ export function nextPageAlerts(
   return headsUpTicketId === alerts.headsUpTicketId &&
     ringingTicketId === alerts.ringingTicketId
     ? alerts
-    : { headsUpTicketId, ringingTicketId };
+    : { ...alerts, headsUpTicketId, ringingTicketId };
 }
 
 /** The Customer tapped "I'm coming": the Called chime stops for good. */
 export function acknowledgeCalled(alerts: PageAlerts): PageAlerts {
-  return alerts.ringingTicketId === null ? alerts : { ...alerts, ringingTicketId: null };
+  return alerts.ringingTicketId === null
+    ? alerts
+    : { ...alerts, ringingTicketId: null, acknowledgedTicketId: alerts.ringingTicketId };
 }

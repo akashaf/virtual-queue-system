@@ -125,6 +125,20 @@ describe("nextPageAlerts: Called", () => {
     expect(alerts.ringingTicketId).toBe("t-1");
   });
 
+  test("rings when a Called view follows one that lost the Ticket", () => {
+    // #31: a refetch sent before the join had set the device cookie answered
+    // with no Ticket, and landed after the join's own Waiting view. The page
+    // never held Waiting just before Called, yet the Customer is in the chair.
+    const alerts = watch(
+      view(null),
+      view({ position: 0 }),
+      view(null),
+      view({ status: "called", position: 0 }),
+    );
+
+    expect(alerts.ringingTicketId).toBe("t-1");
+  });
+
   test("keeps ringing across refetches until acknowledged", () => {
     const called = view({ status: "called", position: 0 });
     const alerts = watch(view({ position: 0 }), called, called, called);
@@ -138,6 +152,16 @@ describe("nextPageAlerts: Called", () => {
 
     expect(acknowledged.ringingTicketId).toBeNull();
     expect(nextPageAlerts(acknowledged, called, called).ringingTicketId).toBeNull();
+  });
+
+  test("stays stopped once acknowledged, even after a view that lost the Ticket", () => {
+    const called = view({ status: "called", position: 0 });
+    const lost = view(null);
+    const acknowledged = acknowledgeCalled(watch(view({ position: 0 }), called));
+
+    const alerts = nextPageAlerts(nextPageAlerts(acknowledged, called, lost), lost, called);
+
+    expect(alerts.ringingTicketId).toBeNull();
   });
 
   test("stops when the Ticket leaves the chair", () => {
@@ -156,6 +180,7 @@ describe("nextPageAlerts: Called", () => {
     expect(initialPageAlerts(view({ status: "called", position: 0 }))).toEqual({
       headsUpTicketId: null,
       ringingTicketId: "t-1",
+      acknowledgedTicketId: null,
     });
   });
 

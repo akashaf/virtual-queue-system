@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import {
   checkCustomerName,
   isFinalStatus,
@@ -122,21 +122,39 @@ export function CustomerQueue({
 
   const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
 
-  const receive = useCallback((next: CustomerView) => {
+  // Every view source takes a number when it starts: a refetch when it is sent,
+  // an action when its result arrives. A refetch answered after a view with a
+  // higher number is stale and dropped. The one that mattered (#31) was sent
+  // while the first join was still in flight, so without the device cookie, and
+  // answered "no Ticket" after the join had shown Waiting. The price is that a
+  // refetch the server answered after an action, so with newer news, is dropped
+  // too; the ping, poll or refocus that follows brings it back.
+  const lastIssued = useRef(0);
+  const lastShown = useRef(0);
+
+  const showIfLatest = useCallback((issued: number, next: CustomerView) => {
+    if (issued < lastShown.current) return;
+    lastShown.current = issued;
     setPage((current) => ({
       view: next,
       alerts: nextPageAlerts(current.alerts, current.view, next),
     }));
   }, []);
 
+  const receive = useCallback(
+    (next: CustomerView) => showIfLatest(++lastIssued.current, next),
+    [showIfLatest],
+  );
+
   const refetch = useCallback(async () => {
+    const issued = ++lastIssued.current;
     try {
       const response = await fetch(`/api/s/${slug}/me`, { cache: "no-store" });
-      if (response.ok) receive((await response.json()) as CustomerView);
+      if (response.ok) showIfLatest(issued, (await response.json()) as CustomerView);
     } catch {
       // Offline, or the tab was frozen mid-request. The next tick tries again.
     }
-  }, [slug, receive]);
+  }, [slug, showIfLatest]);
 
   useQueueChanged(view.shop.id, refetch);
 
