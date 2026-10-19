@@ -104,7 +104,7 @@ You need a test Shop, or a real Shop outside its hours, and two phones or a phon
 2. The page should say *Alerts are on — we'll notify you*.
 3. In the OneSignal dashboard, open **Audience**, then **Subscriptions** (or **Users**). A new web push subscription should appear within a minute. Its user's **External ID** is the Ticket's ID, a UUID.
 4. Lock the phone. On the Owner dashboard, press **Call next**.
-5. The phone should show a notification titled with the Shop's name, reading *It's your turn: #001*. Tapping it opens the queue page.
+5. The phone should show a notification titled with the Shop's name, reading *Queue alert: it's your turn (#001). Please go to the counter now.*. Tapping it opens the queue page.
 6. In Supabase (Dashboard, then **SQL Editor**), run:
    ```sql
    select kind, outcome, notification_id, created_at
@@ -124,7 +124,7 @@ You need a test Shop, or a real Shop outside its hours, and two phones or a phon
 
 ### Malay text
 
-Switch the queue page to **BM** before joining, and the notification should come in Malay (*Giliran anda: #001*).
+Switch the queue page to **BM** before joining, and the notification should come in Malay (*Makluman giliran: tiba giliran anda (#001). Sila ke kaunter sekarang.*).
 
 ---
 

@@ -85,10 +85,13 @@ export const ms: Dictionary = {
     "Bunyi dimainkan pada kelantangan media, bukan nada dering, jadi kuatkan kelantangan.",
 
   // Notifikasi tolak: nama kedai ialah tajuk, ini teksnya
-  pushHeadsUp: "Hampir giliran anda ({number}).",
-  pushCalled: "Giliran anda: {number}",
-  pushLastCall: "Akan tutup sebentar lagi. Pilih untuk kekal atau pindah ke hari esok.",
-  pushShopClosed: "Kedai telah tutup.",
+  pushHeadsUp:
+    "Makluman giliran: giliran anda hampir tiba ({number}). Sila kembali ke kedai sekarang.",
+  pushCalled: "Makluman giliran: tiba giliran anda ({number}). Sila ke kaunter sekarang.",
+  pushLastCall:
+    "Makluman giliran: kedai akan tutup sebentar lagi. Buka halaman untuk kekal dalam giliran atau pindah ke hari esok.",
+  pushShopClosed:
+    "Makluman giliran: kedai telah tutup untuk hari ini. Terima kasih kerana menunggu.",
 
   // Panggilan terakhir dan kedai tutup
   lastCallChoiceTitle: "Kedai akan tutup sebentar lagi",

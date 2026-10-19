@@ -84,10 +84,11 @@ export const en = {
     "The sound plays at your media volume, not your ringer, so turn the volume up.",
 
   // Push notifications: the Shop's name is the title, these are the text
-  pushHeadsUp: "It's almost your turn ({number}).",
-  pushCalled: "It's your turn: {number}",
-  pushLastCall: "Closing soon. Choose to stay or move to the next day.",
-  pushShopClosed: "The shop has closed.",
+  pushHeadsUp: "Queue alert: you're nearly next ({number}). Please head back to the shop now.",
+  pushCalled: "Queue alert: it's your turn ({number}). Please go to the counter now.",
+  pushLastCall:
+    "Queue alert: the shop is closing soon. Open the page to stay in the queue or move to the next day.",
+  pushShopClosed: "Queue alert: the shop has closed for today. Thank you for waiting.",
 
   // Last Call and Close Shop
   lastCallChoiceTitle: "Shop is closing soon",

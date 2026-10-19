@@ -106,8 +106,8 @@ describe("dispatchAlerts", () => {
       target_channel: "push",
       headings: { en: shop.name, ms: shop.name },
       contents: {
-        en: `It's your turn: ${formatTicketNumber(called.number)}`,
-        ms: `Giliran anda: ${formatTicketNumber(called.number)}`,
+        en: `Queue alert: it's your turn (${formatTicketNumber(called.number)}). Please go to the counter now.`,
+        ms: `Makluman giliran: tiba giliran anda (${formatTicketNumber(called.number)}). Sila ke kaunter sekarang.`,
       },
       url: `${APP_BASE_URL}/s/${shop.slug}`,
       ttl: 600,
@@ -115,13 +115,17 @@ describe("dispatchAlerts", () => {
       web_push_topic: "called",
     });
     expect(byTicket.get(next.id)).toMatchObject({
+      contents: {
+        en: `Queue alert: you're nearly next (${formatTicketNumber(next.number)}). Please head back to the shop now.`,
+        ms: `Makluman giliran: giliran anda hampir tiba (${formatTicketNumber(next.number)}). Sila kembali ke kedai sekarang.`,
+      },
       ttl: 600,
       priority: 5,
       web_push_topic: "heads_up",
     });
   });
 
-  test("the slower kinds keep for an hour", async () => {
+  test("the slower kinds say what happened and keep for an hour", async () => {
     const { shop } = await createShop();
     const ticket = await join(shop.slug);
 
@@ -130,6 +134,16 @@ describe("dispatchAlerts", () => {
     await dispatchAlerts([{ ticketId: ticket.id, kind: "shop_closed" }], send);
 
     expect(send.mock.calls.map(([notification]) => notification.ttl)).toEqual([3600, 3600]);
+    expect(send.mock.calls.map(([notification]) => notification.contents)).toEqual([
+      {
+        en: "Queue alert: the shop is closing soon. Open the page to stay in the queue or move to the next day.",
+        ms: "Makluman giliran: kedai akan tutup sebentar lagi. Buka halaman untuk kekal dalam giliran atau pindah ke hari esok.",
+      },
+      {
+        en: "Queue alert: the shop has closed for today. Thank you for waiting.",
+        ms: "Makluman giliran: kedai telah tutup untuk hari ini. Terima kasih kerana menunggu.",
+      },
+    ]);
   });
 
   test("logs every send: sent with OneSignal's id, or no subscriber", async () => {
