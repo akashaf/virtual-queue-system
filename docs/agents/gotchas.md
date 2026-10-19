@@ -46,8 +46,8 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **The first join's device cookie arrives with the Server Action's response.** Anything the
   browser sends before that response lands goes without the cookie, so the server answers as
   if this browser holds no Ticket. The join's own `queue_changed` ping triggers such a refetch.
-  `customer-queue.tsx` drops a refetch sent before a newer view was shown (#31); any new screen that
-  refetches a view needs the same.
+  Every screen that refetches a view orders it through `createViewOrder` (`lib/view-order.ts`),
+  which drops a refetch sent before a newer view was shown (#31, #32); a new screen needs it too.
 
 ## Supabase and migrations
 

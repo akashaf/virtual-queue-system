@@ -1,11 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedShop, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
+import { seedShop, seedTicket, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
   permissions: ["geolocation", "notifications"],
 });
+
+/** A promise settled from outside, for holding a response until the test says so. */
+function deferred() {
+  let settle!: () => void;
+  const done = new Promise<void>((resolve) => (settle = resolve));
+  return { done, settle };
+}
 
 async function join(page: Page, slug: string, name: string) {
   await page.goto(`/s/${slug}`);
@@ -158,6 +165,46 @@ test("a Customer who rejoins after being served cannot be undone over", async ({
   await expect(dashboard.getByText("Waiting 1 · In chair 0")).toBeVisible();
 
   await owner.close();
+});
+
+test("an older Queue arriving late does not replace the Owner's newer one", async ({ page }) => {
+  // #32: the board applied whichever answer landed last, and one read before
+  // Call next but delivered after it put the called Customer back in Waiting
+  // until the 30 s poll.
+  const { email, password, shop } = await seedShop();
+  await seedTicket(shop.slug, "Siti");
+  await signInAsOwner(page, email, password);
+  await expect(page.getByText("Waiting 1 · In chair 0")).toBeVisible();
+
+  // The refetch Ahmad's join triggers is answered at once and delivered later.
+  // If the ping were missed, `answered` never settles and the test times out.
+  const answered = deferred();
+  const release = deferred();
+  const delivered = deferred();
+  let heldOne = false;
+  await page.route("**/api/owner/queue", async (route) => {
+    if (heldOne) return route.continue();
+    heldOne = true;
+    const response = await route.fetch();
+    answered.settle();
+    await release.done;
+    await route.fulfill({ response });
+    delivered.settle();
+  });
+  await seedTicket(shop.slug, "Ahmad");
+  await answered.done;
+
+  await page.getByRole("button", { name: "Call next" }).click();
+  await expect(page.getByText("Waiting 1 · In chair 1")).toBeVisible();
+  // Long enough for the press's own refetch and the call's ping to land first.
+  await page.waitForTimeout(2_000);
+  release.settle();
+  await delivered.done;
+  // Time for the board to render whatever it made of it.
+  await page.waitForTimeout(1_000);
+
+  await expect(page.getByText("Waiting 1 · In chair 1")).toBeVisible();
+  await expect(page.getByText("Waiting 2 · In chair 0")).toHaveCount(0);
 });
 
 test("the Customer sees their turn in Bahasa Malaysia too", async ({ page, browser }) => {

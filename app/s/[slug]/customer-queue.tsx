@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import {
   checkCustomerName,
   isFinalStatus,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/customer/view";
 import type { Dictionary, Lang } from "@/lib/i18n";
 import { useQueueChanged } from "@/lib/queue-changed";
+import { createViewOrder } from "@/lib/view-order";
 import {
   acknowledgeCalled,
   initialPageAlerts,
@@ -122,39 +123,36 @@ export function CustomerQueue({
 
   const storageKey = `${DISMISSED_TICKET_KEY}:${slug}`;
 
-  // Every view source takes a number when it starts: a refetch when it is sent,
-  // an action when its result arrives. A refetch answered after a view with a
-  // higher number is stale and dropped. The one that mattered (#31) was sent
-  // while the first join was still in flight, so without the device cookie, and
-  // answered "no Ticket" after the join had shown Waiting. The price is that a
-  // refetch the server answered after an action, so with newer news, is dropped
-  // too; the ping, poll or refocus that follows brings it back.
-  const lastIssued = useRef(0);
-  const lastShown = useRef(0);
+  // Views land out of order; a refetch sent before a newer view is dropped (#31).
+  const [order] = useState(createViewOrder);
 
-  const showIfLatest = useCallback((issued: number, next: CustomerView) => {
-    if (issued < lastShown.current) return;
-    lastShown.current = issued;
+  const show = useCallback((next: CustomerView) => {
     setPage((current) => ({
       view: next,
       alerts: nextPageAlerts(current.alerts, current.view, next),
     }));
   }, []);
 
+  // An action's result is a view this page made, newer than any refetch in flight.
   const receive = useCallback(
-    (next: CustomerView) => showIfLatest(++lastIssued.current, next),
-    [showIfLatest],
+    (next: CustomerView) => {
+      order.claim();
+      show(next);
+    },
+    [order, show],
   );
 
   const refetch = useCallback(async () => {
-    const issued = ++lastIssued.current;
+    const issued = order.next();
     try {
       const response = await fetch(`/api/s/${slug}/me`, { cache: "no-store" });
-      if (response.ok) showIfLatest(issued, (await response.json()) as CustomerView);
+      if (!response.ok) return;
+      const next = (await response.json()) as CustomerView;
+      if (order.accept(issued)) show(next);
     } catch {
       // Offline, or the tab was frozen mid-request. The next tick tries again.
     }
-  }, [slug, showIfLatest]);
+  }, [slug, order, show]);
 
   useQueueChanged(view.shop.id, refetch);
 

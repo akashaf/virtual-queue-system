@@ -4,6 +4,7 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useQueueChanged } from "@/lib/queue-changed";
+import { createViewOrder } from "@/lib/view-order";
 import {
   applyMove,
   type CloseShopResult,
@@ -44,15 +45,20 @@ import { EmptyQueue, WaitingList } from "./waiting-list";
  */
 export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   const [queue, setQueue] = useState(initialQueue);
+  // Refetches overlap, so an older Queue can land after a newer one (#32).
+  const [order] = useState(createViewOrder);
 
   const refetch = useCallback(async () => {
+    const issued = order.next();
     try {
       const response = await fetch("/api/owner/queue", { cache: "no-store" });
-      if (response.ok) setQueue((await response.json()) as OwnerQueue);
+      if (!response.ok) return;
+      const next = (await response.json()) as OwnerQueue;
+      if (order.accept(issued)) setQueue(next);
     } catch {
       // Offline, or the tab was frozen mid-request. The next tick tries again.
     }
-  }, []);
+  }, [order]);
 
   useQueueChanged(queue.shop.id, refetch);
 
@@ -60,8 +66,10 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   const move = useCallback((intent: QueueMove) => {
     // Whichever Undo was pressed, the toast offering it is now stale.
     if (intent.kind === "undo_served") toast.dismiss(undoToastId(intent.ticketId));
+    // Any refetch already in flight was read before the press.
+    order.claim();
     setQueue((current) => applyMove(current, intent, new Date()));
-  }, []);
+  }, [order]);
 
   /** Every press ends the same way: say so if it was refused, then re-read the Queue. */
   const settle = useCallback(
