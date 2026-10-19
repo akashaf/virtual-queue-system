@@ -74,6 +74,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   `'called'`, which is `unknown` and matches both. `db:reset` catches it, `tsc` cannot. Either
   cast at every call site or, as #7 did, keep one signature and move the old callers onto it
   in the same migration.
+- **Redefine a function from the database, not from an old migration.** One function can be
+  replaced in many migration files, and copying a stale one silently undoes every later fix.
+  Take the current body from the local database after `db:reset` (there is no `psql` on the host):
+  `docker exec supabase_db_virtual-queue-system psql -U postgres -Atc "select pg_get_functiondef('public.leave_queue'::regproc);"`
 - **A broadcast is testable without a browser.** `realtime.send` just inserts into
   `realtime.messages`, so `tests/db/queue-broadcast.test.ts` reads that table over the plain
   `pg` connection. Two things to know: the rows outlive `resetTestData`, which truncates only
@@ -90,10 +94,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   model, which is not always shaped like the thing the dashboard toggles.
 - **A push to `main` does not migrate production.** Netlify deploys the code; nothing applies
   `supabase/migrations/` to the cloud project. #11, #12 and #14 all shipped code to production
-  while its database stayed three migrations behind, and nobody noticed until #13 checked. After
-  a ticket with a migration lands, run `bunx supabase db push --dry-run` (read-only; the linked
-  CLI needs no password for it) and, if it lists anything, have the user run `bunx supabase db push`.
-  A dry run afterwards should say *Remote database is up to date*.
+  while its database stayed three migrations behind, and nobody noticed until #13 checked. Before
+  `git push`, run `bunx supabase db push --dry-run` (read-only; the linked CLI needs no password
+  for it). If it lists anything, settle the order with the user: an additive migration goes
+  first; one that changes what live code reads or calls (a dropped table, a new return shape, as
+  in #29) breaks production whichever lands first, so the two ship back to back. The user runs
+  `bunx supabase db push`; a dry run afterwards should say *Remote database is up to date*.
 - **Never run `supabase config push` from the repo.** `supabase/config.toml` is the local
   development config and much of it is wrong for production — `site_url`, redirect URLs,
   pooler sizes, OTP and email limits. It has no per-key flag, and a non-interactive run
