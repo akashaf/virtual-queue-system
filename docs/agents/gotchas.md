@@ -204,7 +204,9 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   to four tests to timeouts, the same tests passing in isolation. It looked exactly like a
   regression from the change under test. `e2e/global-setup.ts` warns at the start of a run when
   the load is high; heed it, and compare against `git stash` back to back, or with
-  `--workers=1`, rather than against an earlier run.
+  `--workers=1`, rather than against an earlier run. To test whether a failure is a timeout,
+  shrink the timeout on a quiet machine (`--testTimeout=800` failed the slowest db test every
+  run, in a minute) rather than loading the machine and waiting for a rare red.
 - **For a flaky e2e test, read its `trace.zip` before adding any logging.** Playwright keeps one
   per failure (`test-results/<test>/trace.zip`, `trace: "retain-on-failure"`), holding the
   browser console and every network request and response in order. `show-trace` is a GUI, so
@@ -235,7 +237,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   about 2 minutes), so it needs local Supabase up and a long command timeout. A failure is a
   real one: fix it rather than reach for `--no-verify`. The db tests run up to six times slower
   on a busy Mac, which is why their timeout is 20 s rather than Vitest's 5 s (`vitest.config.mts`);
-  a db test timing out past that is most likely a hang, not the load.
+  a db test timing out past that is most likely a hang, not the load. A Vitest run writes
+  `.test-results/vitest.json`, each test's status, duration and failure message, so read a
+  failed push there before rerunning: the next run overwrites it, and a `--reporter` flag
+  replaces the report.
 
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when

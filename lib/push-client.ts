@@ -59,6 +59,7 @@ function readPushDeclined(): boolean {
   }
 }
 
+/** Remembers that the Customer turned alerts down, so the sheet is not offered again. */
 export function rememberPushDeclined(): void {
   try {
     localStorage.setItem(PUSH_DECLINED_KEY, "1");

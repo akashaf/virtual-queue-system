@@ -29,6 +29,7 @@ export interface ShopResource {
  */
 type ShopColumns = Omit<ShopRow, "owner_user_id">;
 
+/** The Operator API's Shop, built from its columns, its Owner's email and its Served count for the current Billing Month. */
 export function toShopResource(
   shop: ShopColumns,
   ownerEmail: string,

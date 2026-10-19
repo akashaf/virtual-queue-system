@@ -50,6 +50,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "eslint-plugin-jsdoc": "^65.3.12",
     "jsqr": "^1.4.0",
     "pg": "^8.23.0",
     "shadcn": "^4.21.0",

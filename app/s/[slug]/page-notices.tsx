@@ -54,6 +54,7 @@ export function Blocked({
   );
 }
 
+/** The notice shown in place of the join form once Last Call has closed joining. */
 export function Announcement({ shopName, message }: { shopName: string; message: string }) {
   return (
     <div className="my-auto flex flex-col gap-4">

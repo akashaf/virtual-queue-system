@@ -12,6 +12,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Every run also leaves its results on disk, durations included, so a failure that
+    // scrolled past can still be read. The next run overwrites it.
+    reporters: ["default", "json"],
+    outputFile: { json: ".test-results/vitest.json" },
     projects: [
       {
         extends: true,

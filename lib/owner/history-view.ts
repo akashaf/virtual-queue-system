@@ -43,6 +43,7 @@ interface OwnerHistoryJson {
   this_month: { served_count: number; amount_sen: number };
 }
 
+/** Reads the Owner's history from `get_owner_history`: today's Tickets, Served by day and this month. */
 export function toOwnerHistory(json: unknown): OwnerHistory {
   const history = json as OwnerHistoryJson;
 

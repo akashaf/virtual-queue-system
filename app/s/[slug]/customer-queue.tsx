@@ -73,6 +73,7 @@ type BusyStage = Extract<
   { kind: "locating" | "joining" | "leaving" | "rejoining" | "choosing" }
 >["kind"];
 
+/** The Customer page for one Shop: joining, Waiting, being Called and the Ticket's ending. */
 export function CustomerQueue({
   slug,
   initialView,

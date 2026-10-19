@@ -4,6 +4,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { formatTicketNumber } from "@/lib/ticket";
 import { LeaveButton } from "./leave-button";
 
+/** The Customer's screen while their Ticket is Called: where to go, and "I'm coming" while it rings. */
 export function Called({
   ticket,
   dict,

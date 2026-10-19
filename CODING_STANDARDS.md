@@ -18,8 +18,12 @@ the decisions in `docs/adr/`, and the traps in `docs/agents/gotchas.md`.
   against, the decision it rests on.
 - **A comment that rests on a decision cites it**: a spec section (`backend.md §7`) or an ADR
   (`ADR 0005`). A cited section must still say what the comment claims.
-- **Every exported function and type has a one-sentence doc comment** naming what it is in
-  domain terms.
+- **Every exported function and component in `app/` and `lib/` has a one-sentence doc
+  comment** naming what it is in domain terms. Exempt: Next.js's special files (`page`,
+  `layout`, `route` and the rest, where the file name says what it is), Server Actions (the
+  `actions.ts` files; one kept anywhere else needs adding to the lint ignores) and types.
+  `bun run lint` enforces its presence (`jsdoc/require-jsdoc`); review checks that it sits on
+  the function it describes and says what it claims.
 
 ## Customer data
 

@@ -1,14 +1,4 @@
-/**
- * Whether this user agent is a social app's in-app browser (frontend.md §3.1).
- *
- * Those webviews cannot deliver Web Push, and several of them also drop the
- * page the moment the Customer switches away — so the page tells them up front
- * to open the link in a real browser instead. Detection is a token search:
- * each app stamps its name into the platform webview's own user agent.
- *
- * Read on the server from the request's User-Agent header, so the banner is in
- * the first HTML rather than appearing after hydration.
- */
+/** The tokens each app stamps into its webview's user agent. */
 const IN_APP_MARKERS = [
   "Instagram",
   // Facebook's iOS and Android apps mark their webviews differently.
@@ -25,6 +15,17 @@ const IN_APP_MARKERS = [
 /** LINE's token needs its slash: bare "Line" appears in unrelated agents. */
 const LINE_MARKER = /\bLine\//;
 
+/**
+ * Whether this user agent is a social app's in-app browser (frontend.md §3.1).
+ *
+ * Those webviews cannot deliver Web Push, and several of them also drop the
+ * page the moment the Customer switches away — so the page tells them up front
+ * to open the link in a real browser instead. Detection is a token search:
+ * each app stamps its name into the platform webview's own user agent.
+ *
+ * Read on the server from the request's User-Agent header, so the banner is in
+ * the first HTML rather than appearing after hydration.
+ */
 export function isInAppBrowser(userAgent: string | null): boolean {
   if (!userAgent) return false;
   return (

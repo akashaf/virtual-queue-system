@@ -9,6 +9,7 @@ import { toOperatorShopResource, type ShopResource } from "./shop-resource";
  * single Shop can never disagree about the Owner's email or the month's count.
  */
 
+/** Every Shop, as the Operator API lists them. */
 export async function listShops(): Promise<ShopResource[]> {
   return operatorShops();
 }

@@ -7,6 +7,7 @@ import { MAX_CUSTOMER_NAME_LENGTH, type NameProblem } from "@/lib/customer/view"
 import { format, type Dictionary } from "@/lib/i18n";
 import type { InstallGate } from "@/lib/install-gate";
 
+/** The join form: the Customer's name, and the Join button the install gate may hold back. */
 export function JoinForm({
   dict,
   shopName,

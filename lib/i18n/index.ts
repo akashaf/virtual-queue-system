@@ -12,6 +12,7 @@ export const dictionaries = { en, ms } satisfies Record<string, Dictionary>;
 
 export type Lang = keyof typeof dictionaries;
 
+/** Whether the value names a language the Customer page speaks. */
 export function isLang(value: string | undefined): value is Lang {
   return value !== undefined && Object.hasOwn(dictionaries, value);
 }

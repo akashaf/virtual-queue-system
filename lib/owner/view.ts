@@ -95,6 +95,7 @@ interface OwnerQueueJson {
   just_served: ServedTicketJson[];
 }
 
+/** Reads the Ticket that `call_next` or `undo_served` put in the chair. */
 export function toCalledTicket(json: unknown): CalledTicket {
   const ticket = json as CalledTicketJson;
   return {
@@ -106,6 +107,7 @@ export function toCalledTicket(json: unknown): CalledTicket {
   };
 }
 
+/** Reads the Ticket that `mark_served` marked Served. */
 export function toServedTicket(json: unknown): ServedTicket {
   const ticket = json as ServedTicketJson;
   return {
@@ -124,6 +126,7 @@ export interface TicketRef {
   number: number;
 }
 
+/** Reads the Ticket a press acted on from its payload. */
 export function toTicketRef(json: unknown): TicketRef {
   const ticket = json as TicketRef;
   return { id: ticket.id, number: ticket.number };
@@ -134,6 +137,7 @@ export interface JoiningStateResult {
   joiningState: JoiningState;
 }
 
+/** Reads the Shop's joining state after a Last Call press from its payload. */
 export function toJoiningStateResult(json: unknown): JoiningStateResult {
   const result = json as { joining_state: JoiningState };
   return { joiningState: result.joining_state };
@@ -145,6 +149,7 @@ export interface CloseShopResult {
   removed: number;
 }
 
+/** Reads how many Tickets Close Shop carried over and removed from its payload. */
 export function toCloseShopResult(json: unknown): CloseShopResult {
   const result = json as { carried_over: number; removed: number };
   return { carriedOver: result.carried_over, removed: result.removed };
@@ -169,6 +174,7 @@ export function closeShopPlan(waiting: WaitingTicket[]): {
   return { moving, removing: waiting.length - moving };
 }
 
+/** Reads the Owner's Queue from `get_owner_queue`: Waiting, in the chair and just Served. */
 export function toOwnerQueue(json: unknown): OwnerQueue {
   const { shop, waiting, called, just_served: justServed } = json as OwnerQueueJson;
 
@@ -227,15 +233,7 @@ export type QueueMove =
   | { kind: "cancel_last_call" }
   | { kind: "close_shop" };
 
-/**
- * The Queue as it will look once a press lands, so the screen can move before
- * the round trip does (frontend.md §4.2). The refetch that follows replaces it
- * with the truth, so this only has to be right about the common case — a move
- * whose Ticket the screen no longer holds is simply not made.
- *
- * `now` is a parameter because the timestamps this invents are the caller's
- * clock, and because a pure function is one that can be tested.
- */
+/** A Ticket in the chair after a move: a fresh call time for Call next, the original after Undo. */
 function inChair(
   ticket: { id: string; number: number; name: string | null },
   calledAt: string,
@@ -250,6 +248,15 @@ function inChair(
   };
 }
 
+/**
+ * The Queue as it will look once a press lands, so the screen can move before
+ * the round trip does (frontend.md §4.2). The refetch that follows replaces it
+ * with the truth, so this only has to be right about the common case — a move
+ * whose Ticket the screen no longer holds is simply not made.
+ *
+ * `now` is a parameter because the timestamps this invents are the caller's
+ * clock, and because a pure function is one that can be tested.
+ */
 export function applyMove(queue: OwnerQueue, move: QueueMove, now: Date): OwnerQueue {
   switch (move.kind) {
     case "call_next": {

@@ -45,6 +45,7 @@ export function UndoButton({
   );
 }
 
+/** The toast after a Ticket is marked Served, offering to take it back while the Undo window lasts. */
 export function UndoToast({
   served,
   move,

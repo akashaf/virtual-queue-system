@@ -145,6 +145,7 @@ export type CustomerError = (typeof CUSTOMER_ERRORS)[number];
  */
 const FINAL_STATUSES: TicketStatus[] = ["served", "no_show", "left", "removed"];
 
+/** Whether the Ticket has ended for good: Served, No-show, Left or Removed. */
 export function isFinalStatus(status: TicketStatus): boolean {
   return FINAL_STATUSES.includes(status);
 }

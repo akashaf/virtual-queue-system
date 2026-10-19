@@ -16,6 +16,7 @@ import { PushStatusNote, type PushStatus } from "./push-alerts";
 
 type Ticket = NonNullable<CustomerView["ticket"]>;
 
+/** The Customer's screen while their Ticket is Waiting: their place, the Estimated Wait, Heads-up and Last Call. */
 export function Waiting({
   ticket,
   estimate,
