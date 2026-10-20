@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Impeccable critique snapshots: tied to this machine's paths and file fingerprints
+.impeccable/critique/
