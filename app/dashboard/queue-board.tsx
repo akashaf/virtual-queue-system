@@ -141,84 +141,91 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   const lastCallOn = queue.shop.joiningState === "last_call";
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pt-4">
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Which door the shop is showing the street: open, or closing soon.
-            Filled while Last Call is on, so the closed door is hard to miss. */}
-        <Badge
-          variant={lastCallOn ? "default" : "outline"}
-          className="px-3 py-1 text-sm"
-        >
-          {lastCallOn ? "Last Call" : "Open"}
-        </Badge>
-        {/* The counts are on screen as the section headings; this line is
-            what a screen reader hears when they change. */}
-        <p className="sr-only" aria-live="polite">
-          Waiting {waiting.length} · In chair {called.length}
-        </p>
-      </div>
+    <main className="flex flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Which door the shop is showing the street: open, or closing soon.
+              Filled while Last Call is on, so the closed door is hard to miss. */}
+          <Badge
+            variant={lastCallOn ? "default" : "outline"}
+            className="px-3 py-1 text-sm"
+          >
+            {lastCallOn ? "Last Call" : "Open"}
+          </Badge>
+          {/* The counts are on screen as the section headings; this line is
+              what a screen reader hears when they change. */}
+          <p className="sr-only" aria-live="polite">
+            Waiting {waiting.length} · In chair {called.length}
+          </p>
+        </div>
 
-      {/* Both headings stay up while anyone is in the Queue, so a zero is
-          read as a free chair or an empty line rather than a missing section. */}
-      {waiting.length === 0 && called.length === 0 ? (
-        <EmptyQueue />
-      ) : (
-        <>
-          <section aria-labelledby="in-chair-heading" className="flex flex-col gap-2">
-            <SectionHeading id="in-chair-heading" label="In chair" count={called.length} />
-            {called.length > 0 ? (
-              <ul className="flex flex-col gap-3">
-                {called.map((ticket) => (
-                  <CalledCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    elapsedMs={elapsedMs}
-                    move={move}
-                    serve={serve}
-                    noShow={noShow}
-                    remove={remove}
-                  />
-                ))}
-              </ul>
-            ) : null}
-          </section>
-
-          <section aria-labelledby="waiting-heading" className="flex flex-col gap-2">
-            <SectionHeading id="waiting-heading" label="Waiting" count={waiting.length} />
-            {waiting.length > 0 ? (
-              <WaitingList
-                waiting={waiting}
-                lastCallOn={lastCallOn}
-                move={move}
-                remove={remove}
-              />
-            ) : null}
-          </section>
-        </>
-      )}
-
-      {/* Read from the database rather than remembered here, so the Undo
-          survives a reload and shows up on the shop's other phone too. */}
-      {undoable.length > 0 ? (
-        <JustServed undoable={undoable} elapsedMs={elapsedMs} move={move} undo={undo} />
-      ) : null}
-
-      {/* Ending the day, kept at the far end of the screen from Call next. The
-          space below it is where toasts land (layout.tsx), so the two-minute
-          Undo toast never sits on Last Call or Close Shop. */}
-      <div className="mt-auto flex flex-col gap-2 pt-4 pb-24">
-        {lastCallOn ? (
-          <>
-            <ReopenJoiningButton move={move} reopen={reopen} />
-            <CloseShopButton queue={queue} move={move} close={close} />
-          </>
+        {/* Both headings stay up while anyone is in the Queue, so a zero is
+            read as a free chair or an empty line rather than a missing section. */}
+        {waiting.length === 0 && called.length === 0 ? (
+          <EmptyQueue />
         ) : (
-          <StartLastCallButton move={move} lastCall={lastCall} />
+          <>
+            <section aria-labelledby="in-chair-heading" className="flex flex-col gap-2">
+              <SectionHeading id="in-chair-heading" label="In chair" count={called.length} />
+              {called.length > 0 ? (
+                <ul className="flex flex-col gap-3">
+                  {called.map((ticket) => (
+                    <CalledCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      elapsedMs={elapsedMs}
+                      move={move}
+                      serve={serve}
+                      noShow={noShow}
+                      remove={remove}
+                    />
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+
+            <section aria-labelledby="waiting-heading" className="flex flex-col gap-2">
+              <SectionHeading id="waiting-heading" label="Waiting" count={waiting.length} />
+              {waiting.length > 0 ? (
+                <WaitingList
+                  waiting={waiting}
+                  lastCallOn={lastCallOn}
+                  move={move}
+                  remove={remove}
+                />
+              ) : null}
+            </section>
+          </>
         )}
+
+        {/* Read from the database rather than remembered here, so the Undo
+            survives a reload and shows up on the shop's other phone too. */}
+        {undoable.length > 0 ? (
+          <JustServed undoable={undoable} elapsedMs={elapsedMs} move={move} undo={undo} />
+        ) : null}
+
+        {/* Ending the day, kept at the far end of the screen from Call next. The
+            pb-24 below it is where toasts land, above the Call next bar
+            (TOAST_OFFSET in layout.tsx), so the two-minute Undo toast never sits
+            on Last Call or Close Shop. */}
+        <div className="mt-auto flex flex-col gap-2 pt-4 pb-24">
+          {lastCallOn ? (
+            <>
+              <ReopenJoiningButton move={move} reopen={reopen} />
+              <CloseShopButton queue={queue} move={move} close={close} />
+            </>
+          ) : (
+            <StartLastCallButton move={move} lastCall={lastCall} />
+          )}
+        </div>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3">
-        <CallNextButton next={waiting[0]} move={move} call={call} />
+      {/* Edge to edge like the header, with the button kept to the column, and
+          still inside <main> so the page's main region ends with its main action. */}
+      <div className="sticky bottom-0 border-t bg-background">
+        <div className="mx-auto w-full max-w-2xl px-4 py-3">
+          <CallNextButton next={waiting[0]} move={move} call={call} />
+        </div>
       </div>
     </main>
   );

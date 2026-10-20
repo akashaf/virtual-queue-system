@@ -13,6 +13,9 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { signOut } from "@/app/login/actions";
 
+/** Clears the Call next bar: a 3.5rem button, 0.75rem above and below, and a hairline. */
+const TOAST_OFFSET = { bottom: "5.5rem" };
+
 /**
  * The authoritative gate for the whole dashboard. It runs on every render,
  * because a Shop can be deactivated in the middle of a session and `proxy.ts`
@@ -70,8 +73,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       {children}
       {/* Errors and the Undo window, from anywhere in the dashboard. Just above
           the sticky Call next bar, in the gap the queue board leaves free above it:
-          at the top, the two-minute Undo toast covered the header's menu on a phone. */}
-      <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 88 }} />
+          at the top, the two-minute Undo toast covered the header's menu on a phone.
+          In rem, like the bar, so the two grow together with the text size. */}
+      <Toaster position="bottom-center" offset={TOAST_OFFSET} mobileOffset={TOAST_OFFSET} />
     </div>
   );
 }

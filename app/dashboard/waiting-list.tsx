@@ -31,7 +31,7 @@ export function WaitingList({
                 {formatTicketNumber(ticket.number)}
               </Badge>
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                <span className="truncate font-medium">{ticket.name}</span>
+                <span className="min-w-0 font-medium break-words">{ticket.name}</span>
                 {/* The one Call next will take, in the burgundy of the shop's
                     next step. */}
                 {index === 0 ? <Badge>Next</Badge> : null}

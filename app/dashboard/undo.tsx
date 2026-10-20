@@ -113,7 +113,7 @@ export function JustServed({
                   <Badge variant="served" className="px-3 py-1 text-base font-semibold tabular-nums">
                     {formatTicketNumber(ticket.number)}
                   </Badge>
-                  <span className="flex-1 truncate">{ticket.name}</span>
+                  <span className="min-w-0 flex-1 break-words">{ticket.name}</span>
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {formatCountdown(ticket.undoExpiresInMs - elapsedMs)}
                   </span>

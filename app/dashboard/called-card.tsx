@@ -40,7 +40,7 @@ export function CalledCard({
             {formatTicketNumber(ticket.number)}
           </Badge>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate font-medium">{ticket.name}</span>
+            <span className="min-w-0 font-medium break-words">{ticket.name}</span>
             {/* The browser's own clock, which may differ from the shop's. */}
             <span className="text-sm text-muted-foreground" suppressHydrationWarning>
               called {formatMinutesAgo(ticket.calledAt, new Date())}
@@ -77,7 +77,7 @@ export function CalledCard({
             <Button
               type="submit"
               variant="outline"
-              className="h-11 px-3 tabular-nums"
+              className="h-11 min-w-30 px-3 tabular-nums"
               disabled={noShow.pending || tooEarly}
             >
               {tooEarly ? `No-show ${formatCountdown(noShowInMs)}` : "No-show"}
