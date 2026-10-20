@@ -1,10 +1,15 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
+import { WifiOffIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useQueueChanged } from "@/lib/queue-changed";
 import { formatTicketLabel } from "@/lib/ticket";
+import { formatMalaysiaTime } from "@/lib/time";
 import { createViewOrder } from "@/lib/view-order";
 import {
   applyMove,
@@ -38,6 +43,12 @@ import { JustServed, UndoToast, undoToastId } from "./undo";
 import { useElapsedMs } from "./use-elapsed-ms";
 import { EmptyQueue, WaitingList } from "./waiting-list";
 
+/** How often a board that has fallen behind tries to catch up. */
+const RETRY_MS = 5_000;
+
+/** How long a refetch may hang before it counts as a failure. */
+const REFETCH_TIMEOUT_MS = 10_000;
+
 /**
  * The Owner's live Queue and the buttons that move it.
  *
@@ -45,24 +56,76 @@ import { EmptyQueue, WaitingList } from "./waiting-list";
  * refetches the whole Queue rather than patching it, so two phones behind the
  * counter and the Customer's own page can never drift apart.
  */
-export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
+export function QueueBoard({
+  initialQueue,
+  readAt,
+}: {
+  initialQueue: OwnerQueue;
+  /** When the server read `initialQueue`, which may be well before this screen woke up. */
+  readAt: string;
+}) {
+  const router = useRouter();
   const [queue, setQueue] = useState(initialQueue);
   // Refetches overlap, so an older Queue can land after a newer one (#32).
   const [order] = useState(createViewOrder);
+  // Two phones and patchy shop wifi: a board that has stopped updating has to
+  // say so, or the Owner calls from a Queue that has already moved on.
+  const [outOfDate, setOutOfDate] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState(() => new Date(readAt));
+  // The newest refetch to have finished, so a slow old one failing after a
+  // newer one got through does not raise the notice again.
+  const lastSettled = useRef(0);
 
   const refetch = useCallback(async () => {
     const issued = order.next();
+    const settled = (ok: boolean) => {
+      if (issued < lastSettled.current) return;
+      lastSettled.current = issued;
+      setOutOfDate(!ok);
+      if (ok) setUpdatedAt(new Date());
+    };
     try {
-      const response = await fetch("/api/owner/queue", { cache: "no-store" });
-      if (!response.ok) return;
+      const response = await fetch("/api/owner/queue", {
+        cache: "no-store",
+        // A stalled request on a weak link would otherwise never fail at all.
+        signal: AbortSignal.timeout(REFETCH_TIMEOUT_MS),
+      });
+      // No active Shop for this session: switched off, or signed out. The
+      // layout tells the two apart, so let it look again.
+      if (response.status === 403) {
+        router.refresh();
+        return;
+      }
+      if (!response.ok) throw new Error(`queue refetch: ${response.status}`);
       const next = (await response.json()) as OwnerQueue;
+      settled(true);
       if (order.accept(issued)) setQueue(next);
     } catch {
-      // Offline, or the tab was frozen mid-request. The next tick tries again.
+      // Offline, timed out, a server error, or the tab was frozen mid-request.
+      settled(false);
     }
-  }, [order]);
+  }, [order, router]);
 
   useQueueChanged(queue.shop.id, refetch);
+
+  // While the board is behind, try again often rather than waiting out the
+  // 30-second poll, and at once when the browser says the network is back.
+  useEffect(() => {
+    if (!outOfDate) return;
+    const retry = setInterval(() => void refetch(), RETRY_MS);
+    return () => clearInterval(retry);
+  }, [outOfDate, refetch]);
+
+  useEffect(() => {
+    const onOnline = () => void refetch();
+    const onOffline = () => setOutOfDate(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [refetch]);
 
   /** Moves the screen before the round trip; the refetch replaces it with the truth. */
   const move = useCallback((intent: QueueMove) => {
@@ -73,18 +136,23 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
     setQueue((current) => applyMove(current, intent, new Date()));
   }, [order]);
 
-  /** Every press ends the same way: say so if it was refused, then re-read the Queue. */
+  /**
+   * Every press ends the same way: say so if it was refused, then re-read the
+   * Queue. A press that could not get an answer may still have landed, so the
+   * screen's guess stays up under the out-of-date notice until a refetch can
+   * say what really happened.
+   */
   const settle = useCallback(
     (outcome: OwnerOutcome<unknown>) => {
-      if (!outcome.ok) toast.error(ownerErrorMessage(outcome.reason));
+      if (!outcome.ok) {
+        toast.error(ownerErrorMessage(outcome.reason));
+        if (outcome.reason === "unreachable") setOutOfDate(true);
+      }
       void refetch();
     },
     [refetch],
   );
 
-  // One action state per kind of press, held here rather than on each row: an
-  // optimistic move unmounts the row it moved, and a button cannot be told how
-  // its own press went once it has gone.
   /** A call alerts a Customer, so the Owner is told whose phone just rang. */
   const announceCall = useCallback(
     (outcome: OwnerOutcome<CalledTicket>) => {
@@ -93,6 +161,10 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
     },
     [settle],
   );
+
+  // One action state per kind of press, held here rather than on each row: an
+  // optimistic move unmounts the row it moved, and a button cannot be told how
+  // its own press went once it has gone.
   const call = useOwnerAction(callNext, announceCall);
   const undo = useOwnerAction(undoServed, settle);
   const noShow = useOwnerAction(markNoShow, settle);
@@ -158,6 +230,12 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
             Waiting {waiting.length} · In chair {called.length}
           </p>
         </div>
+
+        <OutOfDateNotice
+          outOfDate={outOfDate}
+          updatedAt={updatedAt}
+          retry={() => void refetch()}
+        />
 
         {/* Both headings stay up while anyone is in the Queue, so a zero is
             read as a free chair or an empty line rather than a missing section. */}
@@ -231,6 +309,40 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   );
 }
 
+/**
+ * Said only while the board has stopped updating, and in the neutral ink of
+ * an ending rather than a status colour: nothing about any one Ticket changed.
+ * The live region is always there, so the notice is announced when it appears.
+ */
+function OutOfDateNotice({
+  outOfDate,
+  updatedAt,
+  retry,
+}: {
+  outOfDate: boolean;
+  updatedAt: Date;
+  retry: () => void;
+}) {
+  return (
+    <div role="status">
+      {outOfDate ? (
+        <div className="flex items-center gap-3 rounded-lg border bg-muted py-2 pr-2 pl-3">
+          <WifiOffIcon className="size-5 shrink-0" aria-hidden />
+          <p className="flex flex-1 flex-col text-sm">
+            <span className="font-medium">Not up to date</span>
+            <span className="text-muted-foreground">
+              As of {formatMalaysiaTime(updatedAt)}. Trying again…
+            </span>
+          </p>
+          <Button type="button" variant="outline" className="h-11" onClick={retry}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** A group's name with its count, the count large enough to read from the chair. */
 function SectionHeading({ id, label, count }: { id: string; label: string; count: number }) {
   return (
@@ -256,7 +368,21 @@ function useOwnerAction<T>(
   ) => Promise<OwnerOutcome<T>>,
   onOutcome: (outcome: OwnerOutcome<T>) => void,
 ): OwnerAction {
-  const [outcome, submit, pending] = useActionState(action, null);
+  const [outcome, submit, pending] = useActionState(
+    async (previous: OwnerOutcome<T> | null, formData: FormData) => {
+      try {
+        return await action(previous, formData);
+      } catch (error) {
+        // Thrown, either would reach global-error.tsx and take the whole board
+        // down with it. A failed fetch is a TypeError: offline, or the request
+        // died on the way. Anything else is the server's fault, not the wifi's.
+        if (error instanceof TypeError) return { ok: false, reason: "unreachable" } as const;
+        Sentry.captureException(error);
+        return { ok: false, reason: "failed" } as const;
+      }
+    },
+    null,
+  );
   const latest = useRef(onOutcome);
 
   useEffect(() => {

@@ -12,5 +12,5 @@ export default async function DashboardPage() {
   // has to survive a Shop that was switched off mid-session on its own.
   if (!queue) redirect("/login?error=inactive");
 
-  return <QueueBoard initialQueue={queue} />;
+  return <QueueBoard initialQueue={queue} readAt={new Date().toISOString()} />;
 }

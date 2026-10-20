@@ -138,6 +138,7 @@ Behaviour:
 - **After a Server Action:** apply the optimistic update, then refetch `/api/owner/queue`.
 - **Error messages:** errors from the functions become toasts, e.g. `queue_empty` → "Nobody waiting", `too_early`, `undo_expired`, `tickets_still_called`.
 - **Several devices:** they can be open at once and stay in sync through Realtime.
+- **Out of date:** when a refetch fails or the browser goes offline, a notice under the joining state badge says "Not up to date · As of 3:37 pm. Trying again…" with a **Retry** button; the board retries every 5 s and at once when the browser is back online, and the notice goes when a refetch succeeds. A refetch that hangs for 10 s counts as failed. A press that gets no answer is a toast ("No connection, so that may not have gone through. The queue will update when you're back online.") and raises the notice; it may still have landed, so the board keeps its optimistic view until a refetch says what happened, and the toast does not invite a second press. A refetch answered 403 (no active Shop for this session) refreshes the page, so the layout sends a switched-off Shop's Owner to `/login?error=inactive` and a signed-out one to `/login`.
 - **Accidental taps:** guard against double taps by disabling buttons while an action is pending.
 
 ### 4.3 `/dashboard/history`

@@ -211,10 +211,14 @@ export const OWNER_ERRORS = [
 
 export type OwnerError = (typeof OWNER_ERRORS)[number];
 
-/** What one press of an owner button did, or why it did nothing. */
+/**
+ * What one press of an owner button did, or why it did nothing. `unreachable`
+ * never comes from the server: it is the screen's own word for a press that
+ * could not get there.
+ */
 export type OwnerOutcome<T> =
   | { ok: true; result: T }
-  | { ok: false; reason: OwnerError | "failed" };
+  | { ok: false; reason: OwnerError | "failed" | "unreachable" };
 
 /** The Undo window, as `undo_window()` in the database measures it. */
 export const UNDO_WINDOW_MS = 120_000;

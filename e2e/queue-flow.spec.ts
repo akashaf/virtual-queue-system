@@ -63,6 +63,27 @@ test("Call next is not offered when nobody is waiting", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Call next" })).toBeDisabled();
 });
 
+test("a press without a connection is refused on the board, not the whole page", async ({
+  page,
+  context,
+}) => {
+  const { email, password, shop } = await seedShop();
+  await seedTicket(shop.slug, "Ali");
+  await signInAsOwner(page, email, password);
+
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Call next" }).click();
+
+  await expect(page.getByText("No connection, so that may not have gone through")).toBeVisible();
+  await expect(page.getByText("Not up to date")).toBeVisible();
+
+  // Back online, the board catches up with what really happened: the press
+  // never left the browser, so Ali is still waiting.
+  await context.setOffline(false);
+  await expect(page.getByText("Not up to date")).toHaveCount(0);
+  await expect(page.getByText("Waiting 1 · In chair 0")).toBeVisible();
+});
+
 test("a Done can be taken back, and the Customer is in the chair again", async ({
   page,
   browser,

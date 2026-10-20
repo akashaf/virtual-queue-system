@@ -15,7 +15,7 @@ export const CHAIRS_STILL_BUSY = "Finish or mark no-show for customers in chair 
  * What the Owner is told when a function refuses. The dashboard is English-only
  * (frontend.md §1), so these need no dictionary.
  */
-export function ownerErrorMessage(reason: OwnerError | "failed"): string {
+export function ownerErrorMessage(reason: OwnerError | "failed" | "unreachable"): string {
   switch (reason) {
     case "queue_empty":
       return "Nobody waiting";
@@ -37,5 +37,9 @@ export function ownerErrorMessage(reason: OwnerError | "failed"): string {
       return SHOP_INACTIVE;
     case "failed":
       return "Something went wrong. Please try again.";
+    case "unreachable":
+      // The press may or may not have landed, so this says only what is known,
+      // and does not invite a second press that could call a second Customer.
+      return "No connection, so that may not have gone through. The queue will update when you're back online.";
   }
 }
