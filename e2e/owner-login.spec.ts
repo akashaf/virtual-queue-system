@@ -59,6 +59,22 @@ test("a wrong password is refused without saying which field was wrong", async (
   await expect(page).toHaveURL("/login");
 });
 
+test("a refused sign-in keeps the email and puts the cursor back in the password", async ({
+  page,
+}) => {
+  const { email } = await seedShop();
+
+  await signIn(page, email, "not-the-password");
+
+  await expect(page.getByText("Wrong email or password")).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveValue(email);
+  const password = page.getByLabel("Password", { exact: true });
+  await expect(password).toBeFocused();
+  await expect(password).toHaveValue("");
+  await expect(password).toHaveAttribute("aria-invalid", "true");
+  await expect(password).toHaveAccessibleDescription("Wrong email or password");
+});
+
 test("an unknown email is refused the same way", async ({ page }) => {
   await signIn(page, "nobody@example.test", "correct-horse-battery");
 
@@ -71,7 +87,7 @@ test("the Owner of a Deactivated Shop is turned away", async ({ page }) => {
   await signIn(page, email, password);
 
   await expect(
-    page.getByText("This shop account is inactive, contact support"),
+    page.getByText("This Shop has been switched off. Contact the Operator to turn it back on."),
   ).toBeVisible();
   await expect(page).toHaveURL("/login");
 });
@@ -87,7 +103,7 @@ test("a Deactivated Shop's Owner cannot stay on the dashboard", async ({ page })
 
   await expect(page).toHaveURL(/\/login\?error=inactive/);
   await expect(
-    page.getByText("This shop account is inactive, contact support"),
+    page.getByText("This Shop has been switched off. Contact the Operator to turn it back on."),
   ).toBeVisible();
 });
 

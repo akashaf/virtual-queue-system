@@ -270,7 +270,7 @@ Big, calm, sure: large flat targets with a light border, and one strong button p
 
 ### Inputs / Fields
 - **Style:** 1px Hairline stroke, transparent fill (15% white in dark mode), 0.5rem radius, 1rem text.
-- **Height:** 2.75rem (`h-11`) on the login form; 3rem (`h-12`) for the Customer's name field, matching the Join queue button below it.
+- **Height:** 3rem (`h-12`) on the login form and the Customer's name field, matching the main button below them and leaving room for a 2.75rem icon button inside the field.
 - **Focus:** the same 3px Focus Ring as buttons.
 - **Error:** Ember border and a faint Ember ring via `aria-invalid`.
 

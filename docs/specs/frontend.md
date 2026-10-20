@@ -112,7 +112,8 @@ The page compares the previous view with the new one after each refetch, in `lib
 
 ### 4.1 `/login`
 - Email and password fields.
-- Errors: "Wrong email or password"; "This shop account is inactive, contact support".
+- Errors: "Wrong email or password"; "This Shop has been switched off. Contact the Operator to turn it back on." The second is not the Owner's mistake, so on this page it shows as a calm notice (`role="status"`) rather than an error. The dashboard still shows it as an error toast, because there the Owner's action did fail.
+- A refused attempt keeps the email and puts the cursor back in the password field.
 - No sign-up and no forgot-password link. Owners contact the Operator instead (deferred).
 - An Owner who is already signed in is sent on to `/dashboard`. `/` relies on this rather than checking the session itself.
 - Below the card, a small line for Customers: "Waiting for a haircut? Scan the QR code at the shop." (§1 covers its language).
