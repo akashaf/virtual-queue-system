@@ -63,74 +63,74 @@ typography:
     fontWeight: 500
     letterSpacing: "0.025em"
 rounded:
-  sm: "6px"
-  md: "8px"
-  lg: "10px"
-  xl: "14px"
+  sm: "0.375rem"
+  md: "0.5rem"
+  lg: "0.625rem"
+  xl: "0.875rem"
   full: "9999px"
 spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "12px"
-  lg: "16px"
-  xl: "24px"
+  xs: "0.25rem"
+  sm: "0.5rem"
+  md: "0.75rem"
+  lg: "1rem"
+  xl: "1.5rem"
 components:
   button-primary:
     backgroundColor: "{colors.barber-burgundy}"
     textColor: "{colors.barber-burgundy-foreground}"
     rounded: "{rounded.md}"
-    padding: "8px 16px"
-    height: "44px"
+    padding: "0.5rem 1rem"
+    height: "2.75rem"
   button-call-next:
     backgroundColor: "{colors.barber-burgundy}"
     textColor: "{colors.barber-burgundy-foreground}"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
-    height: "56px"
+    height: "3.5rem"
     width: "100%"
   button-outline:
     backgroundColor: "{colors.warm-paper}"
     textColor: "{colors.ink}"
     rounded: "{rounded.md}"
-    padding: "8px 16px"
-    height: "44px"
+    padding: "0.5rem 1rem"
+    height: "2.75rem"
   button-destructive:
     backgroundColor: "{colors.ember-destructive}"
     textColor: "{colors.card-white}"
     rounded: "{rounded.md}"
-    padding: "8px 16px"
-    height: "44px"
+    padding: "0.5rem 1rem"
+    height: "2.75rem"
   input:
     backgroundColor: "{colors.card-white}"
     textColor: "{colors.ink}"
     rounded: "{rounded.md}"
-    padding: "4px 12px"
-    height: "44px"
+    padding: "0.25rem 0.75rem"
+    height: "2.75rem"
   card:
     backgroundColor: "{colors.card-white}"
     textColor: "{colors.ink}"
     rounded: "{rounded.xl}"
-    padding: "24px"
+    padding: "1.5rem"
   badge-waiting:
     backgroundColor: "{colors.waiting-blue}"
     textColor: "{colors.waiting-blue-foreground}"
     rounded: "{rounded.full}"
-    padding: "4px 12px"
+    padding: "0.25rem 0.75rem"
   badge-called:
     backgroundColor: "{colors.turn-amber}"
     textColor: "{colors.turn-amber-foreground}"
     rounded: "{rounded.full}"
-    padding: "4px 12px"
+    padding: "0.25rem 0.75rem"
   badge-served:
     backgroundColor: "{colors.served-green}"
     textColor: "{colors.served-green-foreground}"
     rounded: "{rounded.full}"
-    padding: "4px 12px"
+    padding: "0.25rem 0.75rem"
   badge-ended:
     backgroundColor: "{colors.blush-muted}"
     textColor: "{colors.muted-ink}"
     rounded: "{rounded.full}"
-    padding: "4px 12px"
+    padding: "0.25rem 0.75rem"
   called-screen:
     backgroundColor: "{colors.turn-amber}"
     textColor: "{colors.turn-amber-foreground}"
@@ -147,16 +147,16 @@ components:
 
 The interface behaves like the paper ticket a counter hands you: one big number, a few plain words, readable at arm's length and held up for the barber to see. Everything that isn't the number or the next action stays quiet (warm off-white paper, near-black ink, hairline borders) so the four status colours can do the talking. A Customer glances at it in bursts between other things, and an Owner taps it with one hand between haircuts. Both need to read it in a second.
 
-The system is built from stock shadcn/ui (new-york style) on Tailwind 4, re-themed rather than restyled. Identity lives in the theme tokens: a burgundy primary, neutrals tinted toward that burgundy (hue 15), the Clarity City typeface, and a status palette that means the same thing on the Customer page and the Owner's board. Density is low on the Customer page (one column, 384px max) and moderate on the dashboard (one column, 672px max). Neither surface ever lays content out in more than one column.
+The system is built from stock shadcn/ui (new-york style) on Tailwind 4, re-themed rather than restyled. Identity lives in the theme tokens: a burgundy primary, neutrals tinted toward that burgundy (hue 15), the Clarity City typeface, and a status palette that means the same thing on the Customer page and the Owner's board. Density is low on the Customer page (one column, 24rem max) and moderate on the dashboard (one column, 42rem max). Neither surface ever lays content out in more than one column.
 
 Dark mode follows the device and is a full second token set, not an inversion. Every foreground and background pair meets WCAG AA in both modes.
 
 **Key Characteristics:**
-- One huge tabular ticket number per Customer screen, never smaller than 64px.
+- One huge tabular ticket number per Customer screen, never smaller than 4rem.
 - Status colour is the loudest thing on screen and means the same thing everywhere.
 - Burgundy marks the shop's own actions; orange-red marks anything destructive, and the two never blur.
 - Flat, bordered surfaces; depth comes from borders and tone, not shadows.
-- Every tap target is at least 44px; the most-used action is 56px and pinned within thumb reach.
+- Every tap target is at least 2.75rem; the most-used action is 3.5rem and pinned within thumb reach.
 
 ## Colors
 
@@ -202,9 +202,9 @@ The status palette is a fixed code shared by the Customer page and the queue boa
 ### Hierarchy
 - **Ticket Number** (`ticket-number`): the Customer's number on the Waiting card. Bold, tight, tabular. Sized so a four-digit `#1000` still fits a 360px card.
 - **Ticket Number, Called** (`ticket-number-called`): the number on the full-screen Called state, one step bigger.
-- **Headline** (`headline`): "It's your turn" on the Called screen; page titles on Owner pages are one step down at 24px.
+- **Headline** (`headline`): "It's your turn" on the Called screen; page titles on Owner pages are one step down at 1.5rem.
 - **Title** (`title`): the shop name in the dashboard header, card titles, the Call next label.
-- **Body** (`body`): running text and inputs. 16px on phones so iOS does not zoom on focus.
+- **Body** (`body`): running text and inputs. 1rem on phones so iOS does not zoom on focus.
 - **Label** (`label`): form labels, badges, secondary lines, counts ("Waiting 4 · In chair 2").
 - **Eyebrow** (`eyebrow`): uppercase, slightly tracked, muted. Used once, above the ticket number ("Your number").
 
@@ -215,15 +215,20 @@ The status palette is a fixed code shared by the Customer page and the queue boa
 
 ## Layout
 
-Single column everywhere, mobile-first from a 360px minimum width with a 16px side gutter.
+Single column everywhere, mobile-first from a 360px minimum width with a 1rem side gutter.
 
-- **Customer page:** centred column, 384px max, 24px vertical rhythm between blocks. The Leave button sits at the bottom of the column (`mt-auto`), away from anything the Customer taps often.
-- **Owner dashboard:** centred column, 672px max, 16px between blocks. A bordered header bar holds the shop name and one 44px menu button. **Call next** is a sticky bottom bar, full-width, with a top hairline. Last Call and Close Shop sit at the far end of the scroll from Call next, and the 88px gap above the sticky bar is reserved for toasts so an Undo toast never covers a control.
-- **Login:** centred column, 384px max, vertically centred.
-- **Spacing rhythm:** 8 / 12 / 16 / 24px (`spacing.sm`–`xl`) carries almost everything; 4px only inside badges.
+- **Customer page:** centred column, 24rem max, 1.5rem vertical rhythm between blocks. The Leave button sits at the bottom of the column (`mt-auto`), away from anything the Customer taps often.
+- **Owner dashboard:** centred column, 42rem max, 1rem between blocks. A bordered header bar holds the shop name and one 2.75rem menu button. **Call next** is a sticky bottom bar, full-width, with a top hairline. Last Call and Close Shop sit at the far end of the scroll from Call next, and the 5.5rem gap above the sticky bar is reserved for toasts so an Undo toast never covers a control.
+- **Login:** centred column, 24rem max, vertically centred.
+- **Spacing rhythm:** 0.5 / 0.75 / 1 / 1.5rem (`spacing.sm`–`xl`) carries almost everything; 0.25rem only inside badges.
+- **Flexbox first:** every layout, from page columns to the rows inside a card, is a flex container (`flex flex-col` with `gap-*` for stacks, `flex items-center` for rows, `flex-1` and `mt-auto` to push an action to the end). Spacing between siblings comes from `gap`, not margins on the children. Grid is used only inside stock shadcn components (the card header) and is not reached for in app code.
 - No breakpoint changes the structure: wider screens only get more margin.
 
 ### Named Rules
+**The Rem Rule.** Every size, padding, gap, radius, width and font size is in rem (in Tailwind, the spacing and size scale: `h-11`, `px-4`, `max-w-sm`), so the whole interface grows with the reader's browser text size. Only hairlines stay in px: 1px borders, 2px emphasis borders and the 3px focus ring. Never fix a height or width in px (`h-[44px]`), and never cap a text container's height so larger text would clip.
+
+**The Flex-First Rule.** Reach for flexbox before grid. The interface is a single column of stacks and rows, and flex with `gap` expresses that directly and wraps gracefully when text grows.
+
 **The Thumb Reach Rule.** The Owner's most frequent action lives at the bottom of the screen; actions that end the day live as far from it as the page allows.
 
 ## Elevation & Depth
@@ -235,16 +240,16 @@ Flat by default. Depth comes from tone (Warm Paper page, Card White surface) and
 
 ## Shapes
 
-Gently rounded, from one base radius of 10px (`--radius: 0.625rem`). Buttons and inputs take 8px (`rounded.md`), cards 14px (`rounded.xl`), and badges and status chips are full pills. The Called screen is the one shape with no corners: it is the whole viewport.
+Gently rounded, from one base radius of 0.625rem (`--radius: 0.625rem`). Buttons and inputs take 0.5rem (`rounded.md`), cards 0.875rem (`rounded.xl`), and badges and status chips are full pills. The Called screen is the one shape with no corners: it is the whole viewport.
 
 ## Components
 
 Big, calm, sure: large flat targets with a light border, and one strong button per screen.
 
 ### Buttons
-- **Shape:** gently rounded (8px).
+- **Shape:** gently rounded (0.5rem).
 - **Primary:** Barber Burgundy fill, near-white text, 500 weight. Hover takes the fill to 90% opacity.
-- **Sizes in use:** the shadcn default is 36px, but app buttons are always raised to 44px (`h-11`) or more: 48px for Join queue and the Last Call choices, 56px with 18px semibold text for Call next and "I'm coming".
+- **Sizes in use:** the shadcn default is 2.25rem, but app buttons are always raised to 2.75rem (`h-11`) or more: 3rem for Join queue and the Last Call choices, 3.5rem with 1.125rem semibold text for Call next and "I'm coming".
 - **Outline:** Warm Paper with a Hairline border; hover fills Blush Accent. Used for secondary actions (Last Call, the menu button, the unchosen Last Call option).
 - **Destructive:** Ember fill, white text. Always behind a confirmation dialog.
 - **Focus:** 3px Focus Ring at 50% opacity plus a ring-coloured border.
@@ -252,28 +257,28 @@ Big, calm, sure: large flat targets with a light border, and one strong button p
 - **Selected state:** a toggle choice becomes Primary with a leading "✓" and `aria-pressed`.
 
 ### Chips (Badges)
-- **Style:** full pill, 12px/500 by default; status chips in Customer or board context are scaled to 14–18px with 12px horizontal padding.
-- **Status variants:** `waiting`, `called`, `served`, `ended`, each the status token pair. On the board, a Called ticket number is a Turn Amber chip in 18px semibold tabular figures.
+- **Style:** full pill, 0.75rem/500 by default; status chips in Customer or board context are scaled to 0.875–1.125rem with 0.75rem horizontal padding.
+- **Status variants:** `waiting`, `called`, `served`, `ended`, each the status token pair. On the board, a Called ticket number is a Turn Amber chip in 1.125rem semibold tabular figures.
 - **Joining state:** "Open" is an outline chip; "Last Call" is a filled burgundy chip, so a closing shop is hard to miss.
 
 ### Cards / Containers
-- **Corner Style:** 14px.
+- **Corner Style:** 0.875rem.
 - **Background:** Card White on Warm Paper.
 - **Shadow Strategy:** stock `shadow-sm` only (see Elevation).
 - **Border:** 1px Hairline; 2px burgundy or Turn Amber when it needs the eye.
-- **Internal Padding:** 24px stock; dashboard Called cards tighten to 16px.
+- **Internal Padding:** 1.5rem stock; dashboard Called cards tighten to 1rem.
 
 ### Inputs / Fields
-- **Style:** 1px Hairline stroke, transparent fill (15% white in dark mode), 8px radius, 16px text.
-- **Height:** 44px (`h-11`) on the login form; 48px (`h-12`) for the Customer's name field, matching the Join queue button below it.
+- **Style:** 1px Hairline stroke, transparent fill (15% white in dark mode), 0.5rem radius, 1rem text.
+- **Height:** 2.75rem (`h-11`) on the login form; 3rem (`h-12`) for the Customer's name field, matching the Join queue button below it.
 - **Focus:** the same 3px Focus Ring as buttons.
 - **Error:** Ember border and a faint Ember ring via `aria-invalid`.
 
 ### Navigation
-The dashboard has no nav bar: one 44px outline menu button in the header opens a dropdown (Queue, History, Sign out), each item at least 44px tall with a leading Lucide icon. The Customer page has no navigation at all; only the EN | BM toggle.
+The dashboard has no nav bar: one 2.75rem outline menu button in the header opens a dropdown (Queue, History, Sign out), each item at least 2.75rem tall with a leading Lucide icon. The Customer page has no navigation at all; only the EN | BM toggle.
 
 ### Called Screen (signature)
-The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 24px, then a 56px burgundy "I'm coming" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.
+The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 1.5rem, then a 3.5rem burgundy "I'm coming" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.
 
 ### Ticket Card (signature)
 The Waiting state: a centred card with the eyebrow "Your number", the ticket number, an optional "Moved from previous day" secondary chip, and a Waiting Blue chip saying how many are ahead. The Heads-up banner sits directly beneath it as a full burgundy block.
@@ -282,8 +287,9 @@ The Waiting state: a centred card with the eyebrow "Your number", the ticket num
 
 ### Do:
 - **Do** use stock shadcn/ui components and theme them through tokens; plain Tailwind is for layout only (flex, grid, spacing, sizing).
-- **Do** make every tap target at least 44px tall, and the screen's main action 48–56px.
-- **Do** show ticket numbers and countdowns in tabular figures, at 64px or more on the Customer page.
+- **Do** make every tap target at least 2.75rem tall (44px at the default 16px text size), and the screen's main action 3–3.5rem.
+- **Do** size everything in rem through Tailwind's scale, and lay it out with flexbox and `gap`.
+- **Do** show ticket numbers and countdowns in tabular figures, at 4rem or more on the Customer page.
 - **Do** pair every status colour with words; colour alone never carries a status.
 - **Do** check both light and dark token sets when adding a colour pair; both must pass WCAG AA.
 - **Do** put a confirmation dialog in front of every Ember action.
@@ -294,5 +300,7 @@ The Waiting state: a centred card with the eyebrow "Your number", the ticket num
 - **Don't** use a status colour for anything except its Ticket status.
 - **Don't** make a destructive action burgundy, or a normal action Ember.
 - **Don't** add shadows for emphasis; use a 2px border or a fill.
+- **Don't** fix heights or widths in px or arbitrary values (`h-[44px]`, `w-[320px]`); only 1–3px borders and focus rings are px.
+- **Don't** use grid in app code where a flex stack or row does the job.
 - **Don't** lay out the Customer page or the dashboard in more than one column.
 - **Don't** add a theme toggle; dark mode follows the device.

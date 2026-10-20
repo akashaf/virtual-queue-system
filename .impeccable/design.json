@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-20T03:49:46+00:00",
+  "generatedAt": "2026-10-20T03:53:23+00:00",
   "title": "Design System: Barbershop Virtual Queue",
   "extensions": {
     "colorMeta": {
@@ -311,7 +311,7 @@
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Running text and inputs; 16px so iOS does not zoom."
+        "purpose": "Running text and inputs; 1rem so iOS does not zoom."
       },
       "label": {
         "displayName": "Label",
@@ -344,11 +344,12 @@
     "breakpoints": [
       {
         "name": "min",
-        "value": "360px"
+        "value": "360px",
+        "purpose": "Narrowest phone width the layout is tested at (a device width, not a CSS size)."
       },
       {
         "name": "md",
-        "value": "768px"
+        "value": "48rem"
       }
     ]
   },
@@ -357,17 +358,17 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The shop's next step: Join queue, Done, I'm coming. 44px minimum.",
+      "description": "The shop's next step: Join queue, Done, I'm coming. 2.75rem minimum.",
       "html": "<button class=\"ds-btn-primary\">Join queue</button>",
-      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:8px 16px;border:1px solid transparent;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 14px/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer;transition:all .15s}.ds-btn-primary:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-btn-primary:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}.ds-btn-primary:disabled{opacity:.5;pointer-events:none}"
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:2.75rem;padding:0.5rem 1rem;border:1px solid transparent;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 0.875rem/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer;transition:all .15s}.ds-btn-primary:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-btn-primary:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}.ds-btn-primary:disabled{opacity:.5;pointer-events:none}"
     },
     {
       "name": "Call Next Bar",
       "kind": "custom",
       "refersTo": "button-call-next",
-      "description": "The Owner's most-used action: a 56px full-width button in a sticky bottom bar.",
+      "description": "The Owner's most-used action: a 3.5rem full-width button in a sticky bottom bar.",
       "html": "<div class=\"ds-callbar\"><button class=\"ds-btn-callnext\">Call next</button></div>",
-      "css": ".ds-callbar{border-top:1px solid var(--border);background:var(--background);padding:12px 16px}.ds-btn-callnext{width:100%;height:56px;border:1px solid transparent;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:600 18px/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer}.ds-btn-callnext:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-btn-callnext:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+      "css": ".ds-callbar{border-top:1px solid var(--border);background:var(--background);padding:0.75rem 1rem}.ds-btn-callnext{width:100%;height:3.5rem;border:1px solid transparent;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:600 1.125rem/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer}.ds-btn-callnext:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-btn-callnext:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     },
     {
       "name": "Outline Button",
@@ -375,7 +376,7 @@
       "refersTo": "button-outline",
       "description": "Secondary actions: Last Call, the menu button, an unchosen option.",
       "html": "<button class=\"ds-btn-outline\">Last Call</button>",
-      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:8px 16px;border:1px solid var(--border);border-radius:calc(var(--radius) * 0.8);background:var(--background);color:var(--foreground);font:500 14px/1 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);cursor:pointer;transition:all .15s}.ds-btn-outline:hover{background:var(--accent);color:var(--accent-foreground)}.ds-btn-outline:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;height:2.75rem;padding:0.5rem 1rem;border:1px solid var(--border);border-radius:calc(var(--radius) * 0.8);background:var(--background);color:var(--foreground);font:500 0.875rem/1 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);cursor:pointer;transition:all .15s}.ds-btn-outline:hover{background:var(--accent);color:var(--accent-foreground)}.ds-btn-outline:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     },
     {
       "name": "Destructive Button",
@@ -383,15 +384,15 @@
       "refersTo": "button-destructive",
       "description": "Ends something: Close Shop, Remove. Always behind a confirmation.",
       "html": "<button class=\"ds-btn-destructive\">Close Shop</button>",
-      "css": ".ds-btn-destructive{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:8px 16px;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--destructive);color:#fff;font:500 14px/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer;transition:all .15s}.ds-btn-destructive:hover{background:color-mix(in oklch,var(--destructive) 90%,transparent)}.ds-btn-destructive:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--destructive) 20%,transparent)}"
+      "css": ".ds-btn-destructive{display:inline-flex;align-items:center;justify-content:center;height:2.75rem;padding:0.5rem 1rem;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--destructive);color:#fff;font:500 0.875rem/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer;transition:all .15s}.ds-btn-destructive:hover{background:color-mix(in oklch,var(--destructive) 90%,transparent)}.ds-btn-destructive:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--destructive) 20%,transparent)}"
     },
     {
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "Name and login fields, 44px tall with 16px text.",
+      "description": "Name and login fields, 2.75rem tall with 1rem text.",
       "html": "<input class=\"ds-input\" placeholder=\"Your name\" />",
-      "css": ".ds-input{height:44px;width:100%;padding:4px 12px;border:1px solid var(--input);border-radius:calc(var(--radius) * 0.8);background:transparent;color:var(--foreground);font:400 16px/1.5 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);transition:color .15s,box-shadow .15s}.ds-input::placeholder{color:var(--muted-foreground)}.ds-input:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+      "css": ".ds-input{height:2.75rem;width:100%;padding:0.25rem 0.75rem;border:1px solid var(--input);border-radius:calc(var(--radius) * 0.8);background:transparent;color:var(--foreground);font:400 1rem/1.5 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);transition:color .15s,box-shadow .15s}.ds-input::placeholder{color:var(--muted-foreground)}.ds-input:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     },
     {
       "name": "Status Chips",
@@ -399,7 +400,7 @@
       "refersTo": "badge-waiting",
       "description": "The four Ticket status colours, the same on both surfaces.",
       "html": "<div class=\"ds-chips\"><span class=\"ds-chip ds-chip-waiting\">3 ahead of you</span><span class=\"ds-chip ds-chip-called\">#017</span><span class=\"ds-chip ds-chip-served\">Served</span><span class=\"ds-chip ds-chip-ended\">No-show</span></div>",
-      "css": ".ds-chips{display:flex;flex-wrap:wrap;gap:8px}.ds-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:9999px;font:500 14px/1.43 var(--font-clarity-city),system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-chip-waiting{background:var(--status-waiting);color:var(--status-waiting-foreground)}.ds-chip-called{background:var(--status-called);color:var(--status-called-foreground);font-weight:600}.ds-chip-served{background:var(--status-served);color:var(--status-served-foreground)}.ds-chip-ended{background:var(--status-ended);color:var(--status-ended-foreground)}"
+      "css": ".ds-chips{display:flex;flex-wrap:wrap;gap:0.5rem}.ds-chip{display:inline-flex;align-items:center;padding:0.25rem 0.75rem;border-radius:9999px;font:500 0.875rem/1.43 var(--font-clarity-city),system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-chip-waiting{background:var(--status-waiting);color:var(--status-waiting-foreground)}.ds-chip-called{background:var(--status-called);color:var(--status-called-foreground);font-weight:600}.ds-chip-served{background:var(--status-served);color:var(--status-served-foreground)}.ds-chip-ended{background:var(--status-ended);color:var(--status-ended-foreground)}"
     },
     {
       "name": "Ticket Card",
@@ -407,7 +408,7 @@
       "refersTo": "card",
       "description": "The Waiting state: eyebrow, the giant tabular number, and how many are ahead.",
       "html": "<div class=\"ds-ticket\"><p class=\"ds-ticket-eyebrow\">Your number</p><p class=\"ds-ticket-number\">#017</p><span class=\"ds-ticket-ahead\">3 ahead of you</span></div>",
-      "css": ".ds-ticket{display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px;border:1px solid var(--border);border-radius:calc(var(--radius) * 1.4);background:var(--card);color:var(--card-foreground);box-shadow:0 1px 3px 0 rgb(0 0 0 / .1);text-align:center;font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-ticket p{margin:0}.ds-ticket-eyebrow{font-size:14px;font-weight:500;letter-spacing:.025em;text-transform:uppercase;color:var(--muted-foreground)}.ds-ticket-number{font-size:72px;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-ticket-ahead{padding:4px 12px;border-radius:9999px;background:var(--status-waiting);color:var(--status-waiting-foreground);font-size:16px;font-weight:500}"
+      "css": ".ds-ticket{display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:1.5rem;border:1px solid var(--border);border-radius:calc(var(--radius) * 1.4);background:var(--card);color:var(--card-foreground);box-shadow:0 1px 3px 0 rgb(0 0 0 / .1);text-align:center;font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-ticket p{margin:0}.ds-ticket-eyebrow{font-size:0.875rem;font-weight:500;letter-spacing:.025em;text-transform:uppercase;color:var(--muted-foreground)}.ds-ticket-number{font-size:4.5rem;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-ticket-ahead{padding:0.25rem 0.75rem;border-radius:9999px;background:var(--status-waiting);color:var(--status-waiting-foreground);font-size:1rem;font-weight:500}"
     },
     {
       "name": "Called Screen",
@@ -415,18 +416,18 @@
       "refersTo": "called-screen",
       "description": "The full-viewport Turn Amber flood a Customer sees when Called.",
       "html": "<div class=\"ds-called\"><p class=\"ds-called-head\">It's your turn</p><p class=\"ds-called-number\">#017</p><p class=\"ds-called-sub\">Go to the counter</p><button class=\"ds-called-btn\">I'm coming</button></div>",
-      "css": ".ds-called{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:420px;padding:16px;background:var(--status-called);color:var(--status-called-foreground);text-align:center;font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-called p{margin:0}.ds-called-head{font-size:30px;font-weight:600;letter-spacing:-.025em}.ds-called-number{font-size:96px;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-called-sub{font-size:24px;font-weight:500}.ds-called-btn{margin-top:24px;width:100%;max-width:320px;height:56px;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 18px/1 inherit;cursor:pointer}.ds-called-btn:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-called-btn:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+      "css": ".ds-called{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:26.25rem;padding:1rem;background:var(--status-called);color:var(--status-called-foreground);text-align:center;font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-called p{margin:0}.ds-called-head{font-size:1.875rem;font-weight:600;letter-spacing:-.025em}.ds-called-number{font-size:6rem;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-called-sub{font-size:1.5rem;font-weight:500}.ds-called-btn{margin-top:1.5rem;width:100%;max-width:20rem;height:3.5rem;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 1.125rem/1 inherit;cursor:pointer}.ds-called-btn:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-called-btn:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     }
   ],
   "narrative": {
     "northStar": "The Ticket Stub",
-    "overview": "The interface behaves like the paper ticket a counter hands you: one big number, a few plain words, readable at arm's length and held up for the barber to see. Everything that isn't the number or the next action stays quiet (warm off-white paper, near-black ink, hairline borders) so the four status colours can do the talking. A Customer glances at it in bursts between other things, and an Owner taps it with one hand between haircuts. Both need to read it in a second.\n\nThe system is built from stock shadcn/ui (new-york style) on Tailwind 4, re-themed rather than restyled. Identity lives in the theme tokens: a burgundy primary, neutrals tinted toward that burgundy (hue 15), the Clarity City typeface, and a status palette that means the same thing on the Customer page and the Owner's board. Density is low on the Customer page (one column, 384px max) and moderate on the dashboard (one column, 672px max). Neither surface ever lays content out in more than one column.\n\nDark mode follows the device and is a full second token set, not an inversion. Every foreground and background pair meets WCAG AA in both modes.",
+    "overview": "The interface behaves like the paper ticket a counter hands you: one big number, a few plain words, readable at arm's length and held up for the barber to see. Everything that isn't the number or the next action stays quiet (warm off-white paper, near-black ink, hairline borders) so the four status colours can do the talking. A Customer glances at it in bursts between other things, and an Owner taps it with one hand between haircuts. Both need to read it in a second.\n\nThe system is built from stock shadcn/ui (new-york style) on Tailwind 4, re-themed rather than restyled. Identity lives in the theme tokens: a burgundy primary, neutrals tinted toward that burgundy (hue 15), the Clarity City typeface, and a status palette that means the same thing on the Customer page and the Owner's board. Density is low on the Customer page (one column, 24rem max) and moderate on the dashboard (one column, 42rem max). Neither surface ever lays content out in more than one column.\n\nDark mode follows the device and is a full second token set, not an inversion. Every foreground and background pair meets WCAG AA in both modes.",
     "keyCharacteristics": [
-      "One huge tabular ticket number per Customer screen, never smaller than 64px.",
+      "One huge tabular ticket number per Customer screen, never smaller than 4rem.",
       "Status colour is the loudest thing on screen and means the same thing everywhere.",
       "Burgundy marks the shop's own actions; orange-red marks anything destructive, and the two never blur.",
       "Flat, bordered surfaces; depth comes from borders and tone, not shadows.",
-      "Every tap target is at least 44px; the most-used action is 56px and pinned within thumb reach."
+      "Every tap target is at least 2.75rem; the most-used action is 3.5rem and pinned within thumb reach."
     ],
     "rules": [
       {
@@ -455,6 +456,16 @@
         "section": "typography"
       },
       {
+        "name": "The Rem Rule",
+        "body": "Every size, padding, gap, radius, width and font size is in rem (in Tailwind, the spacing and size scale: `h-11`, `px-4`, `max-w-sm`), so the whole interface grows with the reader's browser text size. Only hairlines stay in px: 1px borders, 2px emphasis borders and the 3px focus ring. Never fix a height or width in px (`h-[44px]`), and never cap a text container's height so larger text would clip.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flex-First Rule",
+        "body": "Reach for flexbox before grid. The interface is a single column of stacks and rows, and flex with `gap` expresses that directly and wraps gracefully when text grows.",
+        "section": "layout"
+      },
+      {
         "name": "The Thumb Reach Rule",
         "body": "The Owner's most frequent action lives at the bottom of the screen; actions that end the day live as far from it as the page allows.",
         "section": "layout"
@@ -467,8 +478,9 @@
     ],
     "dos": [
       "**Do** use stock shadcn/ui components and theme them through tokens; plain Tailwind is for layout only (flex, grid, spacing, sizing).",
-      "**Do** make every tap target at least 44px tall, and the screen's main action 48–56px.",
-      "**Do** show ticket numbers and countdowns in tabular figures, at 64px or more on the Customer page.",
+      "**Do** make every tap target at least 2.75rem tall (44px at the default 16px text size), and the screen's main action 3–3.5rem.",
+      "**Do** size everything in rem through Tailwind's scale, and lay it out with flexbox and `gap`.",
+      "**Do** show ticket numbers and countdowns in tabular figures, at 4rem or more on the Customer page.",
       "**Do** pair every status colour with words; colour alone never carries a status.",
       "**Do** check both light and dark token sets when adding a colour pair; both must pass WCAG AA.",
       "**Do** put a confirmation dialog in front of every Ember action."
@@ -479,6 +491,8 @@
       "**Don't** use a status colour for anything except its Ticket status.",
       "**Don't** make a destructive action burgundy, or a normal action Ember.",
       "**Don't** add shadows for emphasis; use a 2px border or a fill.",
+      "**Don't** fix heights or widths in px or arbitrary values (`h-[44px]`, `w-[320px]`); only 1–3px borders and focus rings are px.",
+      "**Don't** use grid in app code where a flex stack or row does the job.",
       "**Don't** lay out the Customer page or the dashboard in more than one column.",
       "**Don't** add a theme toggle; dark mode follows the device."
     ]
