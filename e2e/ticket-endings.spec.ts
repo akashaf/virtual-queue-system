@@ -18,7 +18,7 @@ async function callAndGiveUp(dashboard: Page, shopId: string) {
 
   await backdateCalls(shopId, 6);
   await dashboard.goto("/dashboard");
-  await dashboard.getByRole("button", { name: "No-show", exact: true }).click();
+  await dashboard.getByRole("button", { name: /^No-show for #\d{3}$/ }).click();
 }
 
 async function join(page: Page, slug: string, name: string) {
@@ -106,7 +106,7 @@ test("No-show waits five minutes, then lets the Customer come back", async ({
 
   await backdateCalls(shop.id, 6);
   await dashboard.goto("/dashboard");
-  await dashboard.getByRole("button", { name: "No-show", exact: true }).click();
+  await dashboard.getByRole("button", { name: /^No-show for #\d{3}$/ }).click();
 
   await expect(page.getByText("You missed your turn")).toBeVisible();
   await expect(dashboard.getByText("Waiting 0 · In chair 0")).toBeVisible();
@@ -115,7 +115,7 @@ test("No-show waits five minutes, then lets the Customer come back", async ({
   await page.getByRole("button", { name: "Join again" }).click();
 
   await expect(page.getByText("#002")).toBeVisible();
-  const row = dashboard.getByRole("listitem").filter({ hasText: "Ali" });
+  const row = dashboard.getByRole("main").getByRole("listitem").filter({ hasText: "Ali" });
   await expect(row).toContainText("Rejoined");
 
   await owner.close();

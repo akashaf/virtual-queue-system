@@ -69,7 +69,7 @@ test("the Owner sees the Customer in the Waiting list", async ({ page, browser }
   await signInAsOwner(dashboard, email, password);
 
   await expect(dashboard.getByText("Waiting 1 · In chair 0")).toBeVisible();
-  const row = dashboard.getByRole("listitem").filter({ hasText: "Ali" });
+  const row = dashboard.getByRole("main").getByRole("listitem").filter({ hasText: "Ali" });
   await expect(row).toContainText("#001");
   await expect(row).toContainText(/\d{1,2}:\d{2} (am|pm)/);
 

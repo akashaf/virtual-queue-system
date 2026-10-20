@@ -205,7 +205,7 @@ The status palette is a fixed code shared by the Customer page and the queue boa
 - **Headline** (`headline`): "It's your turn" on the Called screen; page titles on Owner pages are one step down at 1.5rem.
 - **Title** (`title`): the shop name in the dashboard header, card titles, the Call next label.
 - **Body** (`body`): running text and inputs. 1rem on phones so iOS does not zoom on focus.
-- **Label** (`label`): form labels, badges, secondary lines, counts ("Waiting 4 · In chair 2").
+- **Label** (`label`): form labels, badges, secondary lines, the dashboard's section names ("In chair", "Waiting"), whose counts sit beside them one step up at 1.125rem semibold.
 - **Eyebrow** (`eyebrow`): uppercase, slightly tracked, muted. Used once, above the ticket number ("Your number").
 
 ### Named Rules
@@ -218,7 +218,7 @@ The status palette is a fixed code shared by the Customer page and the queue boa
 Single column everywhere, mobile-first from a 360px minimum width with a 1rem side gutter.
 
 - **Customer page:** centred column, 24rem max, 1.5rem vertical rhythm between blocks. The Leave button sits at the bottom of the column (`mt-auto`), away from anything the Customer taps often.
-- **Owner dashboard:** centred column, 42rem max, 1rem between blocks. A bordered header bar holds the shop name and one 2.75rem menu button. **Call next** is a sticky bottom bar, full-width, with a top hairline. Last Call and Close Shop sit at the far end of the scroll from Call next, and the 5.5rem gap above the sticky bar is reserved for toasts so an Undo toast never covers a control.
+- **Owner dashboard:** centred column, 42rem max, 1rem between blocks. A bordered header bar holds the shop name and one 2.75rem menu button. The board is two headed sections, "In chair N" then "Waiting N", 0.5rem from heading to list. **Call next** is a sticky bottom bar, full-width, with a top hairline, naming the Ticket it will take on a second line. Last Call and Close Shop sit at the far end of the scroll from Call next, and the 5.5rem gap above the sticky bar is reserved for toasts so an Undo toast never covers a control.
 - **Login:** centred column, 24rem max, vertically centred.
 - **Spacing rhythm:** 0.5 / 0.75 / 1 / 1.5rem (`spacing.sm`–`xl`) carries almost everything; 0.25rem only inside badges.
 - **Flexbox first:** every layout, from page columns to the rows inside a card, is a flex container (`flex flex-col` with `gap-*` for stacks, `flex items-center` for rows, `flex-1` and `mt-auto` to push an action to the end). Spacing between siblings comes from `gap`, not margins on the children. Grid is used only inside stock shadcn components (the card header) and is not reached for in app code.

@@ -10,17 +10,22 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { closeShopPlan, type OwnerQueue } from "@/lib/owner/view";
+import { closeShopPlan, type OwnerQueue, type WaitingTicket } from "@/lib/owner/view";
+import { formatTicketLabel } from "@/lib/ticket";
 import { CHAIRS_STILL_BUSY } from "./messages";
 import { MoveForm, type Move, type OwnerAction } from "./move-form";
 
-/** The biggest thing on the board: the press the Owner makes between every haircut. */
+/**
+ * The biggest thing on the board: the press the Owner makes between every
+ * haircut. It names who it will call, because the alert it sends cannot be
+ * taken back.
+ */
 export function CallNextButton({
-  nobodyWaiting,
+  next,
   move,
   call,
 }: {
-  nobodyWaiting: boolean;
+  next: WaitingTicket | undefined;
   move: Move;
   call: OwnerAction;
 }) {
@@ -29,10 +34,13 @@ export function CallNextButton({
       <Button
         type="submit"
         size="lg"
-        className="h-14 w-full text-lg font-semibold"
-        disabled={call.pending || nobodyWaiting}
+        className="h-auto min-h-14 w-full flex-col gap-0 py-2"
+        disabled={call.pending || !next}
       >
-        Call next
+        <span className="text-lg leading-tight font-semibold">Call next</span>
+        <span className="max-w-full truncate text-sm leading-tight tabular-nums">
+          {next ? formatTicketLabel(next) : "Nobody waiting"}
+        </span>
       </Button>
     </MoveForm>
   );

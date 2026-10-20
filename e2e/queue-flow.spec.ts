@@ -36,12 +36,14 @@ test("the Owner calls the Customer and marks them done, live on both screens", a
   const owner = await browser.newContext();
   const dashboard = await owner.newPage();
   await signInAsOwner(dashboard, email, password);
-  const row = dashboard.getByRole("listitem").filter({ hasText: "Ali" });
+  // The board's rows, not the "Called #001 Ali" toast, which is a list item too.
+  const row = dashboard.getByRole("main").getByRole("listitem").filter({ hasText: "Ali" });
   await expect(row).toContainText("#001");
 
   await dashboard.getByRole("button", { name: "Call next" }).click();
 
   await expect(dashboard.getByText("Waiting 0 · In chair 1")).toBeVisible();
+  await expect(dashboard.getByText("Called #001 Ali")).toBeVisible();
   await expect(row).toContainText("called just now");
   await expect(page.getByText("It's your turn")).toBeVisible();
   await expect(page.getByText("Go to the counter")).toBeVisible();

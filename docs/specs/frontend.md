@@ -122,13 +122,13 @@ The page compares the previous view with the new one after each refetch, in `lib
 The layout checks the session and `is_active` on the server, and redirects to `/login` otherwise.
 
 Layout, from top to bottom:
-1. **Header:** shop name, joining state badge (Open / Last Call), counts "Waiting N · In chair N", menu (Queue, History, Sign out) behind one 44 px button.
-2. **Primary button:** **Call next** (large, sticky at the bottom on phones). Disabled when nobody is Waiting.
-3. **Called list:** one card per Called Ticket showing number, name and "called 3 min ago", with these actions:
-   - **Done**
-   - **No-show:** disabled until 5 minutes after the call, with a countdown shown
+1. **Header:** shop name, joining state badge (Open / Last Call), menu (Queue, History, Sign out) behind one 44 px button. The counts are the section headings below; a screen-reader-only line "Waiting N · In chair N" announces them when they change.
+2. **Primary button:** **Call next** (large, sticky at the bottom on phones), with the Ticket it will take beneath the label ("#003 Raj Kumar"). Disabled when nobody is Waiting, and then says "Nobody waiting". After a call, a toast "Called #003 Raj Kumar".
+3. **Called list**, headed "In chair N": one card per Called Ticket showing number, name and "called 3 min ago", with these actions:
+   - **Done**, the wide filled button
+   - **No-show:** a narrow outline button a full gap from Done, because it is final and Done is not. Disabled until 5 minutes after the call, with a countdown shown
    - **Remove** in an overflow menu, with confirmation
-4. **Waiting list:** ordered rows showing number, name, time joined, and badges for "Moved from previous day", "Rejoined" and "Chose: next day / stay" during Last Call. **Remove** is in an overflow menu with confirmation.
+4. **Waiting list**, headed "Waiting N": ordered rows showing number, name, time joined, and badges for "Next" on the first row (the one Call next takes), "Moved from previous day", "Rejoined" and "Chose: next day / stay" during Last Call. **Remove** is in an overflow menu with confirmation.
 5. **Undo toast:** after Done, a Sonner toast, shown at the bottom just above Call next so it never covers the header's menu, "#017 marked done · Undo" stays for the remaining undo window (2 min) with a visible countdown. Recently Served Tickets still in the window are also listed in a collapsed "Just served" section with Undo, so the undo survives a page reload.
 6. **Footer actions:**
    - **Last Call** (confirmation: "Stop new customers joining and ask waiting customers to choose?"). While Last Call is active this becomes **Reopen joining** and **Close Shop**.

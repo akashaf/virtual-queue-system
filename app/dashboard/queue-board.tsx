@@ -4,9 +4,11 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useQueueChanged } from "@/lib/queue-changed";
+import { formatTicketLabel } from "@/lib/ticket";
 import { createViewOrder } from "@/lib/view-order";
 import {
   applyMove,
+  type CalledTicket,
   type CloseShopResult,
   type OwnerOutcome,
   type OwnerQueue,
@@ -83,7 +85,15 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
   // One action state per kind of press, held here rather than on each row: an
   // optimistic move unmounts the row it moved, and a button cannot be told how
   // its own press went once it has gone.
-  const call = useOwnerAction(callNext, settle);
+  /** A call alerts a Customer, so the Owner is told whose phone just rang. */
+  const announceCall = useCallback(
+    (outcome: OwnerOutcome<CalledTicket>) => {
+      if (outcome.ok) toast(`Called ${formatTicketLabel(outcome.result)}`);
+      settle(outcome);
+    },
+    [settle],
+  );
+  const call = useOwnerAction(callNext, announceCall);
   const undo = useOwnerAction(undoServed, settle);
   const noShow = useOwnerAction(markNoShow, settle);
   const remove = useOwnerAction(removeTicket, settle);
@@ -141,36 +151,50 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
         >
           {lastCallOn ? "Last Call" : "Open"}
         </Badge>
-        <p className="text-sm font-medium text-muted-foreground" aria-live="polite">
+        {/* The counts are on screen as the section headings; this line is
+            what a screen reader hears when they change. */}
+        <p className="sr-only" aria-live="polite">
           Waiting {waiting.length} · In chair {called.length}
         </p>
       </div>
 
-      {called.length > 0 ? (
-        <ul className="flex flex-col gap-3">
-          {called.map((ticket) => (
-            <CalledCard
-              key={ticket.id}
-              ticket={ticket}
-              elapsedMs={elapsedMs}
-              move={move}
-              serve={serve}
-              noShow={noShow}
-              remove={remove}
-            />
-          ))}
-        </ul>
-      ) : null}
-
+      {/* Both headings stay up while anyone is in the Queue, so a zero is
+          read as a free chair or an empty line rather than a missing section. */}
       {waiting.length === 0 && called.length === 0 ? (
         <EmptyQueue />
       ) : (
-        <WaitingList
-          waiting={waiting}
-          lastCallOn={lastCallOn}
-          move={move}
-          remove={remove}
-        />
+        <>
+          <section aria-labelledby="in-chair-heading" className="flex flex-col gap-2">
+            <SectionHeading id="in-chair-heading" label="In chair" count={called.length} />
+            {called.length > 0 ? (
+              <ul className="flex flex-col gap-3">
+                {called.map((ticket) => (
+                  <CalledCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    elapsedMs={elapsedMs}
+                    move={move}
+                    serve={serve}
+                    noShow={noShow}
+                    remove={remove}
+                  />
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <section aria-labelledby="waiting-heading" className="flex flex-col gap-2">
+            <SectionHeading id="waiting-heading" label="Waiting" count={waiting.length} />
+            {waiting.length > 0 ? (
+              <WaitingList
+                waiting={waiting}
+                lastCallOn={lastCallOn}
+                move={move}
+                remove={remove}
+              />
+            ) : null}
+          </section>
+        </>
       )}
 
       {/* Read from the database rather than remembered here, so the Undo
@@ -194,13 +218,19 @@ export function QueueBoard({ initialQueue }: { initialQueue: OwnerQueue }) {
       </div>
 
       <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3">
-        <CallNextButton
-          nobodyWaiting={waiting.length === 0}
-          move={move}
-          call={call}
-        />
+        <CallNextButton next={waiting[0]} move={move} call={call} />
       </div>
     </main>
+  );
+}
+
+/** A group's name with its count, the count large enough to read from the chair. */
+function SectionHeading({ id, label, count }: { id: string; label: string; count: number }) {
+  return (
+    <h2 id={id} className="flex items-baseline gap-2">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-lg font-semibold tabular-nums">{count}</span>
+    </h2>
   );
 }
 

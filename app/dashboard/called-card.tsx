@@ -10,7 +10,7 @@ import { TicketMenu } from "./ticket-menu";
 /**
  * A Customer in a chair, outlined in the Called status colour so it stands
  * apart from the Waiting list below. Done is the filled button, No-show the
- * outlined one, and Remove sits in the menu in orange-red: three presses that
+ * outlined narrow one, and Remove sits in the menu in orange-red: three presses that
  * should never be mistaken for one another.
  */
 export function CalledCard({
@@ -49,20 +49,27 @@ export function CalledCard({
           <TicketMenu ticket={ticket} move={move} remove={remove} />
         </CardContent>
 
-        <CardContent className="flex items-center gap-2 px-4">
+        {/* No-show is final and Done is not, so they are not a matching pair:
+            Done takes the width, No-show stays narrow and a full gap away. */}
+        <CardContent className="flex items-center gap-4 px-4">
           <MoveForm
             className="flex-1"
             move={move}
             intent={{ kind: "mark_served", ticketId: ticket.id }}
             action={serve}
           >
-            <Button type="submit" className="h-11 w-full" disabled={serve.pending}>
+            <Button
+              type="submit"
+              className="h-11 w-full"
+              disabled={serve.pending}
+              aria-label={`Done for ${formatTicketNumber(ticket.number)}`}
+            >
               Done
             </Button>
           </MoveForm>
 
           <MoveForm
-            className="flex-1"
+            className="shrink-0"
             move={move}
             intent={{ kind: "mark_no_show", ticketId: ticket.id }}
             action={noShow}
@@ -70,10 +77,12 @@ export function CalledCard({
             <Button
               type="submit"
               variant="outline"
-              className="h-11 w-full tabular-nums"
+              className="h-11 px-3 tabular-nums"
               disabled={noShow.pending || tooEarly}
             >
               {tooEarly ? `No-show ${formatCountdown(noShowInMs)}` : "No-show"}
+              {/* Kept out of aria-label so a screen reader still hears the countdown. */}
+              <span className="sr-only">for {formatTicketNumber(ticket.number)}</span>
             </Button>
           </MoveForm>
         </CardContent>

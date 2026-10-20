@@ -20,7 +20,7 @@ export function WaitingList({
 }) {
   return (
     <ol className="flex flex-col gap-2">
-      {waiting.map((ticket) => (
+      {waiting.map((ticket, index) => (
         <li key={ticket.id}>
           <Card className="py-2">
             <CardContent className="flex items-center gap-3 pr-1 pl-4">
@@ -32,6 +32,9 @@ export function WaitingList({
               </Badge>
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                 <span className="truncate font-medium">{ticket.name}</span>
+                {/* The one Call next will take, in the burgundy of the shop's
+                    next step. */}
+                {index === 0 ? <Badge>Next</Badge> : null}
                 {/* They are at the back with a high number, but they have been
                     in the shop a while. */}
                 {ticket.origin === "rejoin" ? (

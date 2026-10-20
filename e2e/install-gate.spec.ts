@@ -185,7 +185,7 @@ test("Rejoin from a No-show is not gated in iPhone Safari", async ({ page, brows
   await expect(dashboard.getByText("Waiting 0 · In chair 1")).toBeVisible();
   await backdateCalls(shop.id, 6);
   await dashboard.goto("/dashboard");
-  await dashboard.getByRole("button", { name: "No-show", exact: true }).click();
+  await dashboard.getByRole("button", { name: /^No-show for #\d{3}$/ }).click();
   await expect(page.getByText("You missed your turn")).toBeVisible();
 
   const iphone = await iphoneSafariWith(browser, page);
