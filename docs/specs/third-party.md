@@ -158,23 +158,9 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 
 The Owner's Sign-in tokens are in cookies page scripts can read, because the Supabase browser client needs them for Realtime. The policy is there so that a script we did not ship cannot run and copy them.
 
-- **Report-only first.** Every page is sent `Content-Security-Policy-Report-Only`, and no enforcing `Content-Security-Policy`, so browsers report what the policy *would* block without blocking anything. After a week of reports, someone reads them in Sentry, allows any real source the policy forgot, and ignores the noise (browser extensions, injected ad scripts). Then **#36, "Enforce the Content-Security-Policy"**, renames the header to the enforcing one. Report-only went out with #35.
+- **Report-only first.** Every page is sent `Content-Security-Policy-Report-Only`, and no enforcing `Content-Security-Policy`, so browsers report what the policy *would* block without blocking anything. After a week of reports, the Owner pastes them from Sentry into #36 and someone reads them, allows any real source the policy forgot, and ignores the noise (browser extensions, injected ad scripts). Then **#36, "Enforce the Content-Security-Policy"**, renames the header to the enforcing one. Report-only went out with #35.
 - **Where it is set:** `proxy.ts`, from `cspHeaders` in `lib/csp.ts`. Route Handlers get none: those outside the proxy matcher (health, cron, operator, the QR code, anything with a file extension) never pass through it, and the proxy skips `/api/` for the rest, which answer with JSON.
-- **The policy:**
-
-  | Directive | Sources | Why |
-  |---|---|---|
-  | `default-src` | `'self'` | |
-  | `script-src` | this request's nonce, `'strict-dynamic'` (`'unsafe-eval'` in development only) | Next puts the nonce on its own scripts; the root layout passes it to next-themes' inline one. `'strict-dynamic'` trusts what those load, which is how OneSignal's SDK arrives. `'self'` and `https://cdn.onesignal.com` follow for browsers too old for `'strict-dynamic'` |
-  | `style-src` | `'self'`, `'unsafe-inline'`, `https://onesignal.com` | Radix, sonner and React style props write inline styles, and a nonce here would switch `'unsafe-inline'` off. Styles cannot read cookies |
-  | `img-src` | `'self'`, `data:`, `blob:` | |
-  | `font-src` | `'self'` | Clarity City is served from our own origin |
-  | `media-src` | `'self'`, `blob:` | The alert chimes are synthesised in the page and played from blob URLs |
-  | `worker-src` | `'self'` | OneSignal's service worker. Without it the browser falls back to `script-src`, where `'strict-dynamic'` ignores `'self'` |
-  | `connect-src` | `'self'`, the Supabase URL and its `wss://` twin, the Sentry DSN's host, `https://api.onesignal.com`, `https://onesignal.com` | |
-  | `object-src`, `base-uri`, `frame-ancestors` | `'none'` | |
-  | `form-action` | `'self'` | Server Actions post to the page itself |
-
+- **The policy** is in `lib/csp.ts`, with the reasons for its sources beside them. It allows our own origin, Supabase's API and Realtime, Sentry, and OneSignal. A script runs only if it carries this request's nonce, or a script that does loaded it (`'strict-dynamic'`, which is how OneSignal's SDK arrives); any other script is reported. Inline styles stay allowed: Radix, sonner and React style props need them, and styles cannot read cookies.
 - **Nonces need per-request rendering.** The root layout reads the request headers, so no page is prerendered; `next build` lists every route as dynamic (`ƒ`). A prerendered page would carry a stale nonce.
 - **Reports go to Sentry**, to the project's security endpoint built from `NEXT_PUBLIC_SENTRY_DSN` (`https://<host>/api/<project>/security/?sentry_key=<public key>`): `report-to` with a `Reporting-Endpoints` header for Chromium, `report-uri` for Safari and Firefox. Without a DSN nothing is reported, as with errors.
-- **Tested** by `lib/csp.test.ts` and `e2e/csp.spec.ts`, which fails on any violation while an Owner signs in and watches the dashboard update live and a Customer joins. e2e has no OneSignal App ID or Sentry DSN, so push sign-up and report delivery are only checked in production, during the report-only week.
+- **Tested** by `lib/csp.test.ts`, by `e2e/csp.spec.ts` for the headers each route gets, and by every e2e test: the `test` in `e2e/helpers.ts` fails any test whose pages raise a violation, and ESLint makes specs import it. e2e has no OneSignal App ID or Sentry DSN, so push sign-up and report delivery are only checked in production, during the report-only week.

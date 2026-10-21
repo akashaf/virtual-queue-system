@@ -1,5 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
-import { backdateCalls, seedShop, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
+import { type Page } from "@playwright/test";
+import {
+  backdateCalls,
+  expect,
+  join,
+  seedShop,
+  SHOP_LAT,
+  SHOP_LNG,
+  signInAsOwner,
+  test,
+} from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
@@ -19,13 +28,6 @@ async function callAndGiveUp(dashboard: Page, shopId: string) {
   await backdateCalls(shopId, 6);
   await dashboard.goto("/dashboard");
   await dashboard.getByRole("button", { name: /^No-show for #\d{3}$/ }).click();
-}
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
 }
 
 test("a Customer leaves the queue, and the Owner's board empties", async ({

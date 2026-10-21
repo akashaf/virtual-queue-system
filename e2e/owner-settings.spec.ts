@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { seedShop, signInAsOwner } from "./helpers";
+import { expect, seedShop, signInAsOwner, test } from "./helpers";
 
 test("the Owner signs out every other device and stays signed in on this one", async ({
   page,

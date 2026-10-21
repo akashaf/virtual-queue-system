@@ -1,5 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
-import { seedShop, seedTicket, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
+import {
+  expect,
+  join,
+  seedShop,
+  seedTicket,
+  SHOP_LAT,
+  SHOP_LNG,
+  signInAsOwner,
+  test,
+} from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
 test.use({
@@ -12,13 +20,6 @@ function deferred() {
   let settle!: () => void;
   const done = new Promise<void>((resolve) => (settle = resolve));
   return { done, settle };
-}
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
 }
 
 /**

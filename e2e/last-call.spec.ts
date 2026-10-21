@@ -1,11 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 import {
   ageSignIns,
+  expect,
+  join,
   seedShop,
-  shopJoiningState,
-  signInAsOwner,
   SHOP_LAT,
   SHOP_LNG,
+  shopJoiningState,
+  signInAsOwner,
+  test,
 } from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
@@ -14,13 +17,6 @@ test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
   permissions: ["geolocation", "notifications"],
 });
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
-}
 
 async function startLastCall(dashboard: Page, shopId: string) {
   await dashboard.getByRole("button", { name: "Last Call" }).click();

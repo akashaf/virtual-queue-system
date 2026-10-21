@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { test as base, expect, type BrowserContext, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import type { Database } from "../lib/supabase/database.types";
@@ -6,6 +6,58 @@ import { readLocalSupabase } from "../tests/local-supabase";
 import { SHOP_LAT, SHOP_LNG } from "../tests/shop-location";
 
 export { SHOP_LAT, SHOP_LNG };
+
+/**
+ * Playwright's `test`, failing any test in which a page breaks the
+ * Content-Security-Policy (third-party.md §9). Every spec imports it from here.
+ *
+ * The policy is report-only until #36 enforces it, so a violation blocks
+ * nothing and the page works regardless: the browser's
+ * `securitypolicyviolation` event is the only place it shows. Watching every
+ * test means #36 starts from pages known to be clean, not from a week of
+ * reports. Contexts a test opens itself through `browser.newContext` are
+ * watched too.
+ */
+export const test = base.extend<{ cspViolations: string[] }>({
+  cspViolations: [
+    // Not `use`, Playwright's usual name: the React hooks lint rule claims it.
+    async ({ context, browser }, runTest) => {
+      const violations: string[] = [];
+      await watchViolations(context, violations);
+
+      const newContext = browser.newContext.bind(browser);
+      browser.newContext = async (options) => {
+        const created = await newContext(options);
+        await watchViolations(created, violations);
+        return created;
+      };
+      try {
+        await runTest(violations);
+      } finally {
+        browser.newContext = newContext;
+      }
+
+      expect(violations, "Content-Security-Policy violations").toEqual([]);
+    },
+    { auto: true },
+  ],
+});
+
+export { expect };
+
+async function watchViolations(context: BrowserContext, violations: string[]) {
+  await context.exposeBinding("__cspViolation", (_source, violation: string) => {
+    violations.push(violation);
+  });
+  await context.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      const report = (window as unknown as { __cspViolation: (v: string) => void })
+        .__cspViolation;
+      const blocked = event.blockedURI || "inline";
+      report(`${event.effectiveDirective} blocked ${blocked} on ${event.documentURI}`);
+    });
+  });
+}
 
 const { apiUrl, dbUrl, secretKey } = readLocalSupabase();
 
@@ -52,6 +104,19 @@ export async function seedTicket(slug: string, name: string) {
     p_accuracy_m: 0,
   });
   if (error) throw new Error(error.message);
+}
+
+/** Fills in a Shop's join form as a Customer and submits it, without waiting for the outcome. */
+export async function submitJoin(page: Page, slug: string, name: string) {
+  await page.goto(`/s/${slug}`);
+  await page.getByLabel("Your name").fill(name);
+  await page.getByRole("button", { name: "Join queue" }).click();
+}
+
+/** Joins a Shop's Queue as a Customer, returning once the join has gone through. */
+export async function join(page: Page, slug: string, name: string) {
+  await submitJoin(page, slug, name);
+  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
 }
 
 /** Signs an Owner in on their own page, landing them on the dashboard. */

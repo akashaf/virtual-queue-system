@@ -54,6 +54,7 @@ export function cspHeaders({
     // nonce here would switch 'unsafe-inline' off. Styles cannot read cookies.
     "style-src": ["'self'", "'unsafe-inline'", "https://onesignal.com"],
     "img-src": ["'self'", "data:", "blob:"],
+    // Clarity City is served from our own origin (app/layout.tsx).
     "font-src": ["'self'"],
     // The alert chimes are synthesised in the page and played from blob URLs
     // (lib/alert-effects.ts).
@@ -73,6 +74,7 @@ export function cspHeaders({
     "object-src": ["'none'"],
     // A <base> tag would re-point every relative script URL.
     "base-uri": ["'none'"],
+    // Server Actions post to the page itself.
     "form-action": ["'self'"],
     "frame-ancestors": ["'none'"],
   };

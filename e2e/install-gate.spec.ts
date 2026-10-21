@@ -1,5 +1,14 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
-import { backdateCalls, seedShop, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
+import { type Browser, type Page } from "@playwright/test";
+import {
+  backdateCalls,
+  expect,
+  seedShop,
+  SHOP_LAT,
+  SHOP_LNG,
+  signInAsOwner,
+  submitJoin,
+  test,
+} from "./helpers";
 
 const IPHONE_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -22,12 +31,6 @@ const AT_SHOP_FRONT = {
 };
 
 test.use(AT_SHOP_FRONT);
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-}
 
 test.describe("iPhone Safari", () => {
   test.use({ userAgent: IPHONE_SAFARI });
@@ -85,7 +88,7 @@ test.describe("an iPhone in-app browser", () => {
     // A new context inherits this block's user agent, so it needs its own.
     const desktop = await browser.newContext({ ...AT_SHOP_FRONT, userAgent: DESKTOP_CHROME });
     const joined = await desktop.newPage();
-    await join(joined, shop.slug, "Ali");
+    await submitJoin(joined, shop.slug, "Ali");
     await expect(joined.getByText("#001")).toBeVisible();
 
     await page.context().addCookies((await desktop.storageState()).cookies);
@@ -115,7 +118,7 @@ test.describe("an iPhone older than iOS 16.4", () => {
 
   test("joins from Safari as before", async ({ page }) => {
     const { shop } = await seedShop();
-    await join(page, shop.slug, "Ali");
+    await submitJoin(page, shop.slug, "Ali");
 
     await expect(page.getByText("#001")).toBeVisible();
   });
@@ -136,7 +139,7 @@ test.describe("the installed Home Screen app", () => {
     page,
   }) => {
     const { shop } = await seedShop();
-    await join(page, shop.slug, "Ali");
+    await submitJoin(page, shop.slug, "Ali");
 
     await expect(page.getByText("#001")).toBeVisible();
     await expect(page.getByText("Keep this page open")).toBeVisible();
@@ -161,7 +164,7 @@ test("a Ticket joined before the gate still shows in iPhone Safari", async ({
   browser,
 }) => {
   const { shop } = await seedShop();
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
   await expect(page.getByText("#001")).toBeVisible();
 
   const iphone = await iphoneSafariWith(browser, page);
@@ -175,7 +178,7 @@ test("a Ticket joined before the gate still shows in iPhone Safari", async ({
 
 test("Rejoin from a No-show is not gated in iPhone Safari", async ({ page, browser }) => {
   const { email, password, shop } = await seedShop();
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
   await expect(page.getByText("#001")).toBeVisible();
 
   const owner = await browser.newContext();

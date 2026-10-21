@@ -1,5 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
-import { seedShop, seedTicket, signInAsOwner, SHOP_LAT, SHOP_LNG } from "./helpers";
+import { type Page } from "@playwright/test";
+import {
+  expect,
+  join,
+  seedShop,
+  seedTicket,
+  SHOP_LAT,
+  SHOP_LNG,
+  signInAsOwner,
+  test,
+} from "./helpers";
 
 test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
@@ -22,13 +31,6 @@ test.beforeEach(async ({ page }) => {
 
 function soundsPlayed(page: Page) {
   return page.evaluate(() => (window as unknown as { soundsPlayed: number }).soundsPlayed);
-}
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-  await expect(page.getByRole("button", { name: "Join queue" })).toHaveCount(0);
 }
 
 test("a Customer whose turn approaches is told to head back", async ({ page, browser }) => {

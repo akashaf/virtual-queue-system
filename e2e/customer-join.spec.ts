@@ -1,11 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
 import {
   deactivateShop,
+  expect,
   seedShop,
   seedTicket,
-  signInAsOwner,
   SHOP_LAT,
   SHOP_LNG,
+  signInAsOwner,
+  submitJoin,
+  test,
 } from "./helpers";
 
 // Standing at the shop's front door, which is what the Join Radius asks for.
@@ -13,12 +15,6 @@ test.use({
   geolocation: { latitude: SHOP_LAT, longitude: SHOP_LNG },
   permissions: ["geolocation", "notifications"],
 });
-
-async function join(page: Page, slug: string, name: string) {
-  await page.goto(`/s/${slug}`);
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Join queue" }).click();
-}
 
 test("a Customer at the shop joins and sees their number and position", async ({
   page,
@@ -30,7 +26,7 @@ test("a Customer at the shop joins and sees their number and position", async ({
   await expect(page.getByRole("heading", { name: shop.name })).toBeVisible();
   await expect(page.getByText("1 person waiting now")).toBeVisible();
 
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
 
   await expect(page.getByText("#002")).toBeVisible();
   await expect(page.getByText("1 person ahead of you")).toBeVisible();
@@ -42,7 +38,7 @@ test("a Customer at the shop joins and sees their number and position", async ({
 test("the first Customer of the day is told they are next", async ({ page }) => {
   const { shop } = await seedShop();
 
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
 
   await expect(page.getByText("#001")).toBeVisible();
   await expect(page.getByText("You're next")).toBeVisible();
@@ -50,7 +46,7 @@ test("the first Customer of the day is told they are next", async ({ page }) => 
 
 test("the Ticket survives a reload, because the device cookie does", async ({ page }) => {
   const { shop } = await seedShop();
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
   await expect(page.getByText("#001")).toBeVisible();
 
   await page.goto(`/s/${shop.slug}`);
@@ -61,7 +57,7 @@ test("the Ticket survives a reload, because the device cookie does", async ({ pa
 
 test("the Owner sees the Customer in the Waiting list", async ({ page, browser }) => {
   const { email, password, shop } = await seedShop();
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
   await expect(page.getByText("#001")).toBeVisible();
 
   const owner = await browser.newContext();
@@ -80,7 +76,7 @@ test("a Customer's page never shows another Customer's name", async ({ page }) =
   const { shop } = await seedShop();
   await seedTicket(shop.slug, "Siti");
 
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
 
   await expect(page.getByText("#002")).toBeVisible();
   await expect(page.getByText("Siti")).toHaveCount(0);
@@ -88,7 +84,7 @@ test("a Customer's page never shows another Customer's name", async ({ page }) =
 
 test("a Customer cannot take two places in one queue", async ({ page }) => {
   const { shop } = await seedShop();
-  await join(page, shop.slug, "Ali");
+  await submitJoin(page, shop.slug, "Ali");
   await expect(page.getByText("#001")).toBeVisible();
 
   // The join form is gone, so reaching it again means clearing the page's idea
@@ -162,7 +158,7 @@ test.describe("away from the shop", () => {
   test("a Customer far from the shop is refused and can try again", async ({ page }) => {
     const { shop } = await seedShop();
 
-    await join(page, shop.slug, "Ali");
+    await submitJoin(page, shop.slug, "Ali");
 
     await expect(page.getByText("You need to be at the shop to join")).toBeVisible();
 
@@ -177,7 +173,7 @@ test.describe("with location refused", () => {
   test("a Customer who blocks location is told how to allow it", async ({ page }) => {
     const { shop } = await seedShop();
 
-    await join(page, shop.slug, "Ali");
+    await submitJoin(page, shop.slug, "Ali");
 
     await expect(
       page.getByText("We need your location to let you join"),
@@ -191,7 +187,7 @@ test.describe("a full Queue", () => {
     const { shop } = await seedShop({ maxQueueSize: 1 });
     await seedTicket(shop.slug, "Siti");
 
-    await join(page, shop.slug, "Ali");
+    await submitJoin(page, shop.slug, "Ali");
 
     await expect(page.getByText("Queue full, please check back soon")).toBeVisible();
   });

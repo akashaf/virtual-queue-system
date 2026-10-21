@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { seedShop, seedTicket, signInAsOwner } from "./helpers";
+import { expect, seedShop, seedTicket, signInAsOwner, test } from "./helpers";
 
 test("the Owner sees today's Tickets and what this month's Served Tickets come to", async ({
   page,

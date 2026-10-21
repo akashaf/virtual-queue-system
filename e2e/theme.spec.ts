@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { seedShop } from "./helpers";
+import { expect, seedShop, test } from "./helpers";
 
 // next-themes puts the resolved theme on <html> as a class, which globals.css keys off.
 for (const colorScheme of ["dark", "light"] as const) {

@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { seedShop, signInAsOwner } from "./helpers";
+import { expect, seedShop, signInAsOwner, test } from "./helpers";
 
 test("the home page sends visitors to sign in, temporarily", async ({ page, request }) => {
   const response = await request.get("/", { maxRedirects: 0 });

@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { deactivateShop, seedShop } from "./helpers";
+import { deactivateShop, expect, seedShop, test } from "./helpers";
 
 async function signIn(page: import("@playwright/test").Page, email: string, password: string) {
   await page.goto("/login");

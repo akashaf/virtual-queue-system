@@ -26,6 +26,27 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // e2e/helpers.ts wraps Playwright's `test` to fail any test whose pages
+    // break the Content-Security-Policy; a spec importing the plain one would
+    // silently skip that check.
+    files: ["e2e/**/*.spec.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@playwright/test",
+              // `default` is `test` again.
+              importNames: ["test", "expect", "default"],
+              message: "Import test and expect from ./helpers, which checks the Content-Security-Policy.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The doc-comment rule and its exemptions: CODING_STANDARDS.md, Comments.
     files: ["{app,lib}/**/*.{ts,tsx}"],
     ignores: [
