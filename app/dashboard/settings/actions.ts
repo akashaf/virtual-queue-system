@@ -2,9 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { endOtherSignIns } from "@/lib/auth/owner";
+import type { OwnerOutcome } from "@/lib/owner/view";
 import { createClient } from "@/lib/supabase/server";
-
-export type SignOutOthersResult = "done" | "failed";
 
 /**
  * Shaped for `useActionState`, so the Owner stays on the Settings page and is
@@ -13,10 +12,10 @@ export type SignOutOthersResult = "done" | "failed";
  * itself been signed out goes where its next request would send it anyway.
  */
 export async function signOutOtherDevices(
-  _previous: SignOutOthersResult | null,
+  _previous: OwnerOutcome<null> | null,
   _formData: FormData,
-): Promise<SignOutOthersResult> {
+): Promise<OwnerOutcome<null>> {
   const result = await endOtherSignIns(await createClient());
   if (result === "signed_out") redirect("/login");
-  return result;
+  return result === "done" ? { ok: true, result: null } : { ok: false, reason: "failed" };
 }

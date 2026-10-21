@@ -24,7 +24,7 @@ import { signOutOtherDevices } from "./actions";
  * included, needs the password again afterwards.
  */
 export function SignOutOthers() {
-  const [result, formAction, pending] = useActionState(signOutOtherDevices, null);
+  const [outcome, formAction, pending] = useActionState(signOutOtherDevices, null);
 
   return (
     <div className="flex flex-col gap-3">
@@ -56,15 +56,15 @@ export function SignOutOthers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {result === "done" ? (
+      {outcome?.ok ? (
         <Alert role="status">
           <CircleCheck aria-hidden />
           <AlertTitle className="line-clamp-none">Every other device is signed out.</AlertTitle>
         </Alert>
-      ) : result === "failed" ? (
+      ) : outcome ? (
         <Alert variant="destructive" role="alert">
           <CircleAlert aria-hidden />
-          <AlertTitle className="line-clamp-none">{ownerErrorMessage("failed")}</AlertTitle>
+          <AlertTitle className="line-clamp-none">{ownerErrorMessage(outcome.reason)}</AlertTitle>
         </Alert>
       ) : null}
     </div>

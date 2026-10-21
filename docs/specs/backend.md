@@ -276,7 +276,7 @@ Some helpers are never called from outside the database, and are revoked from ev
 | `signIn(email, password)`, `signOut()` | — | Supabase Auth. `signIn` rejects Deactivated Shops |
 | `signOutOtherDevices()` | Supabase session | Supabase Auth `signOut({ scope: "others" })`, through `endOtherSignIns` in `lib/auth/owner.ts` |
 
-`signOutOtherDevices()` ends every Sign-in of the Owner but the calling device's, and answers `"done"` or `"failed"`. It asks `getUser()` first, because supabase-js treats a logout refused for a missing Sign-in as success: a device that has itself been signed out is sent to `/login` rather than told it worked. The other devices learn at once, since the dashboard layout's `getUser()` is refused for an ended Sign-in; their access JWTs stay good for the Data API until they expire, as with `revoke_owner_sessions`.
+`signOutOtherDevices()` ends every Sign-in of the Owner but the calling device's, and answers an `OwnerOutcome` like the queue actions, refused only as `failed`. It asks `getUser()` first, because supabase-js treats a logout refused for a missing Sign-in as success: a device that has itself been signed out is sent to `/login` rather than told it worked. The other devices learn at once, since the dashboard layout's `getUser()` is refused for an ended Sign-in; their access JWTs stay good for the Data API until they expire, as with `revoke_owner_sessions`.
 
 When `close_shop` answers `signed_out: true`, `closeShop()` clears the Sign-in's cookies and redirects to `/login?error=weekly`. The alerts still go: they were handed to `after()` first.
 

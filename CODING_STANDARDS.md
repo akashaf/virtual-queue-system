@@ -37,7 +37,9 @@ the decisions in `docs/adr/`, and the traps in `docs/agents/gotchas.md`.
 ## Errors
 
 - **A refusal the Customer or Owner can run into is a value, not a throw.** Server Actions
-  return a result union (`{ status: "rejected", reason }`); the reason is one the UI can show.
+  return a result union whose reason is one the UI can show: `{ status: "rejected", reason }`
+  on the Customer page, `OwnerOutcome` (`{ ok: false, reason }`, `lib/owner/view.ts`) on the
+  dashboard. A new action takes the shape of its side of the app.
 - **Anything else is a bug and is reported as one**: `functionErrorReason` or
   `reportUnexpected`, answered `failed`. A missing environment variable goes through
   `requireEnv` and fails loudly.

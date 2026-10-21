@@ -69,6 +69,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **`db:reset` before the migration edit is not a reset.** A test asserting a new constraint
   passed against the old function for exactly this reason. Reset after the *last* SQL edit,
   then run the tests.
+- **`supabase.auth.signOut()` reports success for a Sign-in that has already ended.** supabase-js
+  swallows the Auth server's "session not found" answer, so a device signed out from elsewhere
+  is told its sign-out worked. `endOtherSignIns` (`lib/auth/owner.ts`) asks `getUser()` first,
+  which is refused at once for an ended Sign-in; do the same before trusting a `signOut()`.
 - **The JWKS endpoint does not tell you whether JWT signing keys have been migrated.**
   `/auth/v1/.well-known/jwks.json` publishes keys that *verify*, and a shared HS256 secret can
   never appear in a JWKS — so a project with an asymmetric key still on *standby* looks
