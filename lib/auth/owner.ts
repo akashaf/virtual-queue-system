@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { reportUnexpected } from "@/lib/error-reporting";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -37,6 +38,26 @@ export async function findOwnerShop(
   if (!shop || !shop.is_active) return null;
 
   return { id: shop.id, slug: shop.slug, name: shop.name };
+}
+
+/**
+ * Ends every one of the Owner's Sign-ins except the one this client holds, for
+ * a lost device or a former staff member who still has access (#34).
+ * "signed_out" when this device's own Sign-in has already ended, which the
+ * Owner can run into from another device. The other devices find out on their
+ * next request: the dashboard layout's `getUser()` is refused at once for an
+ * ended Sign-in.
+ */
+export async function endOtherSignIns(
+  supabase: SupabaseClient<Database>,
+): Promise<"done" | "signed_out" | "failed"> {
+  // signOut() treats "no such Sign-in" as success, so it cannot be the one to tell.
+  const { error: signedOut } = await supabase.auth.getUser();
+  if (signedOut) return "signed_out";
+  const { error } = await supabase.auth.signOut({ scope: "others" });
+  if (!error) return "done";
+  reportUnexpected("signOut others failed", error);
+  return "failed";
 }
 
 /**

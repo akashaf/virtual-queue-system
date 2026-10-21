@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HistoryIcon, ListOrderedIcon, LogOutIcon, MenuIcon } from "lucide-react";
+import { HistoryIcon, ListOrderedIcon, LogOutIcon, MenuIcon, SettingsIcon } from "lucide-react";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +53,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 <Link href="/dashboard/history">
                   <HistoryIcon />
                   History
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="min-h-11">
+                <Link href="/dashboard/settings">
+                  <SettingsIcon />
+                  Settings
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

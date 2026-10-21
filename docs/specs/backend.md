@@ -274,6 +274,9 @@ Some helpers are never called from outside the database, and are revoked from ev
 | `rejoinQueue(ticketId)`, `leaveQueue(ticketId)`, `chooseLastCall(ticketId, choice)` | Device cookie | Matching function |
 | `callNext()`, `markServed(id)`, `undoServed(id)`, `markNoShow(id)`, `removeTicket(id)`, `startLastCall()`, `cancelLastCall()`, `closeShop()` | Supabase session, Shop active | Matching function via the user-JWT client |
 | `signIn(email, password)`, `signOut()` | — | Supabase Auth. `signIn` rejects Deactivated Shops |
+| `signOutOtherDevices()` | Supabase session | Supabase Auth `signOut({ scope: "others" })`, through `endOtherSignIns` in `lib/auth/owner.ts` |
+
+`signOutOtherDevices()` ends every Sign-in of the Owner but the calling device's, and answers `"done"` or `"failed"`. It asks `getUser()` first, because supabase-js treats a logout refused for a missing Sign-in as success: a device that has itself been signed out is sent to `/login` rather than told it worked. The other devices learn at once, since the dashboard layout's `getUser()` is refused for an ended Sign-in; their access JWTs stay good for the Data API until they expire, as with `revoke_owner_sessions`.
 
 When `close_shop` answers `signed_out: true`, `closeShop()` clears the Sign-in's cookies and redirects to `/login?error=weekly`. The alerts still go: they were handed to `after()` first.
 
@@ -389,6 +392,7 @@ It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken 
   - Undo within and after 2 minutes; No-show before and after 5 minutes
   - Join Radius boundaries, including the accuracy tolerance and its 100 m cap
   - Close Shop ending the caller's old Sign-ins on every device, leaving young ones and other Owners' alone, and ending none when refused
+  - Sign out other devices ending the Owner's other Sign-ins, keeping the calling device's and other Owners', and failing for a device already signed out
   - Close Shop refused while a Ticket is Called; Last Call cancel keeps choices; Leave while Called; Rejoin refused after Close Shop
   - Billing month boundaries in Malaysia time (a Ticket served at 23:59 MYT on the 31st vs 00:01 on the 1st)
   - Personal-data erasure

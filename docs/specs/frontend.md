@@ -123,7 +123,7 @@ The page compares the previous view with the new one after each refetch, in `lib
 The layout checks the session and `is_active` on the server, and redirects to `/login` otherwise.
 
 Layout, from top to bottom:
-1. **Header:** shop name, joining state badge (Open / Last Call), menu (Queue, History, Sign out) behind one 44 px button. The counts are the section headings below; a screen-reader-only line "Waiting N · In chair N" announces them when they change.
+1. **Header:** shop name, joining state badge (Open / Last Call), menu (Queue, History, Settings, Sign out) behind one 44 px button. The counts are the section headings below; a screen-reader-only line "Waiting N · In chair N" announces them when they change.
 2. **Primary button:** **Call next** (large, sticky at the bottom on phones), with the Ticket it will take beneath the label ("#003 Raj Kumar"). Disabled when nobody is Waiting, and then says "Nobody waiting". After a call, a toast "Called #003 Raj Kumar".
 3. **Called list**, headed "In chair N": one card per Called Ticket showing number, name and "called 3 min ago", with these actions:
    - **Done**, the wide filled button
@@ -147,6 +147,10 @@ Behaviour:
 - **Last 30 days:** a simple list or bar row of Served counts per day, plus a **This month** total shown as "Served: N · Amount due: RM x.xx".
 - No exports.
 
+### 4.4 `/dashboard/settings`
+- Behind the same gate as the rest of the dashboard (the layout's).
+- **Sign out other devices**, for a lost device or a former staff member who still has access. The confirmation asks "Sign out every other device? They'll need the password to get back in." Confirming ends every one of the Owner's Sign-ins except this device's; the Owner stays on the page and reads "Every other device is signed out." The devices signed out arrive at `/login` on their next request, with no notice.
+
 ## 5. Accessibility and UX rules
 - Ticket number ≥ 64 px on the customer page, AA contrast, and states announced with `aria-live="polite"` (`assertive` for Called).
 - Never rely on sound alone: the Called state is also a full-screen colour change.
@@ -163,6 +167,7 @@ app/
   dashboard/{called-card,waiting-list,ticket-menu,undo,queue-controls,move-form}.tsx, use-elapsed-ms.ts
                               (presentational pieces of the queue board; state and actions stay in queue-board.tsx)
   dashboard/history/page.tsx
+  dashboard/settings/page.tsx, sign-out-others.tsx, actions.ts
   api/s/[slug]/me/route.ts
   api/owner/queue/route.ts, api/owner/history/route.ts
   api/operator/…            (see backend.md §8)
