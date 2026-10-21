@@ -1,6 +1,6 @@
-# Barbershop Virtual Queue
+# Virtual Queue System
 
-Walk-in customers join a barbershop's queue from their phone and are alerted when their turn approaches; Owners run the queue from a dashboard.
+Walk-in customers join a business's queue from their phone and are alerted when their turn approaches; Owners run the queue from a dashboard. Barbershops in Malaysia are the first market; the same system is meant to serve other walk-in queues later.
 
 - Domain language: [CONTEXT.md](CONTEXT.md)
 - Decisions: [docs/adr/](docs/adr/)

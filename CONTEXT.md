@@ -1,6 +1,6 @@
-# Barbershop Virtual Queue
+# Virtual Queue System
 
-Walk-in customers join a barbershop's queue from their phone instead of waiting in the shop, and are alerted when their turn approaches. Shop owners run the queue from a dashboard.
+Walk-in customers join a Shop's queue from their phone instead of waiting on site, and are alerted when their turn approaches. Shop owners run the queue from a dashboard. Barbershops are the first market, so some examples below speak of haircuts and chairs; the terms themselves are meant to hold for any walk-in business.
 
 ## Language
 
@@ -11,7 +11,7 @@ The platform owner who onboards Shops and creates Owner accounts. Not a Shop use
 _Avoid_: Admin, super-admin
 
 **Shop**:
-A single barbershop location with exactly one Queue. Onboarded manually by the Operator, never self-registered.
+A single business location with exactly one Queue (today, a barbershop). Onboarded manually by the Operator, never self-registered.
 _Avoid_: Store, outlet, branch, tenant
 
 **Owner**:
@@ -33,7 +33,7 @@ An Owner being logged in on one device. Each device has its own, which ends at t
 _Avoid_: Session, login
 
 **Barber**:
-Not modelled. The Queue is shop-wide; any free chair takes the next Ticket.
+Not modelled, nor is any individual server. The Queue is shop-wide; any free chair (or counter) takes the next Ticket.
 
 ### Queue
 
@@ -48,7 +48,7 @@ _Avoid_: Entry, booking, reservation, appointment, transaction
 **Ticket status**:
 - **Waiting**: in the Queue, not yet called.
 - **Called**: the Owner has summoned the Customer to a chair.
-- **Served**: the Owner marked the haircut done. Final once the 2-minute Undo window passes; within it the Owner may revert it to Called.
+- **Served**: the Owner marked the service done (at a barbershop, the haircut). Final once the 2-minute Undo window passes; within it the Owner may revert it to Called.
 - **No-show**: called but never arrived. Final.
 - **Left**: the Customer cancelled their own Ticket. Final.
 - **Removed**: taken out by the Owner or by the system. Final.
