@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getOwnerSession } from "@/lib/auth/owner";
 import { dictionaries, LANG_COOKIE, resolveLang } from "@/lib/i18n";
 import { LoginForm } from "./login-form";
-import { SHOP_INACTIVE } from "./messages";
+import { SHOP_INACTIVE, WEEKLY_SIGN_IN } from "./messages";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -22,9 +22,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const session = await getOwnerSession();
   if (session.status === "active") redirect("/dashboard");
 
-  // Set by the dashboard when it turns away a Shop deactivated mid-session.
+  // Set by the dashboard when it turns away a Shop deactivated mid-session, or
+  // when the Owner's own Close Shop ended their week-old Sign-in.
   const { error } = await searchParams;
-  const notice = error === "inactive" ? SHOP_INACTIVE : null;
+  const notice =
+    error === "inactive" ? SHOP_INACTIVE : error === "weekly" ? WEEKLY_SIGN_IN : null;
 
   const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
   const lang = resolveLang(

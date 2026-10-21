@@ -1,5 +1,6 @@
 import "server-only";
 import type { PostgrestError } from "@supabase/supabase-js";
+import { ownerSignInMaxDays } from "@/lib/env";
 import { functionErrorReason } from "@/lib/error-reporting";
 import { toQueueAlerts, type Mutated } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
@@ -128,10 +129,19 @@ export async function cancelShopLastCall(): Promise<
   );
 }
 
-/** Ends the Queue Day: carries the carry-choosers, removes the rest. */
+/**
+ * Ends the Queue Day: carries the carry-choosers, removes the rest, and ends
+ * every one of the Owner's Sign-ins that is a week old (ADR 0006).
+ */
 export async function closeShopDay(): Promise<Mutated<OwnerOutcome<CloseShopResult>>> {
+  // Read first, so a misconfigured deploy fails before the day is closed.
+  const signInMaxDays = ownerSignInMaxDays();
   const supabase = await createClient();
-  return outcome("close_shop", await supabase.rpc("close_shop"), toCloseShopResult);
+  return outcome(
+    "close_shop",
+    await supabase.rpc("close_shop", { p_sign_in_max_days: signInMaxDays }),
+    toCloseShopResult,
+  );
 }
 
 /**

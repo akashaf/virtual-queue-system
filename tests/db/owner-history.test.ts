@@ -152,7 +152,7 @@ describe("get_owner_history", () => {
   test("leaves out the Tickets of Queue Days already closed", async () => {
     const { shop, client } = await ownerWithShop();
     await serveOne(client, shop.slug, "Yesterday");
-    const closed = await client.rpc("close_shop");
+    const closed = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
     if (closed.error) throw new Error(closed.error.message);
     const today = await joinQueue(shop.slug, "Today");
 

@@ -114,6 +114,7 @@ The page compares the previous view with the new one after each refetch, in `lib
 - Email and password fields.
 - Errors: "Wrong email or password"; "This Shop has been switched off. Contact the Operator to turn it back on." The second is not the Owner's mistake, so on this page it shows as a calm notice (`role="status"`) rather than an error. The dashboard still shows it as an error toast, because there the Owner's action did fail.
 - A refused attempt keeps the email and puts the cursor back in the password field.
+- After a Close Shop that ended the Owner's own week-old Sign-in (ADR 0006), a calm notice: "The Shop closed as usual. Owners sign in again once a week, and this does not affect the Queue." Other devices that Close Shop signed out arrive at `/login` with no notice: nothing can tell them why by then.
 - No sign-up and no forgot-password link. Owners contact the Operator instead (deferred).
 - An Owner who is already signed in is sent on to `/dashboard`. `/` relies on this rather than checking the session itself.
 - Below the card, a small line for Customers: "Waiting for a haircut? Scan the QR code at the shop." (§1 covers its language).

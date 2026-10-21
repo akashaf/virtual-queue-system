@@ -8,6 +8,7 @@ import {
   serviceClient,
   SHOP_LNG,
   signInAs,
+  type OwnerClient,
 } from "./helpers";
 
 let db: Client;
@@ -75,7 +76,7 @@ async function currentDayOf(shopId: string): Promise<string> {
 }
 
 interface CloseEnvelope {
-  result: { carried_over: number; removed: number };
+  result: { carried_over: number; removed: number; signed_out: boolean };
   alerts: { ticket_id: string; kind: string }[];
 }
 
@@ -87,7 +88,7 @@ describe("close_shop", () => {
     await client.rpc("call_next");
     await client.rpc("start_last_call");
 
-    const { error } = await client.rpc("close_shop");
+    const { error } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     expect(error?.message).toBe("tickets_still_called");
     expect(await currentDayOf(shop.id)).toBe(shop.current_queue_day_id);
@@ -105,11 +106,11 @@ describe("close_shop", () => {
     await choose(firstCarry.id, firstCarry.deviceId, "carry");
     await choose(secondCarry.id, secondCarry.deviceId, "carry");
 
-    const { data, error } = await client.rpc("close_shop");
+    const { data, error } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     expect(error).toBeNull();
     const envelope = data as unknown as CloseEnvelope;
-    expect(envelope.result).toEqual({ carried_over: 2, removed: 2 });
+    expect(envelope.result).toEqual({ carried_over: 2, removed: 2, signed_out: false });
     expect(envelope.alerts).toEqual([
       { ticket_id: staying.id, kind: "shop_closed" },
       { ticket_id: undecided.id, kind: "shop_closed" },
@@ -149,7 +150,7 @@ describe("close_shop", () => {
     const client = await signInAs(owner.email, owner.password);
     await client.rpc("start_last_call");
 
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     const fresh = await join(shop.slug);
     expect(fresh.number).toBe(1);
@@ -161,17 +162,18 @@ describe("close_shop", () => {
     const client = await signInAs(owner.email, owner.password);
     await client.rpc("start_last_call");
     await choose(ticket.id, ticket.deviceId, "carry");
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
     expect((await ticketRow(ticket.id)).status).toBe("waiting");
 
     // The next evening: choosing carry again changes nothing at Close Shop.
     await client.rpc("start_last_call");
     await choose(ticket.id, ticket.deviceId, "carry");
-    const { data } = await client.rpc("close_shop");
+    const { data } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     expect((data as unknown as CloseEnvelope).result).toEqual({
       carried_over: 0,
       removed: 1,
+      signed_out: false,
     });
     const row = await ticketRow(ticket.id);
     expect(row.status).toBe("removed");
@@ -188,7 +190,7 @@ describe("close_shop", () => {
       [ticket.id],
     );
     await client.rpc("mark_no_show", { p_ticket_id: ticket.id });
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     const { error } = await serviceClient().rpc("rejoin_queue", {
       p_ticket_id: ticket.id,
@@ -203,7 +205,7 @@ describe("close_shop", () => {
     const ticket = await join(shop.slug);
     const client = await signInAs(owner.email, owner.password);
     await client.rpc("start_last_call");
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     const { data } = await serviceClient().rpc("get_customer_view", {
       p_slug: shop.slug,
@@ -241,7 +243,7 @@ describe("close_shop", () => {
     await client.rpc("start_last_call");
     await choose(leader.id, leader.deviceId, "carry");
     await choose(carried.id, carried.deviceId, "carry");
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     const { data } = await serviceClient().rpc("get_customer_view", {
       p_slug: shop.slug,
@@ -272,7 +274,7 @@ describe("close_shop", () => {
     const client = await signInAs(owner.email, owner.password);
     await client.rpc("start_last_call");
     await choose(carried.id, carried.deviceId, "carry");
-    await client.rpc("close_shop");
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
 
     // The next day: a fresh join, then Last Call again and one answer so far.
     const fresh = await join(shop.slug, crypto.randomUUID(), "Siti");
@@ -296,5 +298,90 @@ describe("close_shop", () => {
       last_call_choice: "stay",
       carried_over: false,
     });
+  });
+});
+
+/** The Sign-in a client holds, read from the `session_id` claim of its access token. */
+async function signInIdOf(client: OwnerClient): Promise<string> {
+  const { data } = await client.auth.getSession();
+  const payload = data.session!.access_token.split(".")[1];
+  return JSON.parse(Buffer.from(payload, "base64url").toString()).session_id as string;
+}
+
+/** Backdates a Sign-in, as if the Owner had signed in on that device `days` ago. */
+async function ageSignIn(client: OwnerClient, days: number) {
+  await db.query(
+    "update auth.sessions set created_at = now() - make_interval(days => $2) where id = $1",
+    [await signInIdOf(client), days],
+  );
+}
+
+/** Whether the Auth server still accepts this device's Sign-in. */
+async function stillSignedIn(client: OwnerClient): Promise<boolean> {
+  const { error } = await client.auth.getUser();
+  return error === null;
+}
+
+describe("close_shop and Sign-ins (ADR 0006)", () => {
+  test("ends the closing device's own Sign-in once it is seven days old, and says so", async () => {
+    const { owner } = await createShop();
+    const client = await signInAs(owner.email, owner.password);
+    await ageSignIn(client, 7);
+
+    const { data, error } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
+
+    expect(error).toBeNull();
+    expect((data as unknown as CloseEnvelope).result.signed_out).toBe(true);
+    expect(await stillSignedIn(client)).toBe(false);
+  });
+
+  test("ends an old Sign-in on another device and keeps the young one that closed", async () => {
+    const { owner } = await createShop();
+    const lostTablet = await signInAs(owner.email, owner.password);
+    await ageSignIn(lostTablet, 30);
+    const phone = await signInAs(owner.email, owner.password);
+    await ageSignIn(phone, 6);
+
+    const { data } = await phone.rpc("close_shop", { p_sign_in_max_days: 7 });
+
+    expect((data as unknown as CloseEnvelope).result.signed_out).toBe(false);
+    expect(await stillSignedIn(lostTablet)).toBe(false);
+    expect(await stillSignedIn(phone)).toBe(true);
+  });
+
+  test("leaves another Owner's old Sign-in alone", async () => {
+    const { owner } = await createShop();
+    const { owner: neighbour } = await createShop();
+    const client = await signInAs(owner.email, owner.password);
+    const neighbourClient = await signInAs(neighbour.email, neighbour.password);
+    await ageSignIn(neighbourClient, 30);
+
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
+
+    expect(await stillSignedIn(neighbourClient)).toBe(true);
+  });
+
+  test("a refused Close Shop ends no Sign-in", async () => {
+    const { owner, shop } = await createShop();
+    await join(shop.slug);
+    const client = await signInAs(owner.email, owner.password);
+    await client.rpc("call_next");
+    await ageSignIn(client, 30);
+
+    const { error } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
+
+    expect(error?.message).toBe("tickets_still_called");
+    expect(await stillSignedIn(client)).toBe(true);
+  });
+
+  test("refuses a limit that is not a positive number of days, closing nothing", async () => {
+    const { owner, shop } = await createShop();
+    const client = await signInAs(owner.email, owner.password);
+
+    const { error } = await client.rpc("close_shop", { p_sign_in_max_days: 0 });
+
+    expect(error?.code).toBe("22023");
+    expect(await currentDayOf(shop.id)).toBe(shop.current_queue_day_id);
+    expect(await stillSignedIn(client)).toBe(true);
   });
 });

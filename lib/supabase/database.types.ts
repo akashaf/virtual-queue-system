@@ -314,7 +314,7 @@ export type Database = {
         }
         Returns: Json
       }
-      close_shop: { Args: never; Returns: Json }
+      close_shop: { Args: { p_sign_in_max_days: number }; Returns: Json }
       create_shop: {
         Args: {
           p_heads_up_threshold?: number

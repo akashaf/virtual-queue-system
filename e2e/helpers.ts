@@ -1,12 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 import type { Database } from "../lib/supabase/database.types";
 import { readLocalSupabase } from "../tests/local-supabase";
 import { SHOP_LAT, SHOP_LNG } from "../tests/shop-location";
 
 export { SHOP_LAT, SHOP_LNG };
 
-const { apiUrl, secretKey } = readLocalSupabase();
+const { apiUrl, dbUrl, secretKey } = readLocalSupabase();
 
 const admin = createClient<Database>(apiUrl, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -95,4 +96,24 @@ export async function shopJoiningState(id: string) {
 export async function deactivateShop(id: string) {
   const { error } = await admin.from("shops").update({ is_active: false }).eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Backdates every one of an Owner's Sign-ins, as if they had signed in `days`
+ * ago. `auth.sessions` is not exposed through the Data API, so this goes
+ * straight to Postgres.
+ */
+export async function ageSignIns(email: string, days: number) {
+  const db = new Client({ connectionString: dbUrl });
+  await db.connect();
+  try {
+    await db.query(
+      `update auth.sessions s set created_at = now() - make_interval(days => $2)
+         from auth.users u
+        where u.id = s.user_id and u.email = $1`,
+      [email.toLowerCase(), days],
+    );
+  } finally {
+    await db.end();
+  }
 }

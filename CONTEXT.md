@@ -28,6 +28,10 @@ Not modelled. Someone waiting physically without a Ticket is served outside the 
 **Deactivated Shop**:
 A Shop the Operator has switched off. Its Queue accepts no Tickets and its Owner cannot log in; its history is kept.
 
+**Sign-in**:
+An Owner being logged in on one device. Each device has its own, which ends at the first Close Shop seven or more days after it began, or earlier when the Owner signs out.
+_Avoid_: Session, login
+
 **Barber**:
 Not modelled. The Queue is shop-wide; any free chair takes the next Ticket.
 

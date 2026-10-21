@@ -143,16 +143,24 @@ export function toJoiningStateResult(json: unknown): JoiningStateResult {
   return { joiningState: result.joining_state };
 }
 
-/** What Close Shop did: who moved to the new Queue Day, and who was removed. */
+/**
+ * What Close Shop did: who moved to the new Queue Day, who was removed, and
+ * whether it ended this device's own Sign-in for being a week old (ADR 0006).
+ */
 export interface CloseShopResult {
   carriedOver: number;
   removed: number;
+  signedOut: boolean;
 }
 
-/** Reads how many Tickets Close Shop carried over and removed from its payload. */
+/** Reads what Close Shop did from its payload. */
 export function toCloseShopResult(json: unknown): CloseShopResult {
-  const result = json as { carried_over: number; removed: number };
-  return { carriedOver: result.carried_over, removed: result.removed };
+  const result = json as { carried_over: number; removed: number; signed_out: boolean };
+  return {
+    carriedOver: result.carried_over,
+    removed: result.removed,
+    signedOut: result.signed_out,
+  };
 }
 
 /**

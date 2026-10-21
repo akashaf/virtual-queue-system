@@ -11,3 +11,8 @@ export const WRONG_CREDENTIALS = "Wrong email or password";
  * back on. */
 export const SHOP_INACTIVE =
   "This Shop has been switched off. Contact the Operator to turn it back on.";
+
+/** Shown to the Owner whose own Close Shop ended a week-old Sign-in (ADR 0006).
+ * Says the Queue is fine, because it was closing the Shop that sent them here. */
+export const WEEKLY_SIGN_IN =
+  "The Shop closed as usual. Owners sign in again once a week, and this does not affect the Queue.";

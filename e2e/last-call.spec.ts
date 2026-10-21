@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  ageSignIns,
   seedShop,
   shopJoiningState,
   signInAsOwner,
@@ -142,4 +143,22 @@ test("Close Shop waits for the chairs, and Reopen joining takes Last Call back",
   await expect(dashboard.getByRole("button", { name: "Last Call" })).toBeVisible();
 
   await owner.close();
+});
+
+test("a week-old Sign-in ends at Close Shop, with a note on the way out", async ({ page }) => {
+  const { email, password, shop } = await seedShop();
+  await signInAsOwner(page, email, password);
+  await ageSignIns(email, 7);
+  await startLastCall(page, shop.id);
+
+  await page.getByRole("button", { name: "Close Shop" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Close Shop" }).click();
+
+  await expect(page).toHaveURL("/login?error=weekly");
+  await expect(page.getByRole("status")).toHaveText(
+    "The Shop closed as usual. Owners sign in again once a week, and this does not affect the Queue.",
+  );
+  // Signed out for real: the dashboard sends the Owner straight back.
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL("/login");
 });

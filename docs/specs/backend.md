@@ -203,12 +203,14 @@ Some helpers are never called from outside the database, and are revoked from ev
   - Sets `joining_state = last_call` and `queue_days.last_call_at`.
   - Returns a `last_call` alert for every Waiting Ticket.
 - `cancel_last_call()`: sets `joining_state = open` and keeps existing choices
-- `close_shop()`
+- `close_shop(sign_in_max_days)`
   - Error `tickets_still_called` if any Ticket is Called; the Owner must resolve those first.
+  - `sign_in_max_days` is `OWNER_SIGN_IN_MAX_DAYS`, passed by the Server Action; anything below 1 is a `22023`.
   - Closes the current Queue Day and creates a new one.
   - Moves carry-choice Tickets to the new Queue Day, numbered 1..k in their original order, with `carried_over_at = now()` and `last_call_choice = null`.
   - Removes the remaining Waiting Tickets, each with a `shop_closed` alert.
   - Resets `joining_state = open`.
+  - Ends every one of the caller's Sign-ins at least `sign_in_max_days` old, on any device, by deleting their `auth.sessions` rows as `revoke_owner_sessions` does (ADR 0006). Younger Sign-ins and other Owners' are left alone, and a refused Close Shop ends none. Returns `{ carried_over, removed, signed_out }`, where `signed_out` says whether the calling device's own Sign-in was among them. Not Supabase's `[auth.sessions] timebox`, even on Pro: that logs Owners out mid-day.
 - `get_owner_queue()` → `{ shop: { id, name, joining_state }, waiting: [{ id, number, name, joined_at, origin, last_call_choice, carried_over }], called: [{ id, number, name, called_at, no_show_in_ms }], just_served: [{ id, number, name, undo_expires_in_ms }] }` for the current Queue Day
   - `origin` is what the dashboard's "Rejoined" badge reads: the Ticket is at the back with a high number, but its Customer has been in the shop a while
   - `last_call_choice` and `carried_over` (#11) feed the Waiting rows' badges, and the Close Shop confirmation counts them the way `close_shop` will act: only an unspent carry choice moves
@@ -272,6 +274,8 @@ Some helpers are never called from outside the database, and are revoked from ev
 | `rejoinQueue(ticketId)`, `leaveQueue(ticketId)`, `chooseLastCall(ticketId, choice)` | Device cookie | Matching function |
 | `callNext()`, `markServed(id)`, `undoServed(id)`, `markNoShow(id)`, `removeTicket(id)`, `startLastCall()`, `cancelLastCall()`, `closeShop()` | Supabase session, Shop active | Matching function via the user-JWT client |
 | `signIn(email, password)`, `signOut()` | — | Supabase Auth. `signIn` rejects Deactivated Shops |
+
+When `close_shop` answers `signed_out: true`, `closeShop()` clears the Sign-in's cookies and redirects to `/login?error=weekly`. The alerts still go: they were handed to `after()` first.
 
 After a successful call, each action runs `after(() => dispatchAlerts(alerts))`.
 
@@ -367,6 +371,7 @@ It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken 
 | `OPERATOR_API_KEY` | server | Admin API |
 | `CRON_SECRET` | server | Cron route |
 | `APP_BASE_URL` | server | QR target: `https://virtual-queue-system.netlify.app` in production |
+| `OWNER_SIGN_IN_MAX_DAYS` | server | How old a Sign-in must be for Close Shop to end it (ADR 0006): `7`. Required, a positive whole number; otherwise Close Shop fails before closing anything |
 | `NEXT_PUBLIC_SENTRY_DSN` | client + server | Error tracking. Absent: nothing is sent |
 | `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | build | Source-map upload. Without the token the build skips it |
 
@@ -383,6 +388,7 @@ It throws on a missing `URL` or `CRON_SECRET` and on a failed call, so a broken 
   - Only one Rejoin; Rejoin skips the location check
   - Undo within and after 2 minutes; No-show before and after 5 minutes
   - Join Radius boundaries, including the accuracy tolerance and its 100 m cap
+  - Close Shop ending the caller's old Sign-ins on every device, leaving young ones and other Owners' alone, and ending none when refused
   - Close Shop refused while a Ticket is Called; Last Call cancel keeps choices; Leave while Called; Rejoin refused after Close Shop
   - Billing month boundaries in Malaysia time (a Ticket served at 23:59 MYT on the 31st vs 00:01 on the 1st)
   - Personal-data erasure

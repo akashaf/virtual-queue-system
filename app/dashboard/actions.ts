@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import {
   callNextTicket,
   cancelShopLastCall,
@@ -19,6 +20,7 @@ import type {
   TicketRef,
 } from "@/lib/owner/view";
 import { dispatched } from "@/lib/push";
+import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 
 /**
@@ -93,5 +95,13 @@ export async function closeShop(
   _previous: OwnerOutcome<CloseShopResult> | null,
   _formData: FormData,
 ): Promise<OwnerOutcome<CloseShopResult>> {
-  return dispatched(await closeShopDay());
+  const outcome = dispatched(await closeShopDay());
+  if (outcome.ok && outcome.result.signedOut) {
+    // The Sign-in is already gone from the database; this only clears its
+    // cookies. Other devices it ended learn on their next request, without a note.
+    const supabase = await createClient();
+    await supabase.auth.signOut({ scope: "local" });
+    redirect("/login?error=weekly");
+  }
+  return outcome;
 }

@@ -89,7 +89,7 @@ export function LoginForm({ notice }: { notice: string | null }) {
       </div>
 
       {message ? (
-        <LoginNotice id={NOTICE_ID} message={message} error={message !== SHOP_INACTIVE} />
+        <LoginNotice id={NOTICE_ID} message={message} error={refused} />
       ) : null}
 
       <Button type="submit" size="lg" className="h-12 text-base" disabled={pending}>
