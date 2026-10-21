@@ -10,7 +10,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: [["./e2e/load-reporter.ts"], [process.env.CI ? "github" : "list"]],
   use: {
     baseURL,
     trace: "retain-on-failure",

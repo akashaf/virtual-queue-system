@@ -207,7 +207,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   background (load average 70–100 on 8 cores), sign-in alone took up to 5 s and every run lost one
   to four tests to timeouts, the same tests passing in isolation. It looked exactly like a
   regression from the change under test. `e2e/global-setup.ts` warns at the start of a run when
-  the load is high; heed it, and compare against `git stash` back to back, or with
+  the load is high; heed it. A run can also turn busy partway through (in #34: 2.3 at the start, 72
+  when two specs timed out). So every failed test also carries a `machine load` attachment, printed
+  under the failure beside its trace: the load when it failed, and `busy` if that was over the
+  start-of-run threshold. `e2e/load-reporter.ts` writes it. A `--reporter` flag replaces the
+  config's reporters, this one included; pass `--reporter=./e2e/load-reporter.ts,list` to keep it. Compare against `git stash` back to back, or with
   `--workers=1`, rather than against an earlier run. To test whether a failure is a timeout,
   shrink the timeout on a quiet machine (`--testTimeout=800` failed the slowest db test every
   run, in a minute) rather than loading the machine and waiting for a rare red.
