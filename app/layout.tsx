@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
+import { NONCE_HEADER } from "@/lib/csp";
 import "./globals.css";
 
 // Clarity City is not on Google Fonts; it ships as WOFF2 in VMware's @clr/city package (OFL).
@@ -19,7 +21,11 @@ export const metadata: Metadata = {
   description: "Join your barbershop's queue from your phone.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Reading the request makes every page render per request, which a nonce
+  // needs: a page built ahead of time would carry a stale one (third-party.md §9).
+  const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
+
   return (
     // next-themes sets the `dark` class before hydration, which React would otherwise flag.
     <html
@@ -28,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider nonce={nonce}>{children}</ThemeProvider>
       </body>
     </html>
   );

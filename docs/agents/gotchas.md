@@ -49,6 +49,13 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   Every screen that refetches a view orders it through `createViewOrder` (`lib/view-order.ts`),
   which drops a refetch sent before a newer view was shown (#31, #32); a new screen needs it too.
 
+- **A new source the page loads must go into `lib/csp.ts`.** Every page carries a
+  Content-Security-Policy (report-only until #36 enforces it), and nothing fails while it is
+  report-only: the browser only raises a `securitypolicyviolation` event. `e2e/csp.spec.ts`
+  turns those into a failure for the main flows; it caught the alert chimes' `blob:` URLs.
+  An inline `<script>` needs the nonce from the `x-nonce` request header, as `app/layout.tsx`
+  passes it to next-themes.
+
 ## Supabase and migrations
 
 - **VS Code can squat on the local database port.** Its extension host (`Code Helper (Plugin)`)

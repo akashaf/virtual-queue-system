@@ -122,6 +122,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
   - Push send failures (OneSignal refusing or unreachable), with the status code only
   - Unexpected function errors (anything not in the known error-code list), through `functionErrorReason`, which passes known codes through unreported. It leaves out the error's `details`, which Postgres fills with the failing row
   - Geolocation timeouts, as breadcrumbs only
+  - Content-Security-Policy violation reports, sent by the browser itself ([§9](#9-content-security-policy))
 - **Privacy:**
   - `sendDefaultPii: false`
   - Scrub `customer_name` and any `lat`/`lng`, and their `p_`-prefixed function arguments, from events and breadcrumbs by key
@@ -152,3 +153,28 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md). How each service is used in c
 | Buy a domain | Add it to Netlify, reprint QR codes, add Resend with DNS records, enable owner forgot-password |
 | Owners report missed alerts on iPhone | Phase 2: WhatsApp Cloud API (needs Meta Business verification, customer phone numbers and a per-message cost, to be weighed against RM0.25) |
 | More than ~20 Shops or manual invoicing is painful | Phase 2: automated invoicing and a payment gateway |
+
+## 9. Content-Security-Policy
+
+The Owner's Sign-in tokens are in cookies page scripts can read, because the Supabase browser client needs them for Realtime. The policy is there so that a script we did not ship cannot run and copy them.
+
+- **Report-only first.** Every page is sent `Content-Security-Policy-Report-Only`, and no enforcing `Content-Security-Policy`, so browsers report what the policy *would* block without blocking anything. After a week of reports, someone reads them in Sentry, allows any real source the policy forgot, and ignores the noise (browser extensions, injected ad scripts). Then **#36, "Enforce the Content-Security-Policy"**, renames the header to the enforcing one. Report-only went out with #35.
+- **Where it is set:** `proxy.ts`, from `cspHeaders` in `lib/csp.ts`. Route Handlers get none: those outside the proxy matcher (health, cron, operator, the QR code, anything with a file extension) never pass through it, and the proxy skips `/api/` for the rest, which answer with JSON.
+- **The policy:**
+
+  | Directive | Sources | Why |
+  |---|---|---|
+  | `default-src` | `'self'` | |
+  | `script-src` | this request's nonce, `'strict-dynamic'` (`'unsafe-eval'` in development only) | Next puts the nonce on its own scripts; the root layout passes it to next-themes' inline one. `'strict-dynamic'` trusts what those load, which is how OneSignal's SDK arrives. `'self'` and `https://cdn.onesignal.com` follow for browsers too old for `'strict-dynamic'` |
+  | `style-src` | `'self'`, `'unsafe-inline'`, `https://onesignal.com` | Radix, sonner and React style props write inline styles, and a nonce here would switch `'unsafe-inline'` off. Styles cannot read cookies |
+  | `img-src` | `'self'`, `data:`, `blob:` | |
+  | `font-src` | `'self'` | Clarity City is served from our own origin |
+  | `media-src` | `'self'`, `blob:` | The alert chimes are synthesised in the page and played from blob URLs |
+  | `worker-src` | `'self'` | OneSignal's service worker. Without it the browser falls back to `script-src`, where `'strict-dynamic'` ignores `'self'` |
+  | `connect-src` | `'self'`, the Supabase URL and its `wss://` twin, the Sentry DSN's host, `https://api.onesignal.com`, `https://onesignal.com` | |
+  | `object-src`, `base-uri`, `frame-ancestors` | `'none'` | |
+  | `form-action` | `'self'` | Server Actions post to the page itself |
+
+- **Nonces need per-request rendering.** The root layout reads the request headers, so no page is prerendered; `next build` lists every route as dynamic (`ƒ`). A prerendered page would carry a stale nonce.
+- **Reports go to Sentry**, to the project's security endpoint built from `NEXT_PUBLIC_SENTRY_DSN` (`https://<host>/api/<project>/security/?sentry_key=<public key>`): `report-to` with a `Reporting-Endpoints` header for Chromium, `report-uri` for Safari and Firefox. Without a DSN nothing is reported, as with errors.
+- **Tested** by `lib/csp.test.ts` and `e2e/csp.spec.ts`, which fails on any violation while an Owner signs in and watches the dashboard update live and a Customer joins. e2e has no OneSignal App ID or Sentry DSN, so push sign-up and report delivery are only checked in production, during the report-only week.
