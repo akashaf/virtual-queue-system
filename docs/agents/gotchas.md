@@ -65,6 +65,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   seeding looked fine. `lsof -nP -iTCP:54322 -sTCP:LISTEN` names the culprit; quitting VS Code
   fully frees it. Killing the process also kills the Claude Code extension running in it.
   Docker here is Colima, so the *healthy* listener is `ssh` (Lima's port-forward mux), not Docker.
+- **A busy Mac can time out `supabase start` itself.** Starting the stack for the push after the
+  #37 retro failed with `HealthCheckTimeoutError` on the realtime and studio containers at a load
+  of 55; the port was free, and a second `bun run db:start` came up. Retry before suspecting the
+  port (the same load fails tests too: Shell, `git push`).
 
 - `bun run db:types` regenerates `lib/supabase/database.types.ts`. Run it after every
   migration and commit the result, or `tsc` quietly stops checking queries.
@@ -209,6 +213,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   it in the transcript, which is how the first `service_role` key leaked. Secrets go into the
   Netlify UI by hand; editing an existing variable there also keeps its secret flag and scopes,
   avoiding the silent failure below. Public values (`NEXT_PUBLIC_*`) are fine by CLI.
+  The same goes for the Supabase CLI's saved login: an agent never reads it or calls Supabase's
+  Management API on production, not even through a helper script (the user's ruling after the
+  #37 retro). Production settings and logs come from the user, via the dashboard or a
+  `!` command they run. The one exception is `bunx supabase db push --dry-run` before a push.
 - **`netlify env:set --scope` fails silently on the Free plan**: no output, exit 0, nothing
   written. Always confirm with `netlify env:list --context production`.
 - **Netlify secret values are write-only.** You cannot read one back to check it, so a key is
@@ -285,5 +293,7 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when
-  polling a deploy state.
+  polling a deploy state. To wait for a pushed commit's deploy, run `scripts/wait-deploy.sh`
+  (in the background: a build takes several minutes) rather than writing the loop. It exits 1
+  on both a failed deploy and a timeout; the printed line says which.
 - `page.reload()` in Playwright re-submits a POST. Poll with `page.goto()` instead.
