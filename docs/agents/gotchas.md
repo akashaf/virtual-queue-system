@@ -68,8 +68,16 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 - `bun run db:types` regenerates `lib/supabase/database.types.ts`. Run it after every
   migration and commit the result, or `tsc` quietly stops checking queries.
-- **Supabase auto-grants new `public` tables to `anon` / `authenticated`**, so every migration
-  must `revoke` and then grant back deliberately.
+- **Grant every new `public` table explicitly, to every role that uses it.** From 2026-10-30 the
+  cloud no longer grants select/insert/update/delete on new tables, or execute on new functions,
+  to `anon` / `authenticated` / `service_role`, and that includes every new project and preview
+  branch. `auto_expose_new_tables = false` in `supabase/config.toml` makes local `db reset` do
+  the same (#39). It still grants truncate/references/trigger, so a migration that creates a
+  table enables RLS, `revoke all … from anon, authenticated`, and grants back what each role
+  needs, `service_role` included when the secret-key client touches it. Production kept its
+  old grants, so a missing one breaks only rebuilt databases. `tests/db/table-grants.test.ts`
+  lists the expected grants and fails on any table not in it. The flag needs
+  `supabase stop && supabase start` and then `db:reset`: a plain start restores the old database.
 - **Default privileges also grant `service_role` execute on every new function**, so
   `revoke … from public, anon, authenticated` leaves it behind. Name `service_role` too for
   helpers that nothing outside the database calls.
