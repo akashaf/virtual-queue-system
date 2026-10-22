@@ -10,7 +10,8 @@ the decisions in `docs/adr/`, and the traps in `docs/agents/gotchas.md`.
   Ticket, Called, Served, Heads-up. A diff that says "user", "booking", "appointment" or "client"
   for one of these is a violation. In prose and comments the terms are capitalised.
 - **A new domain idea gets a `CONTEXT.md` entry in the same change.** A word the diff relies on
-  that the glossary does not define is a finding.
+  that the glossary does not define is a finding. First look for an existing word that fits
+  ("visitor" at the login page is the Owner); only a genuinely new idea earns a new entry.
 
 ## Comments
 

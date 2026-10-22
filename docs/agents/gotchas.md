@@ -125,6 +125,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   first; one that changes what live code reads or calls (a dropped table, a new return shape, as
   in #29) breaks production whichever lands first, so the two ship back to back. The user runs
   `bunx supabase db push`; a dry run afterwards should say *Remote database is up to date*.
+- **Only the Auth server's `/token` log line shows the IP Auth used.** Checking sign-in IP
+  forwarding (#37) sent the user to two wrong entries first: the `msg: "Login"` event and the
+  `log_type: "edge"` gateway entry carry no usable IP. In *Logs → Auth*, the entry for the same
+  second with `path: "/token"` and `msg: "request completed"` has `remote_addr`, which is the
+  forwarded IP when Auth accepted one and the caller's (Netlify's, on AWS) otherwise.
 - **Never run `supabase config push` from the repo.** `supabase/config.toml` is the local
   development config and much of it is wrong for production — `site_url`, redirect URLs,
   pooler sizes, OTP and email limits. It has no per-key flag, and a non-interactive run
@@ -195,6 +200,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Netlify and secrets
 
+- **There is no non-production deploy.** Netlify builds only `main` (the site's branch
+  settings in the Netlify UI, not `netlify.toml`; no deploy previews), and a push to `main` is a production deploy. A local `netlify deploy` fails
+  inside the Next.js plugin's packaging step and would bake in `.env.local` anyway. So a
+  temporary diagnostic route (#37's `/api/health/ip`) ships to production on its own commit and
+  is reverted straight after; plan for that, and for the user running the push.
 - **Never let a production secret pass through an agent.** A command containing the value puts
   it in the transcript, which is how the first `service_role` key leaked. Secrets go into the
   Netlify UI by hand; editing an existing variable there also keeps its secret flag and scopes,
@@ -260,10 +270,18 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   about 2 minutes), so it needs local Supabase up and a long command timeout. A failure is a
   real one: fix it rather than reach for `--no-verify`. The db tests run up to six times slower
   on a busy Mac, which is why their timeout is 20 s rather than Vitest's 5 s (`vitest.config.mts`);
-  a db test timing out past that is most likely a hang, not the load. A Vitest run writes
+  a db test timing out past that is most likely a hang, not the load. Not always: at a load of
+  43–65 (#37) two Queue tests failed a push and passed alone, so rerun a failing file on its
+  own before debugging it; the hook prints the load first. A Vitest run writes
   `.test-results/vitest.json`, each test's status, duration and failure message, so read a
   failed push there before rerunning: the next run overwrites it, and a `--reporter` flag
   replaces the report.
+- **Two sessions in one checkout corrupt each other's work.** During #37 a session working
+  #39 in the same folder had its files staged under #37's commit, reset the local database
+  mid-run (Close Shop went from 1 failure to 9), and left an unpushed migration commit beneath
+  #37's revert. Parallel sessions each take a worktree (`claude --worktree`). Worktrees still
+  share the one local Supabase, so only one session at a time runs db tests, `db:reset` or a
+  push. Before committing, `git status` should list only your own files.
 
 - `git diff` can hang on a pager here; use `git --no-pager diff`.
 - `until <check>; do sleep; done` stops when the check **succeeds** — easy to invert when

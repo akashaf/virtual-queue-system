@@ -12,6 +12,16 @@ if ! bunx supabase status >/dev/null 2>&1; then
   exit 1
 fi
 
+# Same threshold as e2e. The db tests' 20 s timeout absorbs most load, but #37 still lost
+# two to a busy Mac that passed alone (docs/agents/gotchas.md, Shell). Advice only, so a
+# failure here never blocks the push.
+bun -e '
+  import { machineLoad } from "./e2e/machine-load";
+  const { busy, summary } = machineLoad();
+  console.log(`pre-push: ${summary}`);
+  if (busy) console.warn("pre-push: that is busy. Rerun a failing test file alone before trusting the failure.");
+' || true
+
 echo "pre-push: typecheck"
 bun run typecheck
 echo "pre-push: lint"

@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // A local `netlify deploy` leaves generated bundles here, and flat config
+    // does not read .gitignore: they failed lint and blocked a push.
+    ".netlify/**",
   ]),
   {
     rules: {
