@@ -9,8 +9,10 @@ import type { Lang } from "@/lib/i18n";
 
 /**
  * Set once the Customer has said no — to our sheet or to the browser's prompt —
- * and never asked again (frontend.md §3.2). localStorage rather than session:
- * "do not re-prompt" would mean little if every visit started over.
+ * so the sheet is never offered again (frontend.md §3.2). localStorage rather
+ * than session: "do not re-prompt" would mean little if every visit started
+ * over. The Customer can still turn alerts on from the Waiting banner, which
+ * clears it (`forgetPushDeclined`).
  */
 export const PUSH_DECLINED_KEY = "vq_push_declined";
 
@@ -19,9 +21,10 @@ export type PushPlan = "subscribe" | "ask" | "fallback";
 /**
  * What to do about push for a Ticket the Customer holds.
  *
- * The browser's own `denied` and our remembered decline both fall back for
- * good; a dismissed browser prompt leaves permission at `default`, which is why
- * the flag exists at all.
+ * The browser's own `denied` and our remembered decline both fall back; a
+ * dismissed browser prompt leaves permission at `default`, which is why the
+ * flag exists at all. Only the Customer's own tap on "Turn on alerts" asks
+ * again after a decline (`canStillAsk`).
  */
 export function pushPlan(state: {
   supported: boolean;
@@ -32,6 +35,19 @@ export function pushPlan(state: {
     return "fallback";
   }
   return state.permission === "granted" ? "subscribe" : "ask";
+}
+
+/**
+ * Whether the browser would still show its own prompt: push works here and the
+ * Customer has not refused it in the browser. Our remembered decline does not
+ * count, because it only stops *us* offering — a Customer who taps "Turn on
+ * alerts" later is asking, not being re-prompted.
+ */
+export function canStillAsk(state: {
+  supported: boolean;
+  permission: NotificationPermission;
+}): boolean {
+  return state.supported && state.permission === "default";
 }
 
 /** The state `pushPlan` needs, read from this browser. */
@@ -65,6 +81,19 @@ export function rememberPushDeclined(): void {
     localStorage.setItem(PUSH_DECLINED_KEY, "1");
   } catch {
     // Nothing to do: the worst case is asking again on the next visit.
+  }
+}
+
+/**
+ * Forgets a decline once the Customer has turned alerts on after all, or
+ * `pushPlan` would keep answering "fallback" and the next reload would leave
+ * the granted subscription unlinked.
+ */
+export function forgetPushDeclined(): void {
+  try {
+    localStorage.removeItem(PUSH_DECLINED_KEY);
+  } catch {
+    // Storage walled off: nothing was remembered either.
   }
 }
 

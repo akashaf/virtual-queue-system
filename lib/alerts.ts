@@ -27,10 +27,10 @@ export interface PageAlerts {
    * twice.
    */
   headsUpTicketId: string | null;
-  /** The Called Ticket whose chime repeats until the Customer taps "I'm coming". */
+  /** The Called Ticket whose chime repeats until the Customer taps "Stop the alert". */
   ringingTicketId: string | null;
   /**
-   * The Ticket the Customer tapped "I'm coming" for. Remembered rather than
+   * The Ticket the Customer tapped "Stop the alert" for. Remembered rather than
    * inferred from the ringing having stopped, because views can arrive out of
    * order (#31): a Called view after a stale one must not ring for it again.
    */
@@ -79,11 +79,19 @@ export function nextPageAlerts(
   const after = next.ticket;
   // A different Ticket — a join, a Rejoin — is a new place, not a move.
   const sameTicket = before !== null && after !== null && before.id === after.id;
+  // Close Shop puts a carried Ticket at the front of the next Queue Day. That is
+  // not a move up either: the Customer chose to come back tomorrow, and the
+  // database stamps no Heads-up at closing time for the same reason (#11).
+  // A tab that slept through Close Shop and wakes inside the threshold stays
+  // quiet too; it only wakes when the Customer comes back to it, so they are
+  // looking at the banner, and the server's own Heads-up push still reaches them.
+  const carriedTonight = sameTicket && !before.carriedOver && after.carriedOver;
 
   let { headsUpTicketId, ringingTicketId } = alerts;
 
   if (
     sameTicket &&
+    !carriedTonight &&
     headsUpTicketId !== after.id &&
     before.status === "waiting" &&
     !isHeadsUpReached(previous) &&
@@ -111,7 +119,7 @@ export function nextPageAlerts(
     : { ...alerts, headsUpTicketId, ringingTicketId };
 }
 
-/** The Customer tapped "I'm coming": the Called chime stops for good. */
+/** The Customer tapped "Stop the alert": the Called chime stops for good. */
 export function acknowledgeCalled(alerts: PageAlerts): PageAlerts {
   return alerts.ringingTicketId === null
     ? alerts

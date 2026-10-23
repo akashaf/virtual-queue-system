@@ -30,6 +30,11 @@ const IPHONE_OS = /\biPhone\b.*\bOS (\d+)_(\d+)/;
 const SAFARI_TOKEN = /\bSafari\//;
 const WEBVIEWS_WITH_SAFARI_TOKEN = /\bGSA\//;
 
+/** Any iPhone, whatever its iOS or browser: for pointing at the phone's Settings app. */
+export function isIPhone(userAgent: string | null): boolean {
+  return userAgent !== null && /\biPhone\b/.test(userAgent);
+}
+
 /**
  * `standalone` is only known in the browser (`isStandalone`), so the server can
  * only ask what the answer would be outside the Home Screen app.

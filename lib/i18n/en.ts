@@ -13,6 +13,8 @@ export const en = {
   nameTooLong: "Please use 30 characters or fewer",
   privacyNotice:
     "Only the shop sees your name, and we delete it 30 days after your visit.",
+  locationNotice:
+    "When you tap Join, your phone asks for your location. We check once that you're at the shop, and don't keep it.",
   joinButton: "Join queue",
 
   // iPhone install gate
@@ -34,8 +36,11 @@ export const en = {
 
   // Why a join did not work
   locationDeniedTitle: "We need your location to let you join",
+  locationDeniedWhy: "We check that you're at the shop, so nobody can queue from home.",
   locationDeniedHelp:
-    "Allow location for this site in your browser settings, then try again.",
+    "Allow location for this site in your browser's site settings (in Chrome, tap the icon to the left of the web address), then try again.",
+  locationDeniedHelpIphone:
+    "On iPhone, open Settings, find your browser (under Apps on newer iPhones), tap Location and choose Ask or Allow. Then come back and try again.",
   locationUnavailableTitle: "We couldn't find your location",
   locationUnavailableHelp:
     "Move somewhere with a clearer signal, then try again.",
@@ -54,12 +59,15 @@ export const en = {
   estimatedWaitAbout: "Estimated wait: about {minutes} min",
   inPersonNote: "Customers waiting in person may be served in between",
   headBackNow: "Head back to the shop now",
+  outOfDateTitle: "Not up to date",
+  outOfDateAsOf: "As of {time}. Trying again…",
+  retry: "Retry",
   headsUpTitle: "⏰ Almost your turn",
 
   // Called, and done
   yourTurn: "It's your turn",
   goToCounter: "Go to the counter",
-  imComing: "I'm coming",
+  stopAlert: "Stop the alert",
   calledTitle: "🔔 Your turn!",
   servedThanks: "Thanks! See you next time",
 
@@ -77,7 +85,7 @@ export const en = {
   pushExplainBody:
     "Allow notifications and we'll alert you when it's almost your turn — even if your screen is locked or this page is closed.",
   pushExplainAllow: "Turn on alerts",
-  pushExplainNotNow: "Not now",
+  pushExplainNotNow: "No thanks, sound only",
   pushOn: "Alerts are on — we'll notify you",
   keepPageOpen: "Keep this page open, we'll alert you with sound",
   mediaVolumeHint:

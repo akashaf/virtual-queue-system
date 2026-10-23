@@ -75,6 +75,9 @@ export function JoinForm({
                 {dict.privacyNotice}
               </p>
 
+              {/* So the browser's location prompt is not a surprise (frontend.md §3.2). */}
+              <p className="text-sm text-muted-foreground">{dict.locationNotice}</p>
+
               <Button type="submit" size="lg" className="h-12 text-base" disabled={!ready}>
                 {dict.joinButton}
               </Button>

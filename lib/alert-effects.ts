@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { PageAlerts } from "@/lib/alerts";
 
-/** How often the Called chime repeats until "I'm coming" is tapped (frontend.md §3.3). */
+/** How often the Called chime repeats until "Stop the alert" is tapped (frontend.md §3.3). */
 const CALLED_REPEAT_MS = 5_000;
 
 /** A Heads-up is one chime; its title flash only needs to outlast a glance away. */

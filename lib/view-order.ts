@@ -18,8 +18,11 @@ export interface ViewOrder {
   next(): number;
   /** Whether the view numbered `issued` is the newest yet; if so, it becomes the one shown. */
   accept(issued: number): boolean;
-  /** A view the screen made itself is shown: it outranks every refetch already in flight. */
-  claim(): void;
+  /**
+   * A view the screen made itself is shown: it outranks every refetch already
+   * in flight. Returns its number.
+   */
+  claim(): number;
 }
 
 /** A fresh ordering for one screen's views, nothing yet sent or shown. */
@@ -35,6 +38,7 @@ export function createViewOrder(): ViewOrder {
     },
     claim() {
       lastShown = ++lastIssued;
+      return lastShown;
     },
   };
 }

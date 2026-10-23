@@ -73,9 +73,9 @@ test("a Called Customer is chimed at until they say they're coming", async ({
   // The chime on the call, and again five seconds later.
   await expect.poll(() => soundsPlayed(page), { timeout: 8_000 }).toBeGreaterThanOrEqual(3);
 
-  await page.getByRole("button", { name: "I'm coming" }).click();
+  await page.getByRole("button", { name: "Stop the alert" }).click();
 
-  await expect(page.getByRole("button", { name: "I'm coming" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Stop the alert" })).toHaveCount(0);
   await expect(page).toHaveTitle("Join the queue");
   const afterAcknowledging = await soundsPlayed(page);
   await page.waitForTimeout(6_000);
@@ -100,7 +100,7 @@ test("a Called Customer whose page reloaded is still chimed at", async ({ page, 
 
   await page.goto(`/s/${shop.slug}`);
 
-  await expect(page.getByRole("button", { name: "I'm coming" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop the alert" })).toBeVisible();
   await expect(page).toHaveTitle("🔔 Your turn!");
   await expect.poll(() => soundsPlayed(page)).toBeGreaterThanOrEqual(1);
 

@@ -189,7 +189,7 @@ The Owner can **Remove**, and the Customer can **Leave**, at any time, not only 
    will get:
    - **Almost your turn**, when only a few people are ahead of them
    - **Your turn**, when the Owner calls them. If the page is open, this repeats until they tap
-     *I'm coming*
+     *Stop the alert*
 4. Can tap **Leave** at any time.
 5. If they miss their turn (No-show), they can **Rejoin** once, at the back of the Queue, on the
    same day. They don't need to be at the Shop to do this.

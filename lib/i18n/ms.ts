@@ -14,6 +14,8 @@ export const ms: Dictionary = {
   nameTooLong: "Sila gunakan 30 aksara atau kurang",
   privacyNotice:
     "Hanya kedai melihat nama anda, dan kami memadamnya 30 hari selepas kunjungan anda.",
+  locationNotice:
+    "Apabila anda ketik Sertai, telefon anda akan meminta lokasi anda. Kami menyemak sekali bahawa anda berada di kedai, dan tidak menyimpannya.",
   joinButton: "Sertai giliran",
 
   // Pasang di iPhone
@@ -35,8 +37,12 @@ export const ms: Dictionary = {
 
   // Sebab menyertai tidak berjaya
   locationDeniedTitle: "Kami perlukan lokasi anda untuk menyertai giliran",
+  locationDeniedWhy:
+    "Kami menyemak bahawa anda berada di kedai, supaya tiada sesiapa beratur dari rumah.",
   locationDeniedHelp:
-    "Benarkan lokasi untuk laman ini dalam tetapan pelayar anda, kemudian cuba lagi.",
+    "Benarkan lokasi untuk laman ini dalam tetapan laman pelayar anda (dalam Chrome, ketik ikon di sebelah kiri alamat web), kemudian cuba lagi.",
+  locationDeniedHelpIphone:
+    "Di iPhone, buka Tetapan, cari pelayar anda (di bawah Apl pada iPhone yang lebih baharu), ketik Lokasi dan pilih Tanya atau Benarkan. Kemudian kembali dan cuba lagi.",
   locationUnavailableTitle: "Kami tidak dapat mencari lokasi anda",
   locationUnavailableHelp:
     "Bergerak ke tempat dengan isyarat lebih baik, kemudian cuba lagi.",
@@ -55,12 +61,15 @@ export const ms: Dictionary = {
   estimatedWaitAbout: "Anggaran menunggu: kira-kira {minutes} minit",
   inPersonNote: "Pelanggan yang menunggu di kedai mungkin dilayan di antaranya",
   headBackNow: "Kembali ke kedai sekarang",
+  outOfDateTitle: "Tidak terkini",
+  outOfDateAsOf: "Setakat {time}. Mencuba lagi…",
+  retry: "Cuba semula",
   headsUpTitle: "⏰ Hampir giliran anda",
 
   // Dipanggil, dan selesai
   yourTurn: "Giliran anda",
   goToCounter: "Sila ke kaunter",
-  imComing: "Saya datang",
+  stopAlert: "Hentikan bunyi",
   calledTitle: "🔔 Giliran anda!",
   servedThanks: "Terima kasih! Jumpa lagi",
 
@@ -78,7 +87,7 @@ export const ms: Dictionary = {
   pushExplainBody:
     "Benarkan notifikasi dan kami akan maklumkan anda apabila giliran anda hampir tiba — walaupun skrin dikunci atau halaman ini ditutup.",
   pushExplainAllow: "Hidupkan makluman",
-  pushExplainNotNow: "Bukan sekarang",
+  pushExplainNotNow: "Tidak, bunyi sahaja",
   pushOn: "Makluman dihidupkan — kami akan maklumkan anda",
   keepPageOpen: "Biarkan halaman ini terbuka, kami akan maklumkan anda dengan bunyi",
   mediaVolumeHint:

@@ -1,3 +1,4 @@
+import { OutOfDateNotice } from "@/components/out-of-date-notice";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ import {
 import type { CustomerView, LastCallChoice } from "@/lib/customer/view";
 import { format, type Dictionary } from "@/lib/i18n";
 import { formatTicketNumber } from "@/lib/ticket";
+import { formatMalaysiaTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import { LeaveButton } from "./leave-button";
 import { PushStatusNote, type PushStatus } from "./push-alerts";
 
@@ -24,6 +27,10 @@ export function Waiting({
   headsUp,
   lastCall,
   pushStatus,
+  onTurnOnPush,
+  outOfDate,
+  updatedAt,
+  onRetry,
   onChoose,
   onLeave,
 }: {
@@ -37,12 +44,28 @@ export function Waiting({
   lastCall: boolean;
   /** Whether push alerts are on, or the page's sound is all there is. */
   pushStatus: PushStatus;
+  onTurnOnPush: () => void;
+  /** The last refetch failed, so the place shown may already have moved on. */
+  outOfDate: boolean;
+  /** When the page last heard from the server. */
+  updatedAt: Date;
+  onRetry: () => void;
   onChoose: (choice: LastCallChoice) => void;
   onLeave: () => void;
 }) {
   return (
     <div className="flex flex-1 flex-col gap-4" aria-live="polite">
-      <TicketCard ticket={ticket} dict={dict} />
+      <TicketCard ticket={ticket} dict={dict} outOfDate={outOfDate} />
+      {outOfDate ? (
+        // Under the Ticket it is about (frontend.md §3.1). No role of its own:
+        // the Waiting view is already a live region.
+        <OutOfDateNotice
+          title={dict.outOfDateTitle}
+          detail={format(dict.outOfDateAsOf, { time: formatMalaysiaTime(updatedAt) })}
+          retryLabel={dict.retry}
+          onRetry={onRetry}
+        />
+      ) : null}
       {estimate ? (
         <p className="text-center text-sm text-muted-foreground">
           {estimateLabel(estimate, dict)}
@@ -64,7 +87,7 @@ export function Waiting({
         />
       ) : null}
       <p className="text-center text-sm text-muted-foreground">{dict.inPersonNote}</p>
-      <PushStatusNote status={pushStatus} dict={dict} />
+      <PushStatusNote status={pushStatus} dict={dict} onTurnOn={onTurnOnPush} />
       <LeaveButton dict={dict} onLeave={onLeave} className="mt-auto w-full" />
     </div>
   );
@@ -74,7 +97,15 @@ export function Waiting({
  * The Ticket number first and largest — read at arm's length, or held up for
  * the Owner — with where it stands in the Queue as a Waiting status badge.
  */
-function TicketCard({ ticket, dict }: { ticket: Ticket; dict: Dictionary }) {
+function TicketCard({
+  ticket,
+  dict,
+  outOfDate,
+}: {
+  ticket: Ticket;
+  dict: Dictionary;
+  outOfDate: boolean;
+}) {
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-3 text-center">
@@ -89,7 +120,12 @@ function TicketCard({ ticket, dict }: { ticket: Ticket; dict: Dictionary }) {
         {ticket.carriedOver ? (
           <Badge variant="secondary">{dict.carriedOverBadge}</Badge>
         ) : null}
-        <Badge variant="waiting" className="px-3 py-1 text-base whitespace-normal">
+        {/* Dimmed while out of date: a count that may have moved on should not
+            read as confidently as one that is current. */}
+        <Badge
+          variant="waiting"
+          className={cn("px-3 py-1 text-base whitespace-normal", outOfDate && "opacity-60")}
+        >
           {aheadLabel(ticket.position, dict)}
         </Badge>
       </CardContent>

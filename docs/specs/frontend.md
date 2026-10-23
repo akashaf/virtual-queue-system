@@ -48,16 +48,17 @@ The page is one component that switches on `get_customer_view`. It shows only th
 |---|---|---|---|
 | Shop not found / inactive | 404 or `is_active = false` | "This shop isn't accepting customers right now" | — |
 | In-app browser warning | UA matches Instagram, FB, TikTok, Line, WeChat or WhatsApp webviews | Banner shown above any state: "Open in Chrome/Safari to get alerts". Not over the iPhone install gate's "Open this page in Safari first" card, which says it already | — |
-| Join form | No active Ticket, `joining_state = open` | Shop name, waiting count, name input (1–30 characters), privacy notice | **Join queue** |
+| Join form | No active Ticket, `joining_state = open` | Shop name, waiting count, name input (1–30 characters), privacy notice, and a line saying the phone will ask for location, checked once and not kept | **Join queue** |
 | Last Call, not joined | No Ticket, `last_call` | "Shop is closing soon, not taking new customers" | — |
-| Location denied | Geolocation permission denied | How to enable location in the browser settings | **Try again** |
+| Location denied | Geolocation permission denied | Why the location check exists (nobody can queue from home), then where the setting lives: the phone's Settings app on an iPhone (the path differs between iOS versions and browsers, so it names the steps loosely), the browser's site settings otherwise. The browser remembers a refusal, so trying again without changing it fails at once | **Try again** |
 | Location unavailable | Geolocation timed out or returned no fix | "We couldn't find your location", and to move somewhere with a clearer signal. Kept apart from denied because only a refusal is the customer's to fix | **Try again** |
 | Too far | `too_far` | "You need to be at the shop to join" | **Try again** |
 | Queue full | `queue_full` | "Queue full, please check back soon" | **Try again** |
 | Waiting | `waiting` | Big ticket number, "N ahead of you", Estimated Wait range if available, the note "Customers waiting in person may be served in between", alert status (push on/off) | **Leave queue** (confirmation) |
+| Out of date | `waiting`, and a refetch failed or the browser went offline | Waiting view plus, under the ticket, "Not up to date · As of 3:37 pm. Trying again…", with "N ahead of you" dimmed. Retries every 5 s while the tab is showing and at once when back online; a refetch that hangs for 10 s counts as failed; goes when a refetch or an action succeeds. A Leave or Last Call choice that gets no answer while Waiting goes back to the Ticket and raises the notice: it may still have landed, so the refetch says what happened. Anywhere else (a Join, a Rejoin, a Leave while Called) it shows "Something went wrong. Please try again." with **Try again**, rather than leaving the busy screen up. The same notice as the Owner's board (§4.2), because the open page is the alert of last resort | **Retry** |
 | Heads-up reached | `waiting` and `position ≤ threshold` | Same as Waiting plus a highlighted "Head back to the shop now" | Leave |
 | Last Call prompt | `waiting`, shop `last_call` | Modal-like card: "Shop is closing soon. Move to the next day's queue, or stay today? If you stay, you may not be served." Shows the current choice | **Move to next day** / **Stay today** (can change until close) |
-| Carried-over | `waiting`, `carried_over` | Waiting view plus the badge "Moved from previous day" | Leave |
+| Carried-over | `waiting`, `carried_over` | Waiting view plus the badge "Moved from previous day". Close Shop moving the Ticket to the front of the new day is not a Heads-up (§3.3) | Leave |
 | Called | `called` | Full-screen high-contrast "It's your turn: #017, go to the counter" | **Leave** |
 | Served | `served` | "Thanks! See you next time" | **Join queue** (back to the join form) |
 | No-show | `no_show` | "You missed your turn" | **Join again** if `can_rejoin` (no location prompt); otherwise "Scan the QR code at the shop to join again" |
@@ -84,19 +85,21 @@ Every final state therefore has a way on, Served included — otherwise a Custom
 3. **Get location:** call `navigator.geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })` and show "Checking you're at the shop…".
 4. Call `joinQueue(slug, name, { lat, lng, accuracy })`.
 5. **Ask for notifications** through OneSignal ([ADR 0005](../adr/0005-onesignal-delivers-web-push.md)). The page initialises the OneSignal Web SDK on load, with its own prompts off, so the sheet's button reaches the browser's prompt inside the tap. On success, if `'PushManager' in window` and `NEXT_PUBLIC_ONESIGNAL_APP_ID` is set:
-   - Show a short explanation sheet, then `OneSignal.Notifications.requestPermission()`.
+   - Show a short explanation sheet ("Turn on alerts" / "No thanks, sound only", both 44 px), then `OneSignal.Notifications.requestPermission()`.
    - If granted: `OneSignal.login(ticketId)` (the Ticket id is the External ID, never the device id), `OneSignal.User.setLanguage(lang)`, and opt the push subscription in. A reload or a Rejoin logs in again silently, which moves the subscription to the Ticket the Customer holds now.
    - If denied or unsupported (for example iOS Safari that isn't installed to the Home Screen): show a persistent banner "Keep this page open, we'll alert you with sound" and **do not re-prompt**. The banner also tells the Customer that alerts play at the media volume, not the ringer, so turn it up.
+   - If the Customer only said no to our sheet (or dismissed the browser's prompt), the browser would still ask, so the banner carries a **Turn on alerts** button. Tapping it is the Customer asking, not a re-prompt; a grant there forgets the remembered decline.
 6. Switch to the Waiting state.
 
 ### 3.3 Alerts on the open page
 The page compares the previous view with the new one after each refetch, in `lib/alerts.ts`, which is pure; `lib/alert-effects.ts` makes the noise. A Heads-up fires only on a change the page *saw happen*, never on a state it merely found: a Customer who has just joined is looking at it, which is the same reason the database stamps a Ticket that joins inside the threshold without alerting it (backend.md §4). Called is the exception: a page that loads already Called rings too. iPhone Safari discards background tabs and this page is its only alert, so a Customer coming back to a reloaded page must not find it silent; the page cannot tell that from a fresh visit, and one chime too many is the cheaper mistake.
 - **Heads-up** (the same Ticket goes from Waiting outside the threshold to Waiting inside it):
   - Plays a chime once, and never again for that Ticket on this page, however the position moves afterwards
+  - Not when Close Shop carries the Ticket to the front of the next Queue Day: the Customer chose to come back tomorrow, and `close_shop` stamps no Heads-up either (backend.md §4, #11)
   - Vibrates `[200,100,200]` where supported
   - Flashes the tab title "⏰ Almost your turn" for 10 s
 - **Called** (the same Ticket goes from Waiting to Called, or the page loads already Called; not Served back to Called while the page watches, which is an Owner undoing a mis-tap on a Customer already in the chair):
-  - Plays a louder chime every 5 s until the customer taps "I'm coming", which only shows while it rings
+  - Plays a louder chime every 5 s until the customer taps "Stop the alert", which only shows while it rings. It only silences this page: the Owner is not told, so it is not worded as a promise to come
   - Vibrates `[500,200,500]` with each chime
   - Flashes the title "🔔 Your turn!" until acknowledged
 - **Sounds** are synthesised in the browser as WAV clips and played through one `<audio>` element, rather than shipped as files. `<audio>`, not Web Audio, because iOS mutes Web Audio on the silent switch. iOS only plays from an element that has played inside a tap: the Join (and Rejoin) tap plays a silent clip on it, and so does the first tap anywhere on the page, so a Customer who reloads while waiting is not left silent.
@@ -139,7 +142,7 @@ Behaviour:
 - **After a Server Action:** apply the optimistic update, then refetch `/api/owner/queue`.
 - **Error messages:** errors from the functions become toasts, e.g. `queue_empty` → "Nobody waiting", `too_early`, `undo_expired`, `tickets_still_called`.
 - **Several devices:** they can be open at once and stay in sync through Realtime.
-- **Out of date:** when a refetch fails or the browser goes offline, a notice under the joining state badge says "Not up to date · As of 3:37 pm. Trying again…" with a **Retry** button; the board retries every 5 s and at once when the browser is back online, and the notice goes when a refetch succeeds. A refetch that hangs for 10 s counts as failed. A press that gets no answer is a toast ("No connection, so that may not have gone through. The queue will update when you're back online.") and raises the notice; it may still have landed, so the board keeps its optimistic view until a refetch says what happened, and the toast does not invite a second press. A refetch answered 403 (no active Shop for this session) refreshes the page, so the layout sends a switched-off Shop's Owner to `/login?error=inactive` and a signed-out one to `/login`.
+- **Out of date:** when a refetch fails or the browser goes offline, a notice under the joining state badge says "Not up to date · As of 3:37 pm. Trying again…" with a **Retry** button; the board retries every 5 s while the tab is showing and at once when the browser is back online, and the notice goes when a refetch succeeds. A refetch that hangs for 10 s counts as failed. A press that gets no answer is a toast ("No connection, so that may not have gone through. The queue will update when you're back online.") and raises the notice; it may still have landed, so the board keeps its optimistic view until a refetch says what happened, and the toast does not invite a second press. A refetch answered 403 (no active Shop for this session) refreshes the page, so the layout sends a switched-off Shop's Owner to `/login?error=inactive` and a signed-out one to `/login`.
 - **Accidental taps:** guard against double taps by disabling buttons while an action is pending.
 
 ### 4.3 `/dashboard/history`

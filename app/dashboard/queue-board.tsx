@@ -2,11 +2,11 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
-import { WifiOffIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { OutOfDateNotice } from "@/components/out-of-date-notice";
+import { REFETCH_TIMEOUT_MS, useCatchUp, useOutOfDate } from "@/lib/out-of-date";
 import { useQueueChanged } from "@/lib/queue-changed";
 import { formatTicketLabel } from "@/lib/ticket";
 import { formatMalaysiaTime } from "@/lib/time";
@@ -43,12 +43,6 @@ import { JustServed, UndoToast, undoToastId } from "./undo";
 import { useElapsedMs } from "./use-elapsed-ms";
 import { EmptyQueue, WaitingList } from "./waiting-list";
 
-/** How often a board that has fallen behind tries to catch up. */
-const RETRY_MS = 5_000;
-
-/** How long a refetch may hang before it counts as a failure. */
-const REFETCH_TIMEOUT_MS = 10_000;
-
 /**
  * The Owner's live Queue and the buttons that move it.
  *
@@ -70,20 +64,10 @@ export function QueueBoard({
   const [order] = useState(createViewOrder);
   // Two phones and patchy shop wifi: a board that has stopped updating has to
   // say so, or the Owner calls from a Queue that has already moved on.
-  const [outOfDate, setOutOfDate] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState(() => new Date(readAt));
-  // The newest refetch to have finished, so a slow old one failing after a
-  // newer one got through does not raise the notice again.
-  const lastSettled = useRef(0);
+  const { outOfDate, updatedAt, settle: settleRefetch, raise } = useOutOfDate(readAt);
 
   const refetch = useCallback(async () => {
     const issued = order.next();
-    const settled = (ok: boolean) => {
-      if (issued < lastSettled.current) return;
-      lastSettled.current = issued;
-      setOutOfDate(!ok);
-      if (ok) setUpdatedAt(new Date());
-    };
     try {
       const response = await fetch("/api/owner/queue", {
         cache: "no-store",
@@ -98,34 +82,16 @@ export function QueueBoard({
       }
       if (!response.ok) throw new Error(`queue refetch: ${response.status}`);
       const next = (await response.json()) as OwnerQueue;
-      settled(true);
+      settleRefetch(issued, true);
       if (order.accept(issued)) setQueue(next);
     } catch {
       // Offline, timed out, a server error, or the tab was frozen mid-request.
-      settled(false);
+      settleRefetch(issued, false);
     }
-  }, [order, router]);
+  }, [order, router, settleRefetch]);
 
   useQueueChanged(queue.shop.id, refetch);
-
-  // While the board is behind, try again often rather than waiting out the
-  // 30-second poll, and at once when the browser says the network is back.
-  useEffect(() => {
-    if (!outOfDate) return;
-    const retry = setInterval(() => void refetch(), RETRY_MS);
-    return () => clearInterval(retry);
-  }, [outOfDate, refetch]);
-
-  useEffect(() => {
-    const onOnline = () => void refetch();
-    const onOffline = () => setOutOfDate(true);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, [refetch]);
+  useCatchUp(outOfDate, refetch);
 
   /** Moves the screen before the round trip; the refetch replaces it with the truth. */
   const move = useCallback((intent: QueueMove) => {
@@ -146,11 +112,11 @@ export function QueueBoard({
     (outcome: OwnerOutcome<unknown>) => {
       if (!outcome.ok) {
         toast.error(ownerErrorMessage(outcome.reason));
-        if (outcome.reason === "unreachable") setOutOfDate(true);
+        if (outcome.reason === "unreachable") raise();
       }
       void refetch();
     },
-    [refetch],
+    [refetch, raise],
   );
 
   /** A call alerts a Customer, so the Owner is told whose phone just rang. */
@@ -231,11 +197,17 @@ export function QueueBoard({
           </p>
         </div>
 
-        <OutOfDateNotice
-          outOfDate={outOfDate}
-          updatedAt={updatedAt}
-          retry={() => void refetch()}
-        />
+        {/* The live region is always there, so the notice is announced when it appears. */}
+        <div role="status">
+          {outOfDate ? (
+            <OutOfDateNotice
+              title="Not up to date"
+              detail={`As of ${formatMalaysiaTime(updatedAt)}. Trying again…`}
+              retryLabel="Retry"
+              onRetry={() => void refetch()}
+            />
+          ) : null}
+        </div>
 
         {/* Both headings stay up while anyone is in the Queue, so a zero is
             read as a free chair or an empty line rather than a missing section. */}
@@ -306,40 +278,6 @@ export function QueueBoard({
         </div>
       </div>
     </main>
-  );
-}
-
-/**
- * Said only while the board has stopped updating, and in the neutral ink of
- * an ending rather than a status colour: nothing about any one Ticket changed.
- * The live region is always there, so the notice is announced when it appears.
- */
-function OutOfDateNotice({
-  outOfDate,
-  updatedAt,
-  retry,
-}: {
-  outOfDate: boolean;
-  updatedAt: Date;
-  retry: () => void;
-}) {
-  return (
-    <div role="status">
-      {outOfDate ? (
-        <div className="flex items-center gap-3 rounded-lg border bg-muted py-2 pr-2 pl-3">
-          <WifiOffIcon className="size-5 shrink-0" aria-hidden />
-          <p className="flex flex-1 flex-col text-sm">
-            <span className="font-medium">Not up to date</span>
-            <span className="text-muted-foreground">
-              As of {formatMalaysiaTime(updatedAt)}. Trying again…
-            </span>
-          </p>
-          <Button type="button" variant="outline" className="h-11" onClick={retry}>
-            Retry
-          </Button>
-        </div>
-      ) : null}
-    </div>
   );
 }
 

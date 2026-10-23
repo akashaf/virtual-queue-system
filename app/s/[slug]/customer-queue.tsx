@@ -9,6 +9,7 @@ import {
   type NameProblem,
 } from "@/lib/customer/view";
 import type { Dictionary, Lang } from "@/lib/i18n";
+import { REFETCH_TIMEOUT_MS, useCatchUp, useOutOfDate } from "@/lib/out-of-date";
 import { useQueueChanged } from "@/lib/queue-changed";
 import { createViewOrder } from "@/lib/view-order";
 import {
@@ -19,8 +20,8 @@ import {
   type PageAlerts,
 } from "@/lib/alerts";
 import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
-import { recordLocationFailure } from "@/lib/error-reporting";
-import { installGate, isStandalone } from "@/lib/install-gate";
+import { recordLocationFailure, reportUnexpected } from "@/lib/error-reporting";
+import { installGate, isIPhone, isStandalone } from "@/lib/install-gate";
 import {
   chooseLastCall,
   joinQueue,
@@ -77,6 +78,7 @@ type BusyStage = Extract<
 export function CustomerQueue({
   slug,
   initialView,
+  readAt,
   dict,
   lang,
   userAgent,
@@ -84,6 +86,8 @@ export function CustomerQueue({
 }: {
   slug: string;
   initialView: CustomerView;
+  /** When the server read `initialView`, which may be well before this page woke up. */
+  readAt: string;
   dict: Dictionary;
   /** OneSignal is told it, so a closed page is still alerted in this language. */
   lang: Lang;
@@ -134,30 +138,47 @@ export function CustomerQueue({
     }));
   }, []);
 
-  // An action's result is a view this page made, newer than any refetch in flight.
+  // The open page is the alert of last resort, so a page that has stopped
+  // updating has to say so: otherwise "3 ahead" from twenty minutes ago reads
+  // as true. The same notice as the Owner's board (frontend.md §4.2).
+  const { outOfDate, updatedAt, settle, raise } = useOutOfDate(readAt);
+
+  // An action's result is a view this page made, newer than any refetch in
+  // flight — and proof the page is up to date, which an older refetch failing
+  // afterwards must not undo.
   const receive = useCallback(
     (next: CustomerView) => {
-      order.claim();
+      settle(order.claim(), true);
       show(next);
     },
-    [order, show],
+    [order, show, settle],
   );
 
   const refetch = useCallback(async () => {
     const issued = order.next();
     try {
-      const response = await fetch(`/api/s/${slug}/me`, { cache: "no-store" });
-      if (!response.ok) return;
+      const response = await fetch(`/api/s/${slug}/me`, {
+        cache: "no-store",
+        // A stalled request on a weak link would otherwise never fail at all.
+        signal: AbortSignal.timeout(REFETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`customer refetch: ${response.status}`);
       const next = (await response.json()) as CustomerView;
+      settle(issued, true);
       if (order.accept(issued)) show(next);
     } catch {
-      // Offline, or the tab was frozen mid-request. The next tick tries again.
+      // Offline, timed out, a server error, or the tab was frozen mid-request.
+      settle(issued, false);
     }
-  }, [slug, order, show]);
+  }, [slug, order, show, settle]);
 
   useQueueChanged(view.shop.id, refetch);
 
   const active = view.ticket !== null && !isFinalStatus(view.ticket.status);
+
+  // Only while there is a Ticket to be out of date about.
+  useCatchUp(outOfDate && active, refetch);
+
   const push = usePushAlerts(active && view.ticket ? view.ticket.id : null, lang);
   useAlertEffects(alerts, {
     headsUpTitle: dict.headsUpTitle,
@@ -186,7 +207,21 @@ export function CustomerQueue({
     busy: BusyStage,
   ): Promise<TicketActionResult> {
     setStage({ kind: busy });
-    const result = await run();
+    const result = await reachServer(run);
+    if (result === "unreachable" && view.ticket?.status === "waiting") {
+      // It may still have landed, so go back to the Ticket under the
+      // out-of-date notice and let a refetch say what happened, as the Owner's
+      // board does (frontend.md §4.2). Only Waiting has that notice; anywhere
+      // else the Customer is told it did not work, and can try again.
+      raise();
+      setStage({ kind: "idle" });
+      return { status: "rejected", reason: "failed" };
+    }
+    if (typeof result === "string") {
+      if (result === "unreachable") raise();
+      setStage({ kind: "rejected", reason: "failed" });
+      return { status: "rejected", reason: "failed" };
+    }
     if (result.status === "done") {
       receive(result.view);
       setStage({ kind: "idle" });
@@ -221,13 +256,17 @@ export function CustomerQueue({
     }
 
     setStage({ kind: "joining" });
-    const result = await joinQueue(slug, checked.name, {
-      lat: coords.latitude,
-      lng: coords.longitude,
-      accuracyM: coords.accuracy,
-    });
+    const result = await reachServer(() =>
+      joinQueue(slug, checked.name, {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        accuracyM: coords.accuracy,
+      }),
+    );
 
-    if (result.status === "joined") {
+    if (typeof result === "string") {
+      setStage({ kind: "rejected", reason: "failed" });
+    } else if (result.status === "joined") {
       receive(result.view);
       setStage({ kind: "idle" });
       // Step 5 of the join flow: the explanation sheet, if there is one to show.
@@ -265,7 +304,15 @@ export function CustomerQueue({
     return withWarning(
       <Blocked
         title={denied ? dict.locationDeniedTitle : dict.locationUnavailableTitle}
-        detail={denied ? dict.locationDeniedHelp : dict.locationUnavailableHelp}
+        // A refusal is remembered by the browser, so trying again without
+        // changing the setting fails at once: say why, and where it lives.
+        detail={
+          denied
+            ? `${dict.locationDeniedWhy} ${
+                isIPhone(userAgent) ? dict.locationDeniedHelpIphone : dict.locationDeniedHelp
+              }`
+            : dict.locationUnavailableHelp
+        }
         action={dict.tryAgain}
         onRetry={tryAgain}
       />
@@ -333,6 +380,10 @@ export function CustomerQueue({
             headsUp={isHeadsUpReached(view)}
             lastCall={view.shop.joiningState === "last_call"}
             pushStatus={push.status}
+            onTurnOnPush={() => void push.allowPush(ticket.id)}
+            outOfDate={outOfDate}
+            updatedAt={updatedAt}
+            onRetry={() => void refetch()}
             onChoose={(choice) =>
               void act(() => chooseLastCall(ticket.id, choice), "choosing")
             }
@@ -413,6 +464,22 @@ function rejectionMessage(reason: CustomerError | "failed", dict: Dictionary): s
       return dict.ticketGone;
     case "failed":
       return dict.joinFailed;
+  }
+}
+
+/**
+ * A Server Action call that never throws. A failed fetch is a TypeError:
+ * offline, or the request died on the way, and it may still have landed.
+ * Anything else — a gateway's error page, say — is reported, and is a plain
+ * failure. Either way the page leaves its busy screen rather than hanging there.
+ */
+async function reachServer<T>(run: () => Promise<T>): Promise<T | "unreachable" | "failed"> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof TypeError) return "unreachable";
+    reportUnexpected("customer action", error);
+    return "failed";
   }
 }
 

@@ -110,6 +110,26 @@ describe("nextPageAlerts: Heads-up", () => {
     expect(alerts.headsUpTicketId).toBeNull();
   });
 
+  test("does not fire when Close Shop carries the Ticket to the front of the next day", () => {
+    // The Customer chose to come back tomorrow; "head back now" at closing time
+    // would be wrong, which is why close_shop stamps nobody either (#11).
+    const alerts = watch(
+      view({ position: 5, lastCallChoice: "carry" }),
+      view({ position: 0, carriedOver: true }),
+    );
+
+    expect(alerts.headsUpTicketId).toBeNull();
+  });
+
+  test("fires for a Carried-over Ticket that later crosses into the threshold", () => {
+    const alerts = watch(
+      view({ position: 4, carriedOver: true }),
+      view({ position: 2, carriedOver: true }),
+    );
+
+    expect(alerts.headsUpTicketId).toBe("t-1");
+  });
+
   test("gives way to Called when the Ticket skips straight to the chair", () => {
     const alerts = watch(view({ position: 3 }), view({ status: "called", position: 0 }));
 

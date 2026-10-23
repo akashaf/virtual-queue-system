@@ -4,7 +4,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { formatTicketNumber } from "@/lib/ticket";
 import { LeaveButton } from "./leave-button";
 
-/** The Customer's screen while their Ticket is Called: where to go, and "I'm coming" while it rings. */
+/** The Customer's screen while their Ticket is Called: where to go, and "Stop the alert" while it rings. */
 export function Called({
   ticket,
   dict,
@@ -14,7 +14,7 @@ export function Called({
 }: {
   ticket: NonNullable<CustomerView["ticket"]>;
   dict: Dictionary;
-  /** The chime is repeating; "I'm coming" is what stops it. */
+  /** The chime is repeating; "Stop the alert" is what stops it. */
   ringing: boolean;
   onAcknowledge: () => void;
   onLeave: () => void;
@@ -41,7 +41,7 @@ export function Called({
           className="mt-6 h-14 w-full max-w-xs text-lg"
           onClick={onAcknowledge}
         >
-          {dict.imComing}
+          {dict.stopAlert}
         </Button>
       ) : null}
       <LeaveButton

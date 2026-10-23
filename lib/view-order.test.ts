@@ -31,4 +31,13 @@ describe("createViewOrder", () => {
     // A refetch sent after it is still newer.
     expect(order.accept(order.next())).toBe(true);
   });
+
+  test("a claimed view's number sits between the refetches before and after it", () => {
+    const order = createViewOrder();
+    const before = order.next();
+    const claimed = order.claim();
+
+    expect(claimed).toBeGreaterThan(before);
+    expect(order.next()).toBeGreaterThan(claimed);
+  });
 });

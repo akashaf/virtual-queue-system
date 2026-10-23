@@ -58,6 +58,7 @@ export default async function CustomerPage({ params }: PageProps<"/s/[slug]">) {
         <CustomerQueue
           slug={slug}
           initialView={view}
+          readAt={new Date().toISOString()}
           dict={dict}
           lang={lang}
           userAgent={userAgent}
