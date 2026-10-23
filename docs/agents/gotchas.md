@@ -58,6 +58,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Supabase and migrations
 
+- **Docker down is not a dead end.** Docker here is Colima: `colima start`, then
+  `bun run db:start`, about a minute, all local. Two critique agents gave up on running the
+  Customer page because the daemon was stopped. Starting the stack drives the load past 100 for
+  a few minutes, and an e2e run started then lost 7 tests that passed once it settled: wait for
+  `uptime` to come back down first.
 - **VS Code can squat on the local database port.** Its extension host (`Code Helper (Plugin)`)
   was found listening on `127.0.0.1:54322`, so every Postgres connection reached it instead of
   Docker and died with *Connection terminated unexpectedly*: db tests, and `supabase start`
@@ -230,6 +235,12 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Testing
 
+- **To see a page without a browser tool, run `bun run shots`.** It captures every Customer
+  state at 360px, light and dark, into `.shots/` (gitignored), for an agent to `Read`
+  (`e2e/customer.shots.ts`; needs local Supabase). A critique run from source alone missed a
+  notice that went unnoticed on a real phone, and one screenshot showed it at once. Normal e2e
+  runs skip it: the `shots` project only exists under `SHOTS=1`. Add a state there when you add
+  one to the page.
 - **e2e runs without OneSignal, so push is always "off" there.** With no
   `NEXT_PUBLIC_ONESIGNAL_APP_ID`, the page treats the browser as having no push: no sheet,
   straight to the keep-this-page-open banner. Contexts still grant `"notifications"` so that a
@@ -259,6 +270,13 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 - **Vitest only collects `{app,lib}/**/*.test.ts` (unit) and `tests/db/**` (db).** A scratch
   test written anywhere else is not ignored loudly — it simply never runs, and the suite stays
   green while proving nothing. Check the file is under one of those roots before trusting a pass.
+
+## Customer copy
+
+- **Customer copy is quoted in four places.** `lib/i18n/{en,ms}.ts` is the source, but
+  `DESIGN.md`, `docs/specs/frontend.md` and `docs/operator-guide.md` quote button labels and
+  messages too. Renaming "I'm coming" missed `DESIGN.md` (at the repo root, not under `docs/`)
+  until the last commit; grep the whole repo when renaming a string.
 
 ## QR codes
 

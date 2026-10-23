@@ -44,12 +44,20 @@ the decisions in `docs/adr/`, and the traps in `docs/agents/gotchas.md`.
 - **Anything else is a bug and is reported as one**: `functionErrorReason` or
   `reportUnexpected`, answered `failed`. A missing environment variable goes through
   `requireEnv` and fails loudly.
+- **A client call to a Server Action handles a throw, and never leaves a busy screen up.**
+  A `TypeError` is a request that never got an answer (offline, or it died on the way) and may
+  still have landed: say so and refetch. Anything else, a gateway's error page say, goes to
+  `reportUnexpected` and reads as `failed`. The Customer page's `reachServer` and the board's
+  `useOwnerAction` are the two shapes.
 
 ## Customer-facing text
 
 - **Every string a Customer sees comes from `lib/i18n`**, written in English and Bahasa
   Malaysia. A hard-coded English string on the Customer page is a violation. The Owner
   dashboard and sign-in stay English-only.
+- **Copy no code can verify is flagged in the hand-over**: steps through another app's menus
+  or a phone's Settings (paths differ between OS versions and browsers), and new Bahasa
+  Malaysia wording. List each one as needing a real-device or a BM speaker's check.
 
 ## Database
 

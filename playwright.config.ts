@@ -15,7 +15,13 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Pixel 7"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Pixel 7"] } },
+    // Screenshots, not tests (e2e/*.shots.ts): only `bun run shots` asks for them.
+    ...(process.env.SHOTS
+      ? [{ name: "shots", testMatch: /\.shots\.ts$/, use: { ...devices["Pixel 7"] } }]
+      : []),
+  ],
   webServer: {
     command: `bunx next dev --port ${PORT}`,
     url: baseURL,
