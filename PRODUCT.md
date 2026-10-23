@@ -22,7 +22,7 @@ This is a general virtual queue system. Barbershops in Malaysia are the first ma
 
 ## Positioning
 
-- **Nothing to install.** Customers scan a QR code and join in the browser, with no app and no account. Owners run the Queue from a phone browser. (iPhone Customers add the page to the Home Screen so push alerts work; that is a browser step, not an app install.)
+- **Nothing to install.** Customers scan a QR code and join in the browser, with no app and no account. Owners run the Queue from a phone browser. (On iOS 16.4 or later, iPhone Customers must add the page to the Home Screen before they can join, because a Safari tab stops alerting once the phone locks (ADR 0001 amendment). That is a browser step, not an app install. Allowing notifications stays optional.)
 - **Pay only per customer served.** RM0.25 per Served Ticket (at a barbershop, per haircut), from the first day, invoiced monthly. No monthly fee, so a quiet month costs almost nothing.
 - **An honest walk-in queue.** A Customer must be within the Shop's Join Radius to join, a device holds at most one active Ticket per Shop, and there are no bookings, so the Queue cannot be gamed from home.
 
@@ -38,7 +38,7 @@ This is a general virtual queue system. Barbershops in Malaysia are the first ma
 ## Capabilities and Constraints
 
 - Customer page `/s/[slug]`: join, wait, Heads-up, Called, Leave, Rejoin, Last Call choice, and every final-state screen. English and Bahasa Malaysia with an EN | BM toggle.
-- Owner app: `/login`, `/dashboard` (live queue), `/dashboard/history` (today's Tickets, Served counts, amount due). English only.
+- Owner app: `/login`, `/dashboard` (live queue), `/dashboard/history` (today's Tickets, Served counts, amount due), `/dashboard/settings` (sign out every other device). English only.
 - Shops are onboarded by the Operator only; Owners cannot sign up or reset their own password.
 - Mobile-first: 360 px minimum width, touch targets of at least 44 px.
 - Official shadcn/ui components only; colours come from theme tokens only, so a Shop's look can later change by overriding tokens (enforced by `lib/theme-tokens.test.ts`).
@@ -57,7 +57,7 @@ None. No Shop is live, so there are no real customers, usage numbers, testimonia
 
 ## Product Principles
 
-1. **The open page is the alert of last resort.** Never rely on push or sound alone; the Customer must be able to see their state at a glance.
+1. **The open page is the alert of last resort.** Never rely on push or sound alone; the Customer must be able to see their state at a glance, and see when what the page shows may be out of date.
 2. **Fairness is visible.** The Customer sees only their own Ticket and how many are ahead, and the rules (be at the shop, one Ticket per device) are explained plainly when they block someone.
 3. **Owners work with their hands full.** Every dashboard action is one obvious tap, guarded against double taps and mis-taps, with Undo where a mistake costs a Customer.
 4. **Every ending has a way on.** No Customer state is a dead end.

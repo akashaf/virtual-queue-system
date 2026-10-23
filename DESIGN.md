@@ -275,7 +275,7 @@ Big, calm, sure: large flat targets with a light border, and one strong button p
 - **Error:** Ember border and a faint Ember ring via `aria-invalid`.
 
 ### Navigation
-The dashboard has no nav bar: one 2.75rem outline menu button in the header opens a dropdown (Queue, History, Sign out), each item at least 2.75rem tall with a leading Lucide icon. The Customer page has no navigation at all; only the EN | BM toggle.
+The dashboard has no nav bar: one 2.75rem outline menu button in the header opens a dropdown (Queue, History, Settings, Sign out), each item at least 2.75rem tall with a leading Lucide icon. The Customer page has no navigation at all; only the EN | BM toggle.
 
 ### Called Screen (signature)
 The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 1.5rem, then a 3.5rem burgundy "Stop the alert" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.

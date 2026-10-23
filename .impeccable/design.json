@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-20T03:53:23+00:00",
+  "generatedAt": "2026-10-23T08:04:22+00:00",
   "title": "Design System: Barbershop Virtual Queue",
   "extensions": {
     "colorMeta": {
@@ -358,7 +358,7 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The shop's next step: Join queue, Done, I'm coming. 2.75rem minimum.",
+      "description": "The shop's next step: Join queue, Done, Stop the alert. 2.75rem minimum.",
       "html": "<button class=\"ds-btn-primary\">Join queue</button>",
       "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:2.75rem;padding:0.5rem 1rem;border:1px solid transparent;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 0.875rem/1 var(--font-clarity-city),system-ui,sans-serif;cursor:pointer;transition:all .15s}.ds-btn-primary:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-btn-primary:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}.ds-btn-primary:disabled{opacity:.5;pointer-events:none}"
     },
@@ -390,9 +390,9 @@
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "Name and login fields, 2.75rem tall with 1rem text.",
+      "description": "Name and login fields, 3rem tall with 1rem text, matching the main button below them.",
       "html": "<input class=\"ds-input\" placeholder=\"Your name\" />",
-      "css": ".ds-input{height:2.75rem;width:100%;padding:0.25rem 0.75rem;border:1px solid var(--input);border-radius:calc(var(--radius) * 0.8);background:transparent;color:var(--foreground);font:400 1rem/1.5 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);transition:color .15s,box-shadow .15s}.ds-input::placeholder{color:var(--muted-foreground)}.ds-input:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+      "css": ".ds-input{height:3rem;width:100%;padding:0.25rem 0.75rem;border:1px solid var(--input);border-radius:calc(var(--radius) * 0.8);background:transparent;color:var(--foreground);font:400 1rem/1.5 var(--font-clarity-city),system-ui,sans-serif;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05);transition:color .15s,box-shadow .15s}.ds-input::placeholder{color:var(--muted-foreground)}.ds-input:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     },
     {
       "name": "Status Chips",
@@ -415,8 +415,16 @@
       "kind": "custom",
       "refersTo": "called-screen",
       "description": "The full-viewport Turn Amber flood a Customer sees when Called.",
-      "html": "<div class=\"ds-called\"><p class=\"ds-called-head\">It's your turn</p><p class=\"ds-called-number\">#017</p><p class=\"ds-called-sub\">Go to the counter</p><button class=\"ds-called-btn\">I'm coming</button></div>",
+      "html": "<div class=\"ds-called\"><p class=\"ds-called-head\">It's your turn</p><p class=\"ds-called-number\">#017</p><p class=\"ds-called-sub\">Go to the counter</p><button class=\"ds-called-btn\">Stop the alert</button></div>",
       "css": ".ds-called{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:26.25rem;padding:1rem;background:var(--status-called);color:var(--status-called-foreground);text-align:center;font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-called p{margin:0}.ds-called-head{font-size:1.875rem;font-weight:600;letter-spacing:-.025em}.ds-called-number{font-size:6rem;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-called-sub{font-size:1.5rem;font-weight:500}.ds-called-btn{margin-top:1.5rem;width:100%;max-width:20rem;height:3.5rem;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--primary);color:var(--primary-foreground);font:500 1.125rem/1 inherit;cursor:pointer}.ds-called-btn:hover{background:color-mix(in oklch,var(--primary) 90%,transparent)}.ds-called-btn:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
+    },
+    {
+      "name": "Out-of-date Notice",
+      "kind": "custom",
+      "refersTo": "out-of-date-notice",
+      "description": "Customer page's strong tone: the ink inverted, above the Ticket Card while refetches fail. The Owner's board uses a quiet Blush Muted tone of the same component.",
+      "html": "<div class=\"ds-ood\"><svg class=\"ds-ood-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h.01\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/><path d=\"M5 12.859a10 10 0 0 1 5.17-2.69\"/><path d=\"M19 12.859a10 10 0 0 0-2.007-1.523\"/><path d=\"M2 8.82a15 15 0 0 1 4.177-2.643\"/><path d=\"M22 8.82a15 15 0 0 0-11.288-3.764\"/><path d=\"m2 2 20 20\"/></svg><p class=\"ds-ood-text\"><span class=\"ds-ood-title\">Not up to date</span><span class=\"ds-ood-detail\">As of 3:42 pm. Trying again…</span></p><button class=\"ds-ood-retry\">Retry</button></div>",
+      "css": ".ds-ood{display:flex;align-items:center;gap:0.75rem;padding:0.75rem 0.75rem 0.75rem 1rem;border-radius:calc(var(--radius) * 0.8);background:var(--foreground);color:var(--background);font-family:var(--font-clarity-city),system-ui,sans-serif}.ds-ood-icon{width:1.5rem;height:1.5rem;flex-shrink:0}.ds-ood-text{display:flex;flex:1;flex-direction:column;margin:0;font-size:1rem}.ds-ood-title{font-weight:600}.ds-ood-detail{font-size:0.875rem;color:color-mix(in oklch,var(--background) 80%,transparent)}.ds-ood-retry{height:2.75rem;padding:0 1rem;border:none;border-radius:calc(var(--radius) * 0.8);background:var(--secondary);color:var(--secondary-foreground);font:500 0.875rem/1 inherit;cursor:pointer;transition:background .15s}.ds-ood-retry:hover{background:color-mix(in oklch,var(--secondary) 80%,transparent)}.ds-ood-retry:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}"
     }
   ],
   "narrative": {
