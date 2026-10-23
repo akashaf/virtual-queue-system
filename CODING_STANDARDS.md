@@ -44,11 +44,13 @@ the decisions in `docs/adr/`, and the traps in `docs/agents/gotchas.md`.
 - **Anything else is a bug and is reported as one**: `functionErrorReason` or
   `reportUnexpected`, answered `failed`. A missing environment variable goes through
   `requireEnv` and fails loudly.
-- **A client call to a Server Action handles a throw, and never leaves a busy screen up.**
-  A `TypeError` is a request that never got an answer (offline, or it died on the way) and may
-  still have landed: say so and refetch. Anything else, a gateway's error page say, goes to
-  `reportUnexpected` and reads as `failed`. The Customer page's `reachServer` and the board's
-  `useOwnerAction` are the two shapes.
+- **A thrown Server Action goes through `classifyActionFailure` (`lib/action-failure.ts`),
+  and never leaves a busy screen up.** It is the one place that knows a `TypeError` is
+  unreachable, that an older build's action reloads the page, and that anything else is
+  `failed` for the caller to report. A called action catches and hands the error to it (the
+  Customer page's `reachServer`, the board's `useOwnerAction`); a form's action is covered by
+  `app/global-error.tsx`. A caller with its own `catch` ladder is a violation: the first deploy
+  fix missed four callers for exactly that reason.
 
 ## Customer-facing text
 

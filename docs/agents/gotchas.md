@@ -184,14 +184,13 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Sentry
 
-- **Agents can read production errors through `$SENTRY_READ_TOKEN`**, a personal token with
-  only Project, Organization and Issue & Event *Read*, set in the user's `~/.zshrc`. A shell
-  started before it was added does not see it: wrap calls in `zsh -ic '…'`, and reference the
-  variable, never its value. The organisation is `akashaf` on `https://us.sentry.io`, the project
-  `virtual-queue-system`. Recent issues:
-  `curl -H "Authorization: Bearer $SENTRY_READ_TOKEN" "https://us.sentry.io/api/0/organizations/akashaf/issues/?query=is:unresolved&statsPeriod=14d&sort=date"`,
-  and an issue's events, with stack and breadcrumbs, at `…/issues/<id>/events/?full=true`.
-  Each event's `release` tag is the deployed commit, which is how a report is tied to a deploy.
+- **Agents read production errors with `scripts/sentry.sh`**: `issues` (unresolved, newest
+  first), `since [sha]` (issues first seen on that deployed commit), `events <id>` (release,
+  browser, stack, breadcrumbs). Read-only, through `$SENTRY_READ_TOKEN`, the user's personal
+  token with Read scopes, set in their `~/.zshrc`; the script loads it even in a shell started
+  before it was added (an interactive zsh prints "Restored session: …" before it, which is why
+  it keeps the last line). Organisation `akashaf` on `us.sentry.io`, project
+  `virtual-queue-system`. Each event's `release` is the deployed commit.
 - **A page left open across a deploy calls Server Actions the new build does not know.** Every
   press answers 404 *Server Action "…" was not found on the server*. Netlify serves only the
   newest build, so Next's `deploymentId` cannot help; `lib/action-failure.ts` reloads the page
@@ -326,4 +325,7 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   polling a deploy state. To wait for a pushed commit's deploy, run `scripts/wait-deploy.sh`
   (in the background: a build takes several minutes) rather than writing the loop. It exits 1
   on both a failed deploy and a timeout; the printed line says which.
+- **After `wait-deploy.sh` says `ready`, give it a few minutes and run `scripts/sentry.sh since
+  <sha>`.** A new issue there is the deploy's doing; tell the user before moving on. The
+  Server-Action-not-found burst of 2026-10-23 was found from Sentry's email, later, by the user.
 - `page.reload()` in Playwright re-submits a POST. Poll with `page.goto()` instead.

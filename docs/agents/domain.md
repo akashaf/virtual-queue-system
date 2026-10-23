@@ -53,3 +53,16 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 ## Specs
 
 The MVP tech specs live in `docs/specs/` (`backend.md`, `frontend.md`, `third-party.md`). Read the relevant spec before working on a ticket; the spec wins over assumptions, and the glossary wins over the spec's wording if they ever disagree.
+
+## Impeccable's files
+
+The Impeccable design skill reads only `PRODUCT.md` (who the product is for, its rules) and
+`DESIGN.md` (how it looks), plus its own copy of `DESIGN.md` in `.impeccable/design.json`. It
+never reads the specs, `CONTEXT.md` or the ADRs, so nothing keeps them in step on its own:
+
+- **After editing `DESIGN.md`**, run `/impeccable doctor`; a `design-sidecar-stale` finding means
+  refresh the copy with `/impeccable document` (sidecar only, `DESIGN.md` kept).
+  `.impeccable/design.json` is tracked: commit it with `DESIGN.md`.
+- **After a spec change that changes the product** (a new screen, rule or audience), compare
+  `PRODUCT.md` with the specs and ADRs claim by claim; `doctor` cannot see this drift. The specs
+  win; `PRODUCT.md` is their summary for Impeccable and links to `docs/specs/frontend.md`.
