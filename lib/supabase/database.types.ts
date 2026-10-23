@@ -501,6 +501,7 @@ export type Database = {
         }
       }
       personal_data_retention: { Args: never; Returns: string }
+      queue_day_started: { Args: { p_queue_day_id: string }; Returns: boolean }
       rejoin_queue: {
         Args: { p_device_id: string; p_ticket_id: string }
         Returns: Json

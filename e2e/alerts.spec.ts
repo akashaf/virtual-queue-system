@@ -106,3 +106,58 @@ test("a Called Customer whose page reloaded is still chimed at", async ({ page, 
 
   await owner.close();
 });
+
+test("nobody is told to head back, or kept awake, before the day's first Call next", async ({
+  page,
+  browser,
+}) => {
+  // Counts the screen wake locks the page holds right now. Headless Chromium
+  // refuses a real one, so the page gets a stand-in it can hold and release.
+  await page.addInitScript(() => {
+    const counter = window as unknown as { wakeLocksHeld: number };
+    counter.wakeLocksHeld = 0;
+    Object.defineProperty(navigator, "wakeLock", {
+      value: {
+        request: async () => {
+          counter.wakeLocksHeld++;
+          const sentinel = {
+            released: false,
+            release: async () => {
+              if (!sentinel.released) counter.wakeLocksHeld--;
+              sentinel.released = true;
+            },
+          };
+          return sentinel;
+        },
+      },
+    });
+  });
+  const wakeLocksHeld = () =>
+    page.evaluate(() => (window as unknown as { wakeLocksHeld: number }).wakeLocksHeld);
+
+  // One ahead, well inside the default threshold of three, in a Queue Day
+  // nobody has been called in yet: the night after Close Shop.
+  const { email, password, shop } = await seedShop();
+  await seedTicket(shop.slug, "Siti");
+  await join(page, shop.slug, "Ali");
+  await expect(
+    page.getByText("The shop hasn't started calling yet. Your place in line is kept"),
+  ).toBeVisible();
+  await expect(page.getByText("Head back to the shop now")).toHaveCount(0);
+  expect(await wakeLocksHeld()).toBe(0);
+
+  const owner = await browser.newContext();
+  const dashboard = await owner.newPage();
+  await signInAsOwner(dashboard, email, password);
+  await dashboard.getByRole("button", { name: "Call next" }).click();
+
+  // The day starts with Ali at the front: now the page tells them, once.
+  await expect(page.getByText("You're next")).toBeVisible();
+  await expect(page.getByText("Head back to the shop now")).toBeVisible();
+  await expect(page.getByText("The shop hasn't started calling yet", { exact: false })).toHaveCount(0);
+  await expect(page).toHaveTitle("⏰ Almost your turn");
+  await expect.poll(() => soundsPlayed(page)).toBe(2);
+  await expect.poll(wakeLocksHeld).toBe(1);
+
+  await owner.close();
+});

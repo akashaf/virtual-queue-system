@@ -66,7 +66,7 @@ The distance from a Shop within which a Customer's device must be to create a Ti
 _Avoid_: Geofence, location lock
 
 **Heads-up**:
-The one-time alert sent the first time a Waiting Ticket has the Shop's Heads-up Threshold (default 3) or fewer Waiting Tickets ahead of it. Distinct from the alert sent on being Called.
+The one-time alert sent the first time a Waiting Ticket has the Shop's Heads-up Threshold (default 3) or fewer Waiting Tickets ahead of it, once its Queue Day has Started. Before then nobody is told to head back, however near the front: a Ticket inside the threshold is told at the day's first Call next. Distinct from the alert sent on being Called.
 _Avoid_: Reminder, warning
 
 **Estimated Wait**:
@@ -77,6 +77,10 @@ A rough range shown to a Waiting Customer, derived from the pace of recent Serve
 **Queue Day**:
 The span between two Close Shop actions. Ticket numbers restart at each new Queue Day. Not tied to calendar dates or opening hours.
 _Avoid_: Session, shift, business day
+
+**Started**:
+A Queue Day has Started once it has had its first Call next. Close Shop opens the next Queue Day at once, with Joining open and the Carried-over Tickets at its front, so a day can wait all night before it Starts. No Heads-up goes out before it does.
+_Avoid_: Opened, begun (the day exists, and takes joins, before it Starts)
 
 **Last Call**:
 The Owner action that stops new Tickets from joining and tells every Waiting Customer the shop is closing soon.

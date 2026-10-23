@@ -100,7 +100,7 @@ In Postman: **Shops → Add a new Shop**. Fill in the body with the real details
 | `ownerEmail` | text | yes | The Owner's email address. Used only to log in. The system never sends emails to it |
 | `ownerPassword` | text | yes | At least 10 characters. To make a strong one, run `openssl rand -base64 15` in a terminal |
 | `joinRadiusM` | whole number | no | At least 1. How close, in metres, a Customer must be to join. Default **150** |
-| `headsUpThreshold` | whole number | no | At least 1. Customers get an "almost your turn" alert when this many people, or fewer, are ahead of them. Default **3** |
+| `headsUpThreshold` | whole number | no | At least 1. Customers get an "almost your turn" alert when this many people, or fewer, are ahead of them, from the day's first **Call next** onwards. Default **3** |
 | `maxQueueSize` | whole number | no | At least 1. The most Customers allowed in the Queue at once. Default **30** |
 
 Example body:
@@ -187,7 +187,9 @@ The Owner can **Remove**, and the Customer can **Leave**, at any time, not only 
    location. Joining only works at the Shop, and only while the Shop is accepting people.
 3. Allows notifications if the phone asks. Now they can walk away and wait somewhere else. They
    will get:
-   - **Almost your turn**, when only a few people are ahead of them
+   - **Almost your turn**, when only a few people are ahead of them. Not before the Owner's
+     first **Call next** of the day: after Close Shop the next day's Queue already exists, and
+     nobody is told to head back until someone is actually being called
    - **Your turn**, when the Owner calls them. If the page is open, this repeats until they tap
      *Stop the alert*
 4. Can tap **Leave** at any time.
@@ -398,7 +400,7 @@ this by hand.
 
 | When | What happens |
 |---|---|
-| Every night at 3:00 am (Malaysia time) | The system cleans up: <br>1. Customers who moved to the next day but are still waiting after 3 days are removed. People behind them who move closer get their "almost your turn" alert <br>2. Customer names and device IDs are erased from Tickets older than 30 days, to protect their privacy (PDPA). The counts used for billing are kept |
+| Every night at 3:00 am (Malaysia time) | The system cleans up: <br>1. Customers who moved to the next day but are still waiting after 3 days are removed. Nobody is sent "almost your turn" for it: the day has not started yet, so the alert waits for the first **Call next** <br>2. Customer names and device IDs are erased from Tickets older than 30 days, to protect their privacy (PDPA). The counts used for billing are kept |
 | Whenever an error happens on the live site | It is recorded in Sentry, which can email you about it |
 
 If the nightly cleanup didn't run, you can start it yourself: open Netlify → *Functions* →

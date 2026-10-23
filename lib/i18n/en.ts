@@ -59,6 +59,8 @@ export const en = {
   estimatedWaitAbout: "Estimated wait: about {minutes} min",
   inPersonNote: "Customers waiting in person may be served in between",
   headBackNow: "Head back to the shop now",
+  notCallingYetFirst: "You're first in line. We'll alert you when the shop starts calling",
+  notCallingYet: "The shop hasn't started calling yet. Your place in line is kept",
   outOfDateTitle: "Not up to date",
   outOfDateAsOf: "As of {time}. Trying again…",
   retry: "Retry",

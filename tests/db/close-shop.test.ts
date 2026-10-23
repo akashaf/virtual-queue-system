@@ -268,6 +268,33 @@ describe("close_shop", () => {
     });
   });
 
+  test("reports the new Queue Day as not started until its first Call next", async () => {
+    const { owner, shop } = await createShop();
+    const client = await signInAs(owner.email, owner.password);
+    const served = await join(shop.slug);
+    await client.rpc("call_next");
+    await client.rpc("mark_served", { p_ticket_id: served.id });
+    const carried = await join(shop.slug);
+    await client.rpc("start_last_call");
+    await choose(carried.id, carried.deviceId, "carry");
+
+    const dayStarted = async () => {
+      const { data } = await serviceClient().rpc("get_customer_view", {
+        p_slug: shop.slug,
+        p_device_id: carried.deviceId,
+      });
+      return (data as unknown as { shop: { day_started: boolean } }).shop.day_started;
+    };
+
+    expect(await dayStarted()).toBe(true);
+    await client.rpc("close_shop", { p_sign_in_max_days: 7 });
+    expect(await dayStarted()).toBe(false);
+    await join(shop.slug);
+    expect(await dayStarted()).toBe(false);
+    await client.rpc("call_next");
+    expect(await dayStarted()).toBe(true);
+  });
+
   test("shows the Owner each Waiting row's choice and origin day", async () => {
     const { owner, shop } = await createShop();
     const carried = await join(shop.slug);

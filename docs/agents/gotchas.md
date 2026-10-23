@@ -76,7 +76,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   port (the same load fails tests too: Shell, `git push`).
 
 - `bun run db:types` regenerates `lib/supabase/database.types.ts`. Run it after every
-  migration and commit the result, or `tsc` quietly stops checking queries.
+  migration and commit the result, or `tsc` quietly stops checking queries. **As of #41 the
+  CLI's output no longer matches the committed file**: unformatted, and with new shapes
+  (`ComputedFields`, computed columns on `Row`) the whole way through, a 1,000-line diff for
+  one new function. #41 kept the committed file and added its one entry by hand; adopting the
+  new output is its own change, with `tsc` run across the app.
 - **Grant every new `public` table explicitly, to every role that uses it.** From 2026-10-30 the
   cloud no longer grants select/insert/update/delete on new tables, or execute on new functions,
   to `anon` / `authenticated` / `service_role`, and that includes every new project and preview

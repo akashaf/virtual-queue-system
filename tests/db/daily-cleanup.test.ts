@@ -106,7 +106,9 @@ describe("expire_carried_over", () => {
   });
 
   test("returns the Heads-ups owed to the Tickets that moved up", async () => {
-    const { shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    // A started Queue Day: no Heads-up goes out before its first Call next.
+    await serveOne(await signInAs(owner.email, owner.password), shop.slug, "Zul");
     // The first two joined inside the threshold and were stamped then; the last two were not.
     const first = await joinQueue(shop.slug, "Ali");
     const second = await joinQueue(shop.slug, "Bala");
@@ -121,6 +123,26 @@ describe("expire_carried_over", () => {
       { ticket_id: third.id, kind: "heads_up" },
       { ticket_id: fourth.id, kind: "heads_up" },
     ]);
+  });
+
+  test("sends no Heads-up in a Queue Day that has not had its first Call next", async () => {
+    const { shop } = await createShop({ p_heads_up_threshold: 1 });
+    const carried = await joinQueue(shop.slug, "Ali");
+    const front = await joinQueue(shop.slug, "Bala");
+    const behind = await joinQueue(shop.slug, "Chong");
+    await setCarriedOverAgo(db, carried.id, "5 days");
+
+    const { alerts } = await expireCarriedOver();
+
+    expect((await ticketRow(carried.id))?.status).toBe("removed");
+    // The job runs for every Shop, so only this one's Tickets are looked at.
+    const mine = [carried.id, front.id, behind.id];
+    expect(alerts.filter((alert) => mine.includes(alert.ticket_id))).toEqual([]);
+    const { rows } = await db.query(
+      "select count(*)::int as stamped from public.tickets where id = any($1) and heads_up_sent_at is not null",
+      [mine],
+    );
+    expect(rows[0].stamped).toBe(0);
   });
 
   test("sends no Heads-up for a Deactivated Shop, which nobody can be served at", async () => {

@@ -61,6 +61,8 @@ export const ms: Dictionary = {
   estimatedWaitAbout: "Anggaran menunggu: kira-kira {minutes} minit",
   inPersonNote: "Pelanggan yang menunggu di kedai mungkin dilayan di antaranya",
   headBackNow: "Kembali ke kedai sekarang",
+  notCallingYetFirst: "Anda yang pertama dalam barisan. Kami akan maklumkan anda apabila kedai mula memanggil",
+  notCallingYet: "Kedai belum mula memanggil. Tempat anda dalam barisan dikekalkan",
   outOfDateTitle: "Tidak terkini",
   outOfDateAsOf: "Setakat {time}. Mencuba lagi…",
   retry: "Cuba semula",

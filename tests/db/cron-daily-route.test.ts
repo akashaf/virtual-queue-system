@@ -139,7 +139,9 @@ describe("POST /api/cron/daily", () => {
 
 describe("runDailyCleanup", () => {
   test("pushes the Heads-ups the expiry earned", async () => {
-    const { shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    // A started Queue Day: no Heads-up goes out before its first Call next.
+    await serveOne(await signInAs(owner.email, owner.password), shop.slug, "Zul");
     const carried = await joinQueue(shop.slug, "Ali");
     await joinQueue(shop.slug, "Bala");
     const behind = await joinQueue(shop.slug, "Chong");

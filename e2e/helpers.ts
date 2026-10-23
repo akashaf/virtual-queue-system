@@ -59,7 +59,7 @@ async function watchViolations(context: BrowserContext, violations: string[]) {
   });
 }
 
-const { apiUrl, dbUrl, secretKey } = readLocalSupabase();
+const { apiUrl, dbUrl, publishableKey, secretKey } = readLocalSupabase();
 
 const admin = createClient<Database>(apiUrl, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -104,6 +104,26 @@ export async function seedTicket(slug: string, name: string) {
     p_accuracy_m: 0,
   });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Starts the Shop's Queue Day by serving one Customer through the Owner's own
+ * presses. Until a day's first Call next nobody is told to head back (#41), so
+ * a test of the Heads-up banner starts the day first.
+ */
+export async function startQueueDay(slug: string, email: string, password: string) {
+  await seedTicket(slug, "Zul");
+  const owner = createClient<Database>(apiUrl, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error: signInError } = await owner.auth.signInWithPassword({ email, password });
+  if (signInError) throw signInError;
+  const { data, error: callError } = await owner.rpc("call_next");
+  if (callError) throw new Error(callError.message);
+  const called = (data as { result: { id: string } }).result;
+  const { error: serveError } = await owner.rpc("mark_served", { p_ticket_id: called.id });
+  if (serveError) throw new Error(serveError.message);
+  await owner.auth.signOut();
 }
 
 /** Fills in a Shop's join form as a Customer and submits it, without waiting for the outcome. */

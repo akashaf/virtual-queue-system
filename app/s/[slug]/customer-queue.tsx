@@ -18,6 +18,7 @@ import {
   initialPageAlerts,
   isHeadsUpReached,
   nextPageAlerts,
+  shouldKeepAwake,
   type PageAlerts,
 } from "@/lib/alerts";
 import { unlockAudio, useAlertEffects } from "@/lib/alert-effects";
@@ -184,9 +185,8 @@ export function CustomerQueue({
   useAlertEffects(alerts, {
     headsUpTitle: dict.headsUpTitle,
     calledTitle: dict.calledTitle,
-    // frontend.md §3.3 asks for the wake lock while Waiting. It is held in the
-    // chair too, or the screen could go dark while the Called chime rings.
-    keepAwake: active,
+    keepAwake: shouldKeepAwake(view),
+    unlockAudioOnTap: active,
   });
 
   // sessionStorage is where dismissal lives, so the page reads it from there
@@ -379,6 +379,7 @@ export function CustomerQueue({
             estimate={view.estimate}
             dict={dict}
             headsUp={isHeadsUpReached(view)}
+            dayStarted={view.shop.dayStarted}
             lastCall={view.shop.joiningState === "last_call"}
             pushStatus={push.status}
             onTurnOnPush={() => void push.allowPush(ticket.id)}

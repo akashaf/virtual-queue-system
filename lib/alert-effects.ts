@@ -28,7 +28,14 @@ export function useAlertEffects(
     headsUpTitle,
     calledTitle,
     keepAwake,
-  }: { headsUpTitle: string; calledTitle: string; keepAwake: boolean },
+    unlockAudioOnTap,
+  }: {
+    headsUpTitle: string;
+    calledTitle: string;
+    keepAwake: boolean;
+    /** There is a Ticket the page may yet alert about, so its chimes must play. */
+    unlockAudioOnTap: boolean;
+  },
 ): void {
   // Held in refs so switching language mid-alert neither chimes again nor
   // restarts the ringing: only a new Ticket id should do either.
@@ -66,11 +73,13 @@ export function useAlertEffects(
 
   // The Join tap unlocks audio, but a Customer who reloads the page while
   // waiting never makes that tap again. Any tap on the page will do as well.
+  // Wider than the wake lock: a page reloaded overnight still chimes when the
+  // day starts.
   useEffect(() => {
-    if (!keepAwake) return;
+    if (!unlockAudioOnTap) return;
     document.addEventListener("pointerdown", unlockAudio, { once: true });
     return () => document.removeEventListener("pointerdown", unlockAudio);
-  }, [keepAwake]);
+  }, [unlockAudioOnTap]);
 }
 
 /**

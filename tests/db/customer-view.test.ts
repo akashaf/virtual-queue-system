@@ -31,6 +31,7 @@ interface CustomerView {
     joining_state: string;
     waiting_count: number;
     heads_up_threshold: number;
+    day_started: boolean;
   };
   ticket: {
     id: string;
@@ -83,6 +84,8 @@ describe("get_customer_view", () => {
         waiting_count: 0,
         // The page decides "Head back to the shop now" from it (frontend.md §3.1).
         heads_up_threshold: 3,
+        // Nobody has been called yet, so nobody is told to head back (#41).
+        day_started: false,
       },
       ticket: null,
       // Estimated Wait waits for 5 Served Tickets, and this Queue has none.
@@ -129,6 +132,7 @@ describe("get_customer_view", () => {
         joining_state: "open",
         waiting_count: 2,
         heads_up_threshold: 3,
+        day_started: false,
       },
       ticket: {
         id: mine.ticket.id,

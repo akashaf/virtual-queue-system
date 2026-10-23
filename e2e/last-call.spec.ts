@@ -62,6 +62,11 @@ test("a carry choice moves the Customer to the front of the next day", async ({
   await expect(page.getByText("#001")).toBeVisible();
   await expect(page.getByText("Moved from previous day")).toBeVisible();
   await expect(page.getByText("You're next")).toBeVisible();
+  // First in line all night, but nobody is being called: no "head back" (#41).
+  await expect(
+    page.getByText("You're first in line. We'll alert you when the shop starts calling"),
+  ).toBeVisible();
+  await expect(page.getByText("Head back to the shop now")).toHaveCount(0);
 
   await owner.close();
 });

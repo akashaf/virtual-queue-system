@@ -281,7 +281,7 @@ The dashboard has no nav bar: one 2.75rem outline menu button in the header open
 The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 1.5rem, then a 3.5rem burgundy "Stop the alert" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.
 
 ### Ticket Card (signature)
-The Waiting state: a centred card with the eyebrow "Your number", the ticket number, an optional "Moved from previous day" secondary chip, and a Waiting Blue chip saying how many are ahead. The Heads-up banner sits directly beneath it as a full burgundy block.
+The Waiting state: a centred card with the eyebrow "Your number", the ticket number, an optional "Moved from previous day" secondary chip, and a Waiting Blue chip saying how many are ahead. The Heads-up banner sits directly beneath it as a full burgundy block. Before the Queue Day's first Call next it is replaced by a calm centred line in body text, no colour ("You're first in line. We'll alert you when the shop starts calling", or "The shop hasn't started calling yet. Your place in line is kept").
 
 ### Out-of-date Notice
 Said only while a live screen has stopped hearing from the server: a Lucide wifi-off icon, "Not up to date", "As of 3:42 pm. Trying again…" and a Retry button, in neutral ink, never a status colour (nothing about any one Ticket changed). Two tones from one component (`components/out-of-date-notice.tsx`):

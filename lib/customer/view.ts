@@ -24,6 +24,12 @@ export interface CustomerView {
      * so it tells the browser nothing about anyone else.
      */
     headsUpThreshold: number;
+    /**
+     * Whether the current Queue Day has had its first Call next. Until it has,
+     * nobody is told to head back, however near the front (#41): Close Shop
+     * opens the next day straight away, with its Carried-over Tickets first.
+     */
+    dayStarted: boolean;
   };
   /**
    * The last Ticket this device took in the Shop's current Queue Day, whatever
@@ -69,6 +75,7 @@ interface CustomerViewJson {
     joining_state: JoiningState;
     waiting_count: number;
     heads_up_threshold: number;
+    day_started: boolean;
   };
   ticket: {
     id: string;
@@ -98,6 +105,7 @@ export function toCustomerView(json: unknown): CustomerView {
       joiningState: shop.joining_state,
       waitingCount: shop.waiting_count,
       headsUpThreshold: shop.heads_up_threshold,
+      dayStarted: shop.day_started,
     },
     ticket: ticket && {
       id: ticket.id,

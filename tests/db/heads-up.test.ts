@@ -68,9 +68,21 @@ async function headsUpSentAt(ticketId: string) {
   return rows[0].heads_up_sent_at as Date | null;
 }
 
+/**
+ * A Shop whose Queue Day has started: one Customer served, so it has had its
+ * first Call next. No Heads-up goes out before that (see the next block).
+ */
+async function startedShop(options: { p_heads_up_threshold: number }) {
+  const created = await createShop(options);
+  const served = await join(created.shop.slug);
+  await asOwner(created.owner, "call_next");
+  await asOwner(created.owner, "mark_served", served.id);
+  return created;
+}
+
 describe("Heads-up after a mutation", () => {
   test("call_next alerts the Called Ticket and the one that moved inside the threshold", async () => {
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 1 });
     const first = await join(shop.slug);
     await join(shop.slug);
     const third = await join(shop.slug);
@@ -87,7 +99,7 @@ describe("Heads-up after a mutation", () => {
   });
 
   test("fires exactly once per Ticket", async () => {
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 1 });
     await join(shop.slug);
     await join(shop.slug);
     const third = await join(shop.slug);
@@ -101,7 +113,7 @@ describe("Heads-up after a mutation", () => {
   });
 
   test("is not sent to a Ticket that joined inside the threshold", async () => {
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 2 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 2 });
     const first = await join(shop.slug);
     const second = await join(shop.slug);
 
@@ -114,7 +126,7 @@ describe("Heads-up after a mutation", () => {
   });
 
   test("follows a Customer leaving from ahead", async () => {
-    const { shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { shop } = await startedShop({ p_heads_up_threshold: 1 });
     const first = await join(shop.slug);
     await join(shop.slug);
     const third = await join(shop.slug);
@@ -131,7 +143,7 @@ describe("Heads-up after a mutation", () => {
   });
 
   test("follows the Owner removing a Ticket from ahead", async () => {
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 1 });
     const first = await join(shop.slug);
     await join(shop.slug);
     const third = await join(shop.slug);
@@ -145,7 +157,7 @@ describe("Heads-up after a mutation", () => {
     // The rule is "after every mutation", so a Ticket owed a Heads-up — here
     // because the threshold was raised under it — is told by the next press,
     // whatever that press was.
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 1 });
     const first = await join(shop.slug);
     await asOwner(owner, "call_next");
     await join(shop.slug);
@@ -161,7 +173,7 @@ describe("Heads-up after a mutation", () => {
   });
 
   test("ignores Tickets that are not Waiting", async () => {
-    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const { owner, shop } = await startedShop({ p_heads_up_threshold: 1 });
     const first = await join(shop.slug);
     await asOwner(owner, "call_next");
     await db.query("update public.tickets set heads_up_sent_at = null where id = $1", [
@@ -173,5 +185,93 @@ describe("Heads-up after a mutation", () => {
 
     expect(alerts).toEqual([]);
     expect(await headsUpSentAt(first.id)).toBeNull();
+  });
+});
+
+describe("Heads-up before the Queue Day's first Call next", () => {
+  /**
+   * A Shop just closed for the night, threshold 1: yesterday's day was started
+   * and served someone, and the one Ticket that chose to carry was too far back
+   * to be told then. It now stands first in a day nobody has called in yet.
+   */
+  async function closedForTheNight() {
+    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const served = await join(shop.slug);
+    await asOwner(owner, "call_next");
+    await asOwner(owner, "mark_served", served.id);
+    await join(shop.slug);
+    await join(shop.slug);
+    const carried = await join(shop.slug);
+    expect(await headsUpSentAt(carried.id)).toBeNull();
+
+    const client = await signInAs(owner.email, owner.password);
+    await client.rpc("start_last_call");
+    await serviceClient().rpc("choose_last_call", {
+      p_ticket_id: carried.id,
+      p_device_id: carried.deviceId,
+      p_choice: "carry",
+    });
+    const { error } = await client.rpc("close_shop", { p_sign_in_max_days: 7 });
+    if (error) throw new Error(error.message);
+    return { owner, shop, carried };
+  }
+
+  test("a join after Close Shop tells nobody, the carried Ticket at the front included", async () => {
+    const { shop, carried } = await closedForTheNight();
+
+    const night = await join(shop.slug);
+
+    expect(night.alerts).toEqual([]);
+    expect(await headsUpSentAt(carried.id)).toBeNull();
+    expect(await headsUpSentAt(night.id)).toBeNull();
+  });
+
+  test("a Customer leaving overnight tells nobody either", async () => {
+    const { shop, carried } = await closedForTheNight();
+    const leaving = await join(shop.slug);
+    const behind = await join(shop.slug);
+
+    const { data, error } = await serviceClient().rpc("leave_queue", {
+      p_ticket_id: leaving.id,
+      p_device_id: leaving.deviceId,
+    });
+
+    expect(error).toBeNull();
+    expect((data as unknown as Envelope).alerts).toEqual([]);
+    expect(await headsUpSentAt(carried.id)).toBeNull();
+    expect(await headsUpSentAt(behind.id)).toBeNull();
+  });
+
+  // No rejoin_queue case: Rejoin needs a No-show in the current Queue Day, and
+  // a No-show needs a Call next, which has started the day by then.
+
+  test("the day's first Call next sends every Heads-up the night held back", async () => {
+    const { owner, shop, carried } = await closedForTheNight();
+    const second = await join(shop.slug);
+    const third = await join(shop.slug);
+
+    const alerts = await asOwner(owner, "call_next");
+
+    expect(alerts).toEqual([
+      { ticket_id: carried.id, kind: "called" },
+      { ticket_id: second.id, kind: "heads_up" },
+      { ticket_id: third.id, kind: "heads_up" },
+    ]);
+  });
+
+  test("a brand-new Shop's first day starts the same way", async () => {
+    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    const first = await join(shop.slug);
+    const second = await join(shop.slug);
+
+    expect(second.alerts).toEqual([]);
+    expect(await headsUpSentAt(second.id)).toBeNull();
+
+    const alerts = await asOwner(owner, "call_next");
+
+    expect(alerts).toEqual([
+      { ticket_id: first.id, kind: "called" },
+      { ticket_id: second.id, kind: "heads_up" },
+    ]);
   });
 });

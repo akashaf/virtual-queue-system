@@ -4,6 +4,7 @@ import {
   join,
   seedShop,
   seedTicket,
+  startQueueDay,
   SHOP_LAT,
   SHOP_LNG,
   signInAsOwner,
@@ -52,11 +53,20 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("heads-up", async ({ page }) => {
-      const { shop } = await seedShop();
+      const { email, password, shop } = await seedShop();
+      await startQueueDay(shop.slug, email, password);
       await seedTicket(shop.slug, "Siti");
       await join(page, shop.slug, "Ali");
       await expect(page.getByText("Head back to the shop now")).toBeVisible();
       await shot(page, "heads-up");
+    });
+
+    test("not calling yet", async ({ page }) => {
+      // First in a Queue Day nobody has been called in, as after Close Shop.
+      const { shop } = await seedShop();
+      await join(page, shop.slug, "Ali");
+      await expect(page.getByText("You're first in line.", { exact: false })).toBeVisible();
+      await shot(page, "not-calling-yet");
     });
 
     test("called, then left", async ({ page, browser }) => {

@@ -20,6 +20,7 @@ describe("toCustomerView", () => {
           joining_state: "open",
           waiting_count: 4,
           heads_up_threshold: 3,
+          day_started: true,
         },
         ticket: {
           id: "t-1",
@@ -41,6 +42,7 @@ describe("toCustomerView", () => {
         joiningState: "open",
         waitingCount: 4,
         headsUpThreshold: 3,
+        dayStarted: true,
       },
       ticket: {
         id: "t-1",

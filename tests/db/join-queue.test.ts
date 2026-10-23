@@ -5,8 +5,10 @@ import {
   createShop,
   metresNorthOf,
   resetTestData,
+  serveOne,
   serviceClient,
   SHOP_LNG,
+  signInAs,
   uniqueSlug,
 } from "./helpers";
 
@@ -59,6 +61,7 @@ interface JoinEnvelope {
       joining_state: string;
       waiting_count: number;
       heads_up_threshold: number;
+      day_started: boolean;
     };
     ticket: {
       id: string;
@@ -90,6 +93,8 @@ describe("join_queue", () => {
       joining_state: "open",
       waiting_count: 1,
       heads_up_threshold: 3,
+      // Nobody has been called yet (#41).
+      day_started: false,
     });
     expect(result.ticket).toEqual({
       id: expect.any(String),
@@ -428,8 +433,10 @@ describe("join_queue and the Heads-up Threshold", () => {
   test("marks a Ticket that joins already inside the threshold as told", async () => {
     // The Customer is looking at the page that says how many are ahead, so the
     // Heads-up has in effect been delivered. Marking it stops the next mutation
-    // sending a pointless alert.
-    const { shop } = await createShop({ p_heads_up_threshold: 1 });
+    // sending a pointless alert. Only in a started Queue Day: before its first
+    // Call next nobody is marked, so that press tells them (#41).
+    const { owner, shop } = await createShop({ p_heads_up_threshold: 1 });
+    await serveOne(await signInAs(owner.email, owner.password), shop.slug, "Zul");
 
     const first = await joinOrThrow({ slug: shop.slug });
     const second = await joinOrThrow({ slug: shop.slug });

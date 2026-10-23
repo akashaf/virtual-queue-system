@@ -52,15 +52,32 @@ export function initialPageAlerts(view: CustomerView): PageAlerts {
 
 /**
  * Whether the Ticket is Waiting with the Shop's Heads-up Threshold or fewer ahead
- * of it — when the page says "Head back to the shop now".
+ * of it, in a Queue Day that has started — when the page says "Head back to the
+ * shop now".
  *
  * Waiting only: every other status reports position 0, which would otherwise
- * read as being next.
+ * read as being next. Started only: after Close Shop the next day's front
+ * Tickets are inside the threshold all night with nobody being served, and the
+ * database sends no Heads-up then either (backend.md §4).
  */
 export function isHeadsUpReached(view: CustomerView): boolean {
   return (
+    view.shop.dayStarted &&
     view.ticket?.status === "waiting" &&
     view.ticket.position <= view.shop.headsUpThreshold
+  );
+}
+
+/**
+ * Whether the page holds a screen wake lock (frontend.md §3.3): in the chair, so
+ * the screen cannot go dark while the Called chime rings, and while Waiting in a
+ * Queue Day that has started. Not before then, or a page left open after Close
+ * Shop keeps the screen on all night (#41).
+ */
+export function shouldKeepAwake(view: CustomerView): boolean {
+  return (
+    view.ticket?.status === "called" ||
+    (view.ticket?.status === "waiting" && view.shop.dayStarted)
   );
 }
 
@@ -77,21 +94,16 @@ export function nextPageAlerts(
 ): PageAlerts {
   const before = previous.ticket;
   const after = next.ticket;
-  // A different Ticket — a join, a Rejoin — is a new place, not a move.
+  // A different Ticket — a join, a Rejoin — is a new place, not a move. Close
+  // Shop carrying a Ticket to the front of the next Queue Day needs no rule of
+  // its own: that day has not started, so the Heads-up is not reached until its
+  // first Call next, which is the move the page alerts for (#41).
   const sameTicket = before !== null && after !== null && before.id === after.id;
-  // Close Shop puts a carried Ticket at the front of the next Queue Day. That is
-  // not a move up either: the Customer chose to come back tomorrow, and the
-  // database stamps no Heads-up at closing time for the same reason (#11).
-  // A tab that slept through Close Shop and wakes inside the threshold stays
-  // quiet too; it only wakes when the Customer comes back to it, so they are
-  // looking at the banner, and the server's own Heads-up push still reaches them.
-  const carriedTonight = sameTicket && !before.carriedOver && after.carriedOver;
 
   let { headsUpTicketId, ringingTicketId } = alerts;
 
   if (
     sameTicket &&
-    !carriedTonight &&
     headsUpTicketId !== after.id &&
     before.status === "waiting" &&
     !isHeadsUpReached(previous) &&

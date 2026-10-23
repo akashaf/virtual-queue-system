@@ -25,6 +25,7 @@ export function Waiting({
   estimate,
   dict,
   headsUp,
+  dayStarted,
   lastCall,
   pushStatus,
   onTurnOnPush,
@@ -40,6 +41,8 @@ export function Waiting({
   dict: Dictionary;
   /** Inside the Heads-up Threshold: time to walk back. */
   headsUp: boolean;
+  /** The Queue Day has had its first Call next; before that nobody heads back yet. */
+  dayStarted: boolean;
   /** Last Call is on: the shop is closing soon, and this Ticket must choose. */
   lastCall: boolean;
   /** Whether push alerts are on, or the page's sound is all there is. */
@@ -80,6 +83,14 @@ export function Waiting({
             {dict.headBackNow}
           </AlertTitle>
         </Alert>
+      ) : null}
+      {!dayStarted && !lastCall ? (
+        // In place of the banner, and as calm as it: after Close Shop the next
+        // day's front Tickets wait all night with nobody being called (#41).
+        // Not beside the Last Call question, which says the shop is closing.
+        <p className="text-center text-base text-balance">
+          {ticket.position === 0 ? dict.notCallingYetFirst : dict.notCallingYet}
+        </p>
       ) : null}
       {lastCall ? (
         <LastCallChoiceCard

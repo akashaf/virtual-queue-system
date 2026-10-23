@@ -5,14 +5,21 @@ import {
   initialPageAlerts,
   isHeadsUpReached,
   nextPageAlerts,
+  shouldKeepAwake,
   NO_PAGE_ALERTS,
   type PageAlerts,
 } from "./alerts";
 
 type Ticket = NonNullable<CustomerView["ticket"]>;
 
-/** A view with a threshold of 2, holding the given Ticket (or none). */
-function view(ticket: Partial<Ticket> | null): CustomerView {
+/**
+ * A view with a threshold of 2, in a Queue Day that has had its first Call next
+ * unless `shop` says otherwise, holding the given Ticket (or none).
+ */
+function view(
+  ticket: Partial<Ticket> | null,
+  shop: Partial<CustomerView["shop"]> = {},
+): CustomerView {
   return {
     shop: {
       id: "s-1",
@@ -21,6 +28,8 @@ function view(ticket: Partial<Ticket> | null): CustomerView {
       joiningState: "open",
       waitingCount: 5,
       headsUpThreshold: 2,
+      dayStarted: true,
+      ...shop,
     },
     ticket: ticket && {
       id: "t-1",
@@ -58,6 +67,38 @@ describe("isHeadsUpReached", () => {
     expect(isHeadsUpReached(view({ status: "called", position: 0 }))).toBe(false);
     expect(isHeadsUpReached(view({ status: "served", position: 0 }))).toBe(false);
     expect(isHeadsUpReached(view(null))).toBe(false);
+  });
+
+  test("is false before the Queue Day's first Call next, however near the front", () => {
+    // After Close Shop the next day's front Tickets sit inside the threshold all
+    // night; nobody is being served, so nobody should head back yet (#41).
+    expect(isHeadsUpReached(view({ position: 0 }, { dayStarted: false }))).toBe(false);
+    expect(
+      isHeadsUpReached(view({ position: 0, carriedOver: true }, { dayStarted: false })),
+    ).toBe(false);
+  });
+});
+
+describe("shouldKeepAwake", () => {
+  test("holds the screen for a Waiting Ticket once the day has started, and in the chair", () => {
+    expect(shouldKeepAwake(view({ position: 5 }))).toBe(true);
+    expect(shouldKeepAwake(view({ status: "called", position: 0 }))).toBe(true);
+  });
+
+  test("lets the screen sleep for a Waiting Ticket before the first Call next", () => {
+    // After Close Shop the page would otherwise keep the screen on all night (#41).
+    expect(shouldKeepAwake(view({ position: 0 }, { dayStarted: false }))).toBe(false);
+  });
+
+  test("still holds it in the chair, whatever the day", () => {
+    expect(
+      shouldKeepAwake(view({ status: "called", position: 0 }, { dayStarted: false })),
+    ).toBe(true);
+  });
+
+  test("lets it sleep once the Ticket has ended, or with no Ticket", () => {
+    expect(shouldKeepAwake(view({ status: "served", position: 0 }))).toBe(false);
+    expect(shouldKeepAwake(view(null))).toBe(false);
   });
 });
 
@@ -112,13 +153,33 @@ describe("nextPageAlerts: Heads-up", () => {
 
   test("does not fire when Close Shop carries the Ticket to the front of the next day", () => {
     // The Customer chose to come back tomorrow; "head back now" at closing time
-    // would be wrong, which is why close_shop stamps nobody either (#11).
+    // would be wrong. The next day has not started, which is what keeps it quiet.
     const alerts = watch(
       view({ position: 5, lastCallChoice: "carry" }),
-      view({ position: 0, carriedOver: true }),
+      view({ position: 0, carriedOver: true }, { dayStarted: false }),
     );
 
     expect(alerts.headsUpTicketId).toBeNull();
+  });
+
+  test("does not fire overnight as the Ticket moves up a day that has not started", () => {
+    const alerts = watch(
+      view({ position: 3 }, { dayStarted: false }),
+      view({ position: 1 }, { dayStarted: false }),
+    );
+
+    expect(alerts.headsUpTicketId).toBeNull();
+  });
+
+  test("fires when the day starts with the Ticket already inside the threshold", () => {
+    // The first Call next: the carried Ticket ahead is Called, this one moves to
+    // the front, and the day starts in the same view.
+    const alerts = watch(
+      view({ position: 1, carriedOver: true }, { dayStarted: false }),
+      view({ position: 0, carriedOver: true }),
+    );
+
+    expect(alerts.headsUpTicketId).toBe("t-1");
   });
 
   test("fires for a Carried-over Ticket that later crosses into the threshold", () => {
