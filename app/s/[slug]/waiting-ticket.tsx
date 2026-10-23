@@ -55,17 +55,19 @@ export function Waiting({
 }) {
   return (
     <div className="flex flex-1 flex-col gap-4" aria-live="polite">
-      <TicketCard ticket={ticket} dict={dict} outOfDate={outOfDate} />
       {outOfDate ? (
-        // Under the Ticket it is about (frontend.md §3.1). No role of its own:
-        // the Waiting view is already a live region.
+        // Above the Ticket, so it is read before the number it qualifies
+        // (frontend.md §3.1). No role of its own: the Waiting view is already
+        // a live region.
         <OutOfDateNotice
+          tone="strong"
           title={dict.outOfDateTitle}
           detail={format(dict.outOfDateAsOf, { time: formatMalaysiaTime(updatedAt) })}
           retryLabel={dict.retry}
           onRetry={onRetry}
         />
       ) : null}
+      <TicketCard ticket={ticket} dict={dict} outOfDate={outOfDate} />
       {estimate ? (
         <p className="text-center text-sm text-muted-foreground">
           {estimateLabel(estimate, dict)}
@@ -108,7 +110,14 @@ function TicketCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center gap-3 text-center">
+      {/* Dimmed whole while out of date: a number and a count that may have
+          moved on should not read as confidently as current ones. */}
+      <CardContent
+        className={cn(
+          "flex flex-col items-center gap-3 text-center transition-opacity",
+          outOfDate && "opacity-60",
+        )}
+      >
         <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
           {dict.yourNumber}
         </p>
@@ -120,12 +129,7 @@ function TicketCard({
         {ticket.carriedOver ? (
           <Badge variant="secondary">{dict.carriedOverBadge}</Badge>
         ) : null}
-        {/* Dimmed while out of date: a count that may have moved on should not
-            read as confidently as one that is current. */}
-        <Badge
-          variant="waiting"
-          className={cn("px-3 py-1 text-base whitespace-normal", outOfDate && "opacity-60")}
-        >
+        <Badge variant="waiting" className="px-3 py-1 text-base whitespace-normal">
           {aheadLabel(ticket.position, dict)}
         </Badge>
       </CardContent>

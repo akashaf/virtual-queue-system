@@ -163,7 +163,7 @@ Dark mode follows the device and is a full second token set, not an inversion. E
 A warm, paper-and-ink base with one burgundy voice and a four-colour status code.
 
 ### Primary
-- **Barber Burgundy** (`barber-burgundy`): the shop's own colour. Filled primary buttons (Call next, Join queue, I'm coming), the Heads-up banner ("Head back to the shop now"), the selected Last Call choice, the filled Last Call badge, and the border of the Last Call question card. In dark mode it lifts to `oklch(0.52 0.16 15)` so it still reads on near-black.
+- **Barber Burgundy** (`barber-burgundy`): the shop's own colour. Filled primary buttons (Call next, Join queue, Stop the alert), the Heads-up banner ("Head back to the shop now"), the selected Last Call choice, the filled Last Call badge, and the border of the Last Call question card. In dark mode it lifts to `oklch(0.52 0.16 15)` so it still reads on near-black.
 - **Focus Ring** (`focus-ring`): a lighter burgundy for keyboard focus rings at 50% opacity, 3px wide.
 
 ### Secondary
@@ -249,7 +249,7 @@ Big, calm, sure: large flat targets with a light border, and one strong button p
 ### Buttons
 - **Shape:** gently rounded (0.5rem).
 - **Primary:** Barber Burgundy fill, near-white text, 500 weight. Hover takes the fill to 90% opacity.
-- **Sizes in use:** the shadcn default is 2.25rem, but app buttons are always raised to 2.75rem (`h-11`) or more: 3rem for Join queue and the Last Call choices, 3.5rem with 1.125rem semibold text for Call next and "I'm coming".
+- **Sizes in use:** the shadcn default is 2.25rem, but app buttons are always raised to 2.75rem (`h-11`) or more: 3rem for Join queue and the Last Call choices, 3.5rem with 1.125rem semibold text for Call next and "Stop the alert".
 - **Outline:** Warm Paper with a Hairline border; hover fills Blush Accent. Used for secondary actions (Last Call, the menu button, the unchosen Last Call option).
 - **Destructive:** Ember fill, white text. Always behind a confirmation dialog.
 - **Focus:** 3px Focus Ring at 50% opacity plus a ring-coloured border.
@@ -278,10 +278,15 @@ Big, calm, sure: large flat targets with a light border, and one strong button p
 The dashboard has no nav bar: one 2.75rem outline menu button in the header opens a dropdown (Queue, History, Sign out), each item at least 2.75rem tall with a leading Lucide icon. The Customer page has no navigation at all; only the EN | BM toggle.
 
 ### Called Screen (signature)
-The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 1.5rem, then a 3.5rem burgundy "I'm coming" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.
+The one state a Customer must notice from across a room. A fixed, full-viewport Turn Amber flood with the dark amber foreground; "It's your turn" as headline, the ticket number at `ticket-number-called`, "Go to the counter" at 1.5rem, then a 3.5rem burgundy "Stop the alert" button (only while the chime rings) and a transparent Leave button outlined in the foreground at 40%. Announced with `role="alert"` and `aria-live="assertive"`.
 
 ### Ticket Card (signature)
 The Waiting state: a centred card with the eyebrow "Your number", the ticket number, an optional "Moved from previous day" secondary chip, and a Waiting Blue chip saying how many are ahead. The Heads-up banner sits directly beneath it as a full burgundy block.
+
+### Out-of-date Notice
+Said only while a live screen has stopped hearing from the server: a Lucide wifi-off icon, "Not up to date", "As of 3:42 pm. Trying again…" and a Retry button, in neutral ink, never a status colour (nothing about any one Ticket changed). Two tones from one component (`components/out-of-date-notice.tsx`):
+- **Quiet** (Owner's board): Blush Muted fill, 1px Hairline, 0.875rem text, outline Retry. The Owner is looking at the board anyway.
+- **Strong** (Customer page): the ink inverted, near-black on light and light on dark, 1rem semibold title, secondary Retry, placed *above* the Ticket Card, which dims to 60% beneath it. The open page is the alert of last resort, and the quiet tone went unnoticed under a confident ticket number on a real phone.
 
 ## Do's and Don'ts
 
