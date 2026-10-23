@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useSyncExternalStore } from "react";
+import { classifyActionFailure } from "@/lib/action-failure";
 import {
   checkCustomerName,
   isFinalStatus,
@@ -468,18 +469,18 @@ function rejectionMessage(reason: CustomerError | "failed", dict: Dictionary): s
 }
 
 /**
- * A Server Action call that never throws. A failed fetch is a TypeError:
- * offline, or the request died on the way, and it may still have landed.
- * Anything else — a gateway's error page, say — is reported, and is a plain
- * failure. Either way the page leaves its busy screen rather than hanging there.
+ * A Server Action call that never throws (`lib/action-failure.ts` says what a
+ * throw means). A page from an older build reloads, and this never settles, so
+ * the busy screen stays up until it does; otherwise the page leaves its busy
+ * screen rather than hanging there.
  */
 async function reachServer<T>(run: () => Promise<T>): Promise<T | "unreachable" | "failed"> {
   try {
     return await run();
   } catch (error) {
-    if (error instanceof TypeError) return "unreachable";
-    reportUnexpected("customer action", error);
-    return "failed";
+    const failure = await classifyActionFailure(error);
+    if (failure === "failed") reportUnexpected("customer action", error);
+    return failure;
   }
 }
 

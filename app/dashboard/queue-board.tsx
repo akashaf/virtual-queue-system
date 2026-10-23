@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { OutOfDateNotice } from "@/components/out-of-date-notice";
+import { classifyActionFailure } from "@/lib/action-failure";
 import { REFETCH_TIMEOUT_MS, useCatchUp, useOutOfDate } from "@/lib/out-of-date";
 import { useQueueChanged } from "@/lib/queue-changed";
 import { formatTicketLabel } from "@/lib/ticket";
@@ -312,11 +313,11 @@ function useOwnerAction<T>(
         return await action(previous, formData);
       } catch (error) {
         // Thrown, either would reach global-error.tsx and take the whole board
-        // down with it. A failed fetch is a TypeError: offline, or the request
-        // died on the way. Anything else is the server's fault, not the wifi's.
-        if (error instanceof TypeError) return { ok: false, reason: "unreachable" } as const;
-        Sentry.captureException(error);
-        return { ok: false, reason: "failed" } as const;
+        // down with it. A board from an older build reloads, and this stays
+        // pending until it does (`lib/action-failure.ts`).
+        const failure = await classifyActionFailure(error);
+        if (failure === "failed") Sentry.captureException(error);
+        return { ok: false, reason: failure } as const;
       }
     },
     null,

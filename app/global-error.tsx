@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
+import { reloadIfFromOlderBuild } from "@/lib/action-failure";
 import { dictionaries } from "@/lib/i18n";
 import "./globals.css";
 
@@ -22,6 +23,9 @@ export default function GlobalError({
   retry: () => void;
 }) {
   useEffect(() => {
+    // A form's Server Action from a page left open across a deploy (the EN | BM
+    // toggle, sign-in, sign-out): the page's code is stale, not broken.
+    if (reloadIfFromOlderBuild(error)) return;
     Sentry.captureException(error);
   }, [error]);
 

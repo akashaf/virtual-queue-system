@@ -184,6 +184,18 @@ Add to this file when something surprises you; it is cheaper than finding it twi
 
 ## Sentry
 
+- **Agents can read production errors through `$SENTRY_READ_TOKEN`**, a personal token with
+  only Project, Organization and Issue & Event *Read*, set in the user's `~/.zshrc`. A shell
+  started before it was added does not see it: wrap calls in `zsh -ic '…'`, and reference the
+  variable, never its value. The organisation is `akashaf` on `https://us.sentry.io`, the project
+  `virtual-queue-system`. Recent issues:
+  `curl -H "Authorization: Bearer $SENTRY_READ_TOKEN" "https://us.sentry.io/api/0/organizations/akashaf/issues/?query=is:unresolved&statsPeriod=14d&sort=date"`,
+  and an issue's events, with stack and breadcrumbs, at `…/issues/<id>/events/?full=true`.
+  Each event's `release` tag is the deployed commit, which is how a report is tied to a deploy.
+- **A page left open across a deploy calls Server Actions the new build does not know.** Every
+  press answers 404 *Server Action "…" was not found on the server*. Netlify serves only the
+  newest build, so Next's `deploymentId` cannot help; `lib/action-failure.ts` reloads the page
+  instead, and `app/global-error.tsx` does the same for a form's action. Expect a burst of these right after a push if someone had a page open.
 - **`@sentry/nextjs` warns on every build** unless `instrumentation-client.ts` exports
   `onRouterTransitionStart`, even with tracing off, and `withSentryConfig` must come from
   `@sentry/nextjs/config` (the root export is deprecated for v11). `next typegen` prints both.
