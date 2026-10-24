@@ -120,12 +120,12 @@ describe("dispatchAlerts", () => {
         ms: `Makluman giliran: giliran anda hampir tiba (${formatTicketNumber(next.number)}). Sila kembali ke kedai sekarang.`,
       },
       ttl: 600,
-      priority: 5,
+      priority: 10,
       web_push_topic: "heads_up",
     });
   });
 
-  test("the slower kinds say what happened and keep for an hour", async () => {
+  test("the slower kinds say what happened, keep for an hour, and go at normal priority", async () => {
     const { shop } = await createShop();
     const ticket = await join(shop.slug);
 
@@ -134,6 +134,7 @@ describe("dispatchAlerts", () => {
     await dispatchAlerts([{ ticketId: ticket.id, kind: "shop_closed" }], send);
 
     expect(send.mock.calls.map(([notification]) => notification.ttl)).toEqual([3600, 3600]);
+    expect(send.mock.calls.map(([notification]) => notification.priority)).toEqual([5, 5]);
     expect(send.mock.calls.map(([notification]) => notification.contents)).toEqual([
       {
         en: "Queue alert: the shop is closing soon. Open the page to stay in the queue or move to the next day.",

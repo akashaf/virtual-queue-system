@@ -304,7 +304,7 @@ Device cookie `vq_device`:
 ### Push dispatch (`lib/push.ts`)
 - `dispatchAlerts(alerts)`:
   1. Load the alerted Tickets' numbers and Shops.
-  2. Send one OneSignal notification per alert (`POST https://api.onesignal.com/notifications`), to `include_aliases.external_id = [ticketId]` on the `push` channel. TTL 10 min for `called` and `heads_up`, 1 h for the others; priority 10 for `called`, 5 otherwise; `web_push_topic` is the kind, so a newer alert of a kind replaces the older one.
+  2. Send one OneSignal notification per alert (`POST https://api.onesignal.com/notifications`), to `include_aliases.external_id = [ticketId]` on the `push` channel. TTL 10 min for `called` and `heads_up`, 1 h for the others; priority 10 for `called` and `heads_up`, 5 otherwise; `web_push_topic` is the kind, so a newer alert of a kind replaces the older one.
   3. Write one `push_sends` row per alert: `sent` with OneSignal's id, `no_subscriber` when OneSignal answers with an empty id, `error` when it refuses or cannot be reached.
   4. Report errors to Sentry, with the status code only.
 - Text: `headings` is the Shop's name and `contents` the message (`pushHeadsUp`, `pushCalled`, `pushLastCall`, `pushShopClosed` in `lib/i18n`), both as `{ en, ms }`. OneSignal shows the language the page set with `OneSignal.User.setLanguage`. `url` is `{APP_BASE_URL}/s/{slug}`.

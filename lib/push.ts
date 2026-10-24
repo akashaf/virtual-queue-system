@@ -81,7 +81,9 @@ export type PushSender = (notification: OneSignalNotification) => Promise<SendRe
 /**
  * How long OneSignal and the push service hold an undelivered notification.
  * "Almost your turn" and "your turn" are stale news within minutes; the
- * closing-time kinds are still worth reading within the hour.
+ * closing-time kinds are still worth reading within the hour. The urgent kinds
+ * also go at high priority: Apple can hold a normal-priority push on a locked
+ * iPhone until it expires unseen (#42).
  */
 const URGENT_TTL_SECONDS = 600;
 const SLOW_TTL_SECONDS = 3_600;
@@ -150,7 +152,7 @@ export async function dispatchAlerts(
         contents: { en: text("en"), ms: text("ms") },
         url: `${baseUrl}/s/${ticket.shop.slug}`,
         ttl: urgent ? URGENT_TTL_SECONDS : SLOW_TTL_SECONDS,
-        priority: alert.kind === "called" ? 10 : 5,
+        priority: urgent ? 10 : 5,
         // A newer alert of the same kind replaces the older one, as `tag` did.
         web_push_topic: alert.kind,
       };
