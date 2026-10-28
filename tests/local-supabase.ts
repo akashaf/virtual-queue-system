@@ -21,8 +21,12 @@ export function readLocalSupabase(): LocalSupabase {
     });
     status = JSON.parse(out.slice(out.indexOf("{")));
   } catch (error) {
+    // With Colima stopped, `db:start` fails too, so name the step before it (gotchas.md).
+    const dockerDown = String((error as { stderr?: unknown }).stderr ?? "").includes("docker.sock");
     throw new Error(
-      "Local Supabase is not running. Start it with `bun run db:start` before running these tests.",
+      dockerDown
+        ? "Docker is down. Run `colima start`, then `bun run db:start`, before running these tests."
+        : "Local Supabase is not running. Start it with `bun run db:start` before running these tests.",
       { cause: error },
     );
   }

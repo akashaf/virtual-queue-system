@@ -6,6 +6,7 @@
 #   scripts/sentry.sh issues          unresolved issues of the last 14 days, newest first
 #   scripts/sentry.sh since [sha]     issues first seen on that deployed commit (default HEAD)
 #   scripts/sentry.sh events <id>     one issue's latest events: release, browser, stack, breadcrumbs
+#   scripts/sentry.sh csp             Content-Security-Policy reports of the last 14 days, resolved too
 set -eu
 
 api="https://us.sentry.io/api/0/organizations/akashaf"
@@ -75,8 +76,35 @@ if events:
                 print("  ", (crumb.get("timestamp") or "")[11:19], crumb.get("category"), detail[:110])
 '
     ;;
+  csp)
+    # Reports are issues of type csp, not the Feed, and an issue already reviewed is resolved,
+    # which `issues` would hide. Each report line: when, browser, what was blocked, by which
+    # directive, on which page, and whether it was blocked (enforce) or only reported.
+    get "issues/?query=event.type:csp&statsPeriod=14d&sort=date&limit=25"
+    ids=$(printf %s "$body" | python3 -c '
+import json, sys
+issues = json.load(sys.stdin)
+if not issues:
+    print("sentry: no csp reports")
+for x in issues:
+    print(x["id"])
+')
+    for id in $ids; do
+      get "issues/$id/events/?full=true&statsPeriod=14d&limit=100"
+      printf %s "$body" | python3 -c '
+import json, sys
+for e in json.load(sys.stdin):
+    tags = {t["key"]: t["value"] for t in e.get("tags", [])}
+    for entry in e["entries"]:
+        if entry["type"] == "csp":
+            d = entry["data"]
+            print(e["dateCreated"][:16], tags.get("browser"), "|", d.get("blocked_uri"), "|",
+                  d.get("effective_directive"), "|", d.get("document_uri"), "|", d.get("disposition"))
+'
+    done
+    ;;
   *)
-    sed -n '6,8p' "$0" | sed 's/^# *//'
+    sed -n '6,9p' "$0" | sed 's/^# *//'
     exit 2
     ;;
 esac

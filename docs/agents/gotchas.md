@@ -196,6 +196,10 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   before it was added (an interactive zsh prints "Restored session: …" before it, which is why
   it keeps the last line). Organisation `akashaf` on `us.sentry.io`, project
   `virtual-queue-system`. Each event's `release` is the deployed commit.
+- **Content-Security-Policy reports are Sentry issues, not the Feed.** Read them with
+  `scripts/sentry.sh csp`, which includes resolved ones (`issues` hides those). In the web UI,
+  search issues for `event.type:csp`:
+  https://akashaf.sentry.io/issues/?query=event.type%3Acsp&statsPeriod=14d
 - **A page left open across a deploy calls Server Actions the new build does not know.** Every
   press answers 404 *Server Action "…" was not found on the server*. Netlify serves only the
   newest build, so Next's `deploymentId` cannot help; `lib/action-failure.ts` reloads the page
