@@ -11,12 +11,11 @@ export { SHOP_LAT, SHOP_LNG };
  * Playwright's `test`, failing any test in which a page breaks the
  * Content-Security-Policy (third-party.md §9). Every spec imports it from here.
  *
- * The policy is report-only until #36 enforces it, so a violation blocks
- * nothing and the page works regardless: the browser's
- * `securitypolicyviolation` event is the only place it shows. Watching every
- * test means #36 starts from pages known to be clean, not from a week of
- * reports. Contexts a test opens itself through `browser.newContext` are
- * watched too.
+ * The policy is enforced, so a violation blocks the script or connection,
+ * and the page may fail later in a way that looks unrelated. The browser's
+ * `securitypolicyviolation` event names the real cause, so every test fails
+ * on it directly. Contexts a test opens itself through `browser.newContext`
+ * are watched too.
  */
 export const test = base.extend<{ cspViolations: string[] }>({
   cspViolations: [

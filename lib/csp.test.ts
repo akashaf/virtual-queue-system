@@ -12,7 +12,7 @@ const PRODUCTION_POLICY = directives(cspHeaders(PRODUCTION));
 
 /** The policy's directives, keyed by name, each a list of its sources. */
 function directives(headers: Record<string, string>): Record<string, string[]> {
-  const policy = headers["Content-Security-Policy-Report-Only"];
+  const policy = headers["Content-Security-Policy"];
   return Object.fromEntries(
     policy
       .split(";")
@@ -86,7 +86,7 @@ describe("cspHeaders", () => {
     expect(directives(headers)["report-uri"]).toBeUndefined();
     expect(directives(headers)["report-to"]).toBeUndefined();
     expect(headers["Reporting-Endpoints"]).toBeUndefined();
-    expect(headers["Content-Security-Policy-Report-Only"]).not.toContain("sentry");
+    expect(headers["Content-Security-Policy"]).not.toContain("sentry");
   });
 
   test("reaches local Supabase over plain HTTP and WebSocket", () => {

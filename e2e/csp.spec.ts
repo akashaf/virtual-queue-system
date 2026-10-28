@@ -14,15 +14,13 @@ test.use({
   permissions: ["geolocation", "notifications"],
 });
 
-test("pages are sent a report-only policy and no enforcing one", async ({ request }) => {
+test("pages are sent an enforcing policy and no report-only one", async ({ request }) => {
   const { shop } = await seedShop();
 
   for (const path of ["/login", `/s/${shop.slug}`]) {
     const response = await request.get(path);
-    expect(response.headers()["content-security-policy-report-only"], path).toContain(
-      "'strict-dynamic'",
-    );
-    expect(response.headers()["content-security-policy"], path).toBeUndefined();
+    expect(response.headers()["content-security-policy"], path).toContain("'strict-dynamic'");
+    expect(response.headers()["content-security-policy-report-only"], path).toBeUndefined();
   }
 });
 

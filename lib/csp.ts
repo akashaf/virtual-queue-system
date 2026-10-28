@@ -86,7 +86,7 @@ export function cspHeaders({
   }
 
   return {
-    "Content-Security-Policy-Report-Only": Object.entries(policy)
+    "Content-Security-Policy": Object.entries(policy)
       .map(([name, sources]) => [name, ...sources].join(" "))
       .join("; "),
     ...(reportUrl ? { "Reporting-Endpoints": `${REPORT_GROUP}="${reportUrl}"` } : {}),

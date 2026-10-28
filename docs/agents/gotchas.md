@@ -49,10 +49,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   Every screen that refetches a view orders it through `createViewOrder` (`lib/view-order.ts`),
   which drops a refetch sent before a newer view was shown (#31, #32); a new screen needs it too.
 
-- **A new source the page loads must go into `lib/csp.ts`.** Every page carries a
-  Content-Security-Policy (report-only until #36 enforces it), so nothing visibly breaks: the
-  browser only raises a `securitypolicyviolation` event. The `test` in `e2e/helpers.ts` fails
-  any e2e test that raises one, which is how the alert chimes' `blob:` URLs were found. An
+- **A new source the page loads must go into `lib/csp.ts`.** Every page carries an enforcing
+  Content-Security-Policy, so the browser blocks the source, and what breaks is often further
+  along (a sound that never plays, a subscription that never arrives). The `test` in
+  `e2e/helpers.ts` fails any e2e test that raises a `securitypolicyviolation`, which names
+  the source; that is how the alert chimes' `blob:` URLs were found. An
   inline `<script>` needs the nonce from the `x-nonce` request header, as `app/layout.tsx`
   passes it to next-themes.
 
@@ -237,6 +238,11 @@ Add to this file when something surprises you; it is cheaper than finding it twi
   Management API on production, not even through a helper script (the user's ruling after the
   #37 retro). Production settings and logs come from the user, via the dashboard or a
   `!` command they run. The one exception is `bunx supabase db push --dry-run` before a push.
+- **Keep the Netlify toolbar off.** Netlify injects its toolbar script into every page for
+  every visitor, without our nonce, so the enforcing Content-Security-Policy blocks it and
+  Sentry gets a report from each page view. It was turned off in the site's dashboard on
+  2026-10-22. On a new site, or if it comes back, turn it off again rather than allowing it in
+  `lib/csp.ts` (#36).
 - **`netlify env:set --scope` fails silently on the Free plan**: no output, exit 0, nothing
   written. Always confirm with `netlify env:list --context production`.
 - **Netlify secret values are write-only.** You cannot read one back to check it, so a key is
